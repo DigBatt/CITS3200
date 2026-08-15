@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>body{margin:0;background:#faf9f7;font-family:Sora,system-ui,sans-serif}a{color:oklch(0.5 0.15 300)}a:hover{color:oklch(0.4 0.15 300)}.leaflet-container{font-family:Sora,system-ui,sans-serif;background:#eeece7}.nw-pin{display:flex;align-items:center;gap:6px;padding:4px 8px 4px 5px;border-radius:7px;font:600 11.5px Sora;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.22)}</style></helmet>
+
+<div style="display:flex;flex-direction:column;min-height:100vh;background:#faf9f7;color:#1c1917">
+
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 16px;background:#fff;border-bottom:1px solid rgba(28,25,23,.10);position:sticky;top:0;z-index:500">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font:700 16px Sora;letter-spacing:-.02em">nuway</span><span style="font:500 10px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.45);letter-spacing:.08em">SHUTTLE OPS</span></div>
+<div style="display:flex;gap:2px;background:rgba(28,25,23,.05);padding:3px;border-radius:8px">
+<div onClick="{{ goFleet }}" style="{{ tabFleet }}">Fleet</div>
+<div onClick="{{ goOperator }}" style="{{ tabOperator }}">Operator</div>
+<div onClick="{{ goRider }}" style="{{ tabRider }}">Rider</div>
+<div onClick="{{ goUtil }}" style="{{ tabUtil }}">Utilisation</div>
+</div>
+<div style="flex:1;min-width:8px"></div>
+<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid rgba(28,25,23,.14);border-radius:7px"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.66 0.15 155)"></span><span style="font:500 12px Sora">Live</span><span style="font:400 11px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.45)">{{ clock }}</span></div>
+<div style="width:30px;height:30px;border-radius:50%;background:oklch(0.62 0.17 300);color:#fff;display:flex;align-items:center;justify-content:center;font:600 11px Sora">JD</div>
+</div>
+
+<div style="display:flex;gap:8px;padding:10px 16px;overflow-x:auto;background:#fff;border-bottom:1px solid rgba(28,25,23,.08);align-items:center">
+<span style="flex:none;font:500 10px Sora;letter-spacing:.05em;color:rgba(28,25,23,.45)">DAY</span>
+<sc-for list="{{ days }}" as="d" hint-placeholder-count="7">
+<div onClick="{{ d.pick }}" style="{{ d.style }}">{{ d.label }}</div>
+</sc-for>
+<span style="flex:none;width:10px"></span>
+<span style="flex:none;font:500 10px Sora;letter-spacing:.05em;color:rgba(28,25,23,.45)">VEHICLE</span>
+<sc-for list="{{ filters }}" as="f" hint-placeholder-count="5">
+<div onClick="{{ f.pick }}" style="{{ f.style }}">{{ f.label }}</div>
+</sc-for>
+</div>
+
+<sc-if value="{{ showMap }}" hint-placeholder-val="{{ true }}">
+<div style="flex:1;display:flex;flex-wrap:wrap;align-items:stretch;min-height:0">
+
+<div style="flex:1 1 300px;min-width:280px;max-width:100%;background:#fff;border-right:1px solid rgba(28,25,23,.10);display:flex;flex-direction:column">
+<sc-if value="{{ showFleetPanel }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column">
+<div style="display:flex;align-items:baseline;justify-content:space-between;padding:16px 18px 12px"><span style="font:600 12px Sora;letter-spacing:.02em">Vehicles</span><span style="font:400 11px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.45)">{{ activeLabel }}</span></div>
+<sc-for list="{{ vehicleRows }}" as="v" hint-placeholder-count="4">
+<div onClick="{{ v.pick }}" style="{{ v.rowStyle }}">
+<div style="flex:1;display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font:600 13.5px Sora">{{ v.id }}</span><span style="{{ v.badgeStyle }}">{{ v.badge }}</span></div>
+<div style="font:400 11.5px Sora;color:rgba(28,25,23,.55)">{{ v.note }}</div>
+<div style="display:flex;gap:14px;font:400 11px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.5)"><span>{{ v.speed }}</span><span>{{ v.batt }}</span><span>{{ v.pax }}</span></div>
+</div>
+<div style="{{ v.chipStyle }}">{{ v.num }}</div>
+</div>
+</sc-for>
+<div style="padding:14px 18px;border-top:1px solid rgba(28,25,23,.08);display:flex;flex-direction:column;gap:10px">
+<span style="font:600 11px Sora;letter-spacing:.04em;color:rgba(28,25,23,.5)">MAP LAYERS</span>
+<sc-for list="{{ layerRows }}" as="l" hint-placeholder-count="4">
+<div onClick="{{ l.toggle }}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;padding:2px 0">
+<span style="font:500 12px Sora">{{ l.label }}</span>
+<span style="{{ l.trackStyle }}"><span style="{{ l.knobStyle }}"></span></span>
+</div>
+</sc-for>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:rgba(28,25,23,.09);border-top:1px solid rgba(28,25,23,.09)">
+<div style="background:#fff;padding:13px 14px;display:flex;flex-direction:column;gap:4px"><span style="font:500 9.5px Sora;letter-spacing:.05em;color:rgba(28,25,23,.5)">UPTIME</span><span style="font:600 18px Sora">{{ kpiUptime }}</span></div>
+<div style="background:#fff;padding:13px 14px;display:flex;flex-direction:column;gap:4px"><span style="font:500 9.5px Sora;letter-spacing:.05em;color:rgba(28,25,23,.5)">EFF. UTIL.</span><span style="font:600 18px Sora">{{ kpiEff }}</span></div>
+<div style="background:#fff;padding:13px 14px;display:flex;flex-direction:column;gap:4px"><span style="font:500 9.5px Sora;letter-spacing:.05em;color:rgba(28,25,23,.5)">DISENGAGE</span><span style="font:600 18px Sora">{{ kpiDis }}</span></div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ showOperatorPanel }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column">
+<div style="padding:18px 18px 14px;border-bottom:1px solid rgba(28,25,23,.08);display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;gap:10px"><span style="font:600 18px Sora;letter-spacing:-.02em">{{ opId }}</span><span style="{{ opBadgeStyle }}">{{ opBadge }}</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(28,25,23,.09);border:1px solid rgba(28,25,23,.09);border-radius:8px;overflow:hidden">
+<div style="background:#fff;padding:11px 13px;display:flex;flex-direction:column;gap:3px"><span style="font:500 9.5px Sora;letter-spacing:.05em;color:rgba(28,25,23,.5)">SPEED</span><span style="font:600 16px 'IBM Plex Mono',monospace">{{ opSpeed }}</span></div>
+<div style="background:#fff;padding:11px 13px;display:flex;flex-direction:column;gap:3px"><span style="font:500 9.5px Sora;letter-spacing:.05em;color:rgba(28,25,23,.5)">BATTERY</span><span style="font:600 16px 'IBM Plex Mono',monospace">{{ opBatt }}</span></div>
+<div style="background:#fff;padding:11px 13px;display:flex;flex-direction:column;gap:3px"><span style="font:500 9.5px Sora;letter-spacing:.05em;color:rgba(28,25,23,.5)">OCCUPANCY</span><span style="font:600 16px 'IBM Plex Mono',monospace">{{ opPax }}</span></div>
+<div style="background:#fff;padding:11px 13px;display:flex;flex-direction:column;gap:3px"><span style="font:500 9.5px Sora;letter-spacing:.05em;color:rgba(28,25,23,.5)">LAST PACKET</span><span style="font:600 16px 'IBM Plex Mono',monospace">{{ opPacket }}</span></div>
+</div>
+<sc-if value="{{ hasRequest }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:7px;padding:12px 13px;border:1px solid oklch(0.75 0.15 75 / .45);background:oklch(0.75 0.15 75 / .10);border-radius:8px">
+<span style="font:600 11.5px Sora;color:oklch(0.42 0.12 60)">Rider waiting · {{ requestStop }}</span>
+<span style="font:400 11px Sora;color:rgba(28,25,23,.6)">{{ requestMeta }}</span>
+<div style="display:flex;gap:7px;margin-top:2px"><div onClick="{{ ackRequest }}" style="padding:6px 12px;background:#1c1917;color:#fff;border-radius:6px;cursor:pointer;font:600 11.5px Sora">Acknowledge</div><div onClick="{{ clearRequest }}" style="padding:6px 12px;border:1px solid rgba(28,25,23,.16);border-radius:6px;cursor:pointer;font:500 11.5px Sora">Dismiss</div></div>
+</div>
+</sc-if>
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font:600 11px Sora;letter-spacing:.04em;color:rgba(28,25,23,.5)">AUTONOMY OVER THE DAY</span>
+<div style="display:flex;height:24px;border-radius:5px;overflow:hidden;background:rgba(28,25,23,.06)">
+<sc-for list="{{ autonomySegments }}" as="g" hint-placeholder-count="9"><div style="{{ g.style }}"></div></sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;font:400 10px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.4)"><span>06</span><span>10</span><span>14</span><span>18</span><span>20</span></div>
+</div>
+</div>
+<div style="padding:14px 18px 8px;display:flex;align-items:baseline;justify-content:space-between"><span style="font:600 12px Sora">Event log · {{ dayLabel }}</span><span style="font:400 11px Sora;color:oklch(0.5 0.15 300);cursor:pointer">Export CSV</span></div>
+<sc-for list="{{ eventRows }}" as="e" hint-placeholder-count="5">
+<div onClick="{{ e.focus }}" style="display:flex;gap:11px;padding:11px 18px;border-top:1px solid rgba(28,25,23,.07);cursor:pointer">
+<span style="font:400 11px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.45);width:44px">{{ e.t }}</span>
+<span style="{{ e.dotStyle }}"></span>
+<div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font:600 12px Sora">{{ e.title }}</span><span style="font:400 11px Sora;color:rgba(28,25,23,.55)">{{ e.d }}</span></div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ showRiderPanel }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:14px;padding:18px">
+<div style="display:flex;flex-direction:column;gap:4px"><span style="font:700 15px Sora;letter-spacing:-.02em">nuway shuttle</span><span style="font:400 12px Sora;color:rgba(28,25,23,.55)">Let the shuttle know you're waiting</span></div>
+<div style="display:flex;flex-direction:column;gap:9px;padding:14px;border:1px solid rgba(28,25,23,.12);border-radius:10px">
+<div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.62 0.17 300)"></span><span style="font:500 10.5px Sora;letter-spacing:.05em;color:rgba(28,25,23,.5)">PICK YOUR STOP</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:7px">
+<sc-for list="{{ stopChips }}" as="c" hint-placeholder-count="4"><div onClick="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</div></sc-for>
+</div>
+<span style="font:400 11px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.45)">{{ stopDistance }}</span>
+</div>
+<div onClick="{{ sendRequest }}" style="{{ requestButtonStyle }}">
+<span style="font:600 15px Sora">{{ requestButtonTitle }}</span>
+<span style="font:400 11.5px Sora;opacity:.7">{{ requestButtonSub }}</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:9px">
+<span style="font:600 12px Sora;color:rgba(28,25,23,.55)">Next arrivals</span>
+<sc-for list="{{ arrivals }}" as="a" hint-placeholder-count="2">
+<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid rgba(28,25,23,.08)">
+<span style="width:36px;height:36px;border-radius:9px;background:rgba(28,25,23,.06);color:rgba(28,25,23,.55);display:flex;align-items:center;justify-content:center;font:600 11.5px 'IBM Plex Mono',monospace">{{ a.num }}</span>
+<div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font:600 13px Sora">{{ a.route }}</span><span style="font:400 11.5px Sora;color:rgba(28,25,23,.55)">{{ a.seats }}</span></div>
+<span style="font:600 14px 'IBM Plex Mono',monospace">{{ a.eta }}</span>
+</div>
+</sc-for>
+</div>
+<div style="padding:12px 14px;border-radius:10px;background:rgba(28,25,23,.04);font:400 11.5px/1.5 Sora;color:rgba(28,25,23,.6)">Your request appears instantly in the Operator view. Nothing is stored against you unless you sign in.</div>
+</div>
+</sc-if>
+</div>
+
+<div style="flex:3 1 460px;min-width:300px;min-height:420px;position:relative">
+<div ref="{{ mapRef }}" style="position:absolute;inset:0"></div>
+<div style="position:absolute;left:12px;bottom:12px;z-index:400;display:flex;gap:10px;flex-wrap:wrap;padding:8px 11px;background:rgba(255,255,255,.94);border:1px solid rgba(28,25,23,.10);border-radius:8px;font:400 10.5px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.6)">
+<span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:oklch(0.66 0.15 155)"></span>engaged</span>
+<span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:oklch(0.75 0.15 75)"></span>manual / disengage</span>
+<span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:oklch(0.60 0.19 25)"></span>e-stop</span>
+<span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:rgba(28,25,23,.4)"></span>no signal</span>
+</div>
+<div style="position:absolute;right:12px;top:12px;z-index:400;padding:6px 10px;background:rgba(255,255,255,.94);border:1px solid rgba(28,25,23,.10);border-radius:7px;font:400 10px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.5)">placeholder route — swap for real GPS</div>
+</div>
+
+</div>
+</sc-if>
+
+<sc-if value="{{ showUtil }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:14px;padding:18px 16px">
+
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+<span style="font:600 14px Sora">{{ utilScope }} · week 10–16 Aug 2026</span>
+<div style="display:flex;gap:2px;background:rgba(28,25,23,.05);padding:3px;border-radius:8px">
+<div onClick="{{ showPie }}" style="{{ pieTabStyle }}">Pie</div>
+<div onClick="{{ showTum }}" style="{{ tumTabStyle }}">Time model</div>
+</div>
+<span style="font:400 11px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.45)">GMG 2020 categories · use the vehicle chips above to scope</span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px">
+<sc-for list="{{ kpiCards }}" as="k" hint-placeholder-count="6">
+<div style="background:#fff;border:1px solid rgba(28,25,23,.10);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:5px">
+<span style="font:500 10px Sora;letter-spacing:.05em;color:rgba(28,25,23,.5)">{{ k.label }}</span>
+<span style="font:600 26px Sora;letter-spacing:-.03em">{{ k.value }}</span>
+<span style="font:400 10px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.45)">{{ k.formula }}</span>
+</div>
+</sc-for>
+</div>
+
+<sc-if value="{{ utilIsPie }}" hint-placeholder-val="{{ true }}">
+<div style="background:#fff;border:1px solid rgba(28,25,23,.10);border-radius:10px;padding:20px;display:flex;flex-wrap:wrap;gap:28px;align-items:center">
+<div style="flex:none;position:relative;width:230px;height:230px;border-radius:50%;background:{{ pieGradient }}">
+<div style="position:absolute;inset:58px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px"><span style="font:600 28px Sora;letter-spacing:-.03em">{{ uptime }}</span><span style="font:500 10px Sora;letter-spacing:.05em;color:rgba(28,25,23,.5)">UPTIME</span><span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.4)">AT / CT</span></div>
+</div>
+<div style="flex:1 1 320px;display:flex;flex-direction:column;gap:9px">
+<sc-for list="{{ legend }}" as="l" hint-placeholder-count="7">
+<div style="display:flex;align-items:center;gap:10px;font:500 12.5px Sora">
+<span style="{{ l.swatch }}"></span><span style="flex:1">{{ l.label }}</span>
+<span style="font-family:'IBM Plex Mono',monospace;color:rgba(28,25,23,.55)">{{ l.hours }}</span>
+<span style="font-family:'IBM Plex Mono',monospace;width:52px;text-align:right">{{ l.pct }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ utilIsTum }}" hint-placeholder-val="{{ false }}">
+<div style="background:#fff;border:1px solid rgba(28,25,23,.10);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:10px">
+<span style="font:600 13px Sora">Time Usage Model · Calendar Time 168 h</span>
+<div style="display:flex;flex-direction:column;gap:4px;font:600 11px Sora;color:#fff">
+<sc-for list="{{ tumRows }}" as="r" hint-placeholder-count="6">
+<div style="display:flex;gap:4px;height:32px">
+<sc-for list="{{ r.segs }}" as="g" hint-placeholder-count="3"><div style="{{ g.style }}">{{ g.label }}</div></sc-for>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:14px;font:400 10.5px 'IBM Plex Mono',monospace;color:rgba(28,25,23,.6);padding-top:4px">
+<sc-for list="{{ legend }}" as="l" hint-placeholder-count="7"><span style="display:flex;align-items:center;gap:6px"><span style="{{ l.swatch }}"></span>{{ l.short }} {{ l.hours }}</span></sc-for>
+</div>
+</div>
+</sc-if>
+
+<div style="background:#fff;border:1px solid rgba(28,25,23,.10);border-radius:10px;overflow:hidden">
+<div style="display:grid;grid-template-columns:1.1fr repeat(5,minmax(72px,1fr));padding:12px 16px;border-bottom:1px solid rgba(28,25,23,.10);font:500 10px Sora;letter-spacing:.05em;color:rgba(28,25,23,.5)">
+<span>VEHICLE</span><span>UPTIME</span><span>PHYS. AVAIL.</span><span>USE OF AVAIL.</span><span>EFF. UTIL.</span><span>OP. EFF.</span>
+</div>
+<sc-for list="{{ utilTable }}" as="r" hint-placeholder-count="5">
+<div onClick="{{ r.pick }}" style="{{ r.style }}">
+<span style="{{ r.nameStyle }}">{{ r.id }}</span><span style="font-family:'IBM Plex Mono',monospace">{{ r.uptime }}</span><span style="font-family:'IBM Plex Mono',monospace">{{ r.pa }}</span><span style="font-family:'IBM Plex Mono',monospace">{{ r.ua }}</span><span style="font-family:'IBM Plex Mono',monospace">{{ r.eu }}</span><span style="font-family:'IBM Plex Mono',monospace">{{ r.oe }}</span>
+</div>
+</sc-for>
+</div>
+
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {view:'fleet', filter:'all', day:3, sel:'NW-01', stop:'Library', requested:false,
+    layers:{live:true, events:true, trail:false, stops:true}, utilMode:'pie', tick:0, ready:false};
+  mapRef = React.createRef();
+
+  route = [[52.7669,-1.2337],[52.7661,-1.2305],[52.7648,-1.2281],[52.7630,-1.2272],[52.7615,-1.2290],[52.7609,-1.2323],[52.7621,-1.2352],[52.7645,-1.2364],[52.7663,-1.2356]];
+  stops = [{n:'Library',p:[52.7661,-1.2305]},{n:'Sports Hall',p:[52.7630,-1.2272]},{n:'Union',p:[52.7609,-1.2323]},{n:'Depot',p:[52.7645,-1.2364]}];
+  events = [{p:[52.7648,-1.2281],k:'disengage',t:'14:02',d:'Pedestrian in lane · 41s manual'},
+    {p:[52.7615,-1.2290],k:'estop',t:'13:31',d:'Emergency stop · cleared by operator'},
+    {p:[52.7621,-1.2352],k:'disengage',t:'12:20',d:'Parked vehicle blocking · 88s manual'},
+    {p:[52.7663,-1.2356],k:'engage',t:'13:47',d:'Engaged at depot exit'}];
+  vehicles = [
+    {id:'NW-01', num:'01', status:'engaged', t:0.06, v:0.00055, speed:18, batt:82, pax:6, note:'Loop A · approaching Library'},
+    {id:'NW-02', num:'02', status:'manual', t:0.38, v:0.00070, speed:24, batt:74, pax:2, note:'Loop A · disengaged 2 min ago'},
+    {id:'NW-03', num:'03', status:'idle', t:0.78, v:0, speed:0, batt:41, pax:0, note:'Depot · charging'},
+    {id:'NW-04', num:'04', status:'offline', t:0.60, v:0, speed:0, batt:0, pax:0, note:'Last packet 14 min ago'}];
+
+  colors = {engaged:'oklch(0.55 0.15 155)', manual:'oklch(0.65 0.15 70)', idle:'rgba(28,25,23,.45)', offline:'rgba(28,25,23,.35)'};
+  badges = {engaged:'ENGAGED', manual:'MANUAL', idle:'IDLE', offline:'NO SIGNAL'};
+
+  componentDidMount(){
+    this.moveTimer = setInterval(()=>this.step(), 120);
+    this.uiTimer = setInterval(()=>this.setState(s=>({tick:s.tick+1})), 1000);
+    this.waitForLeaflet();
+  }
+  componentWillUnmount(){ clearInterval(this.moveTimer); clearInterval(this.uiTimer); }
+
+  waitForLeaflet(tries){
+    tries = tries || 0;
+    if (window.L && this.mapRef.current) return this.initMap();
+    if (tries > 100) return;
+    setTimeout(()=>this.waitForLeaflet(tries+1), 100);
+  }
+
+  initMap(){
+    const L = window.L;
+    this.map = L.map(this.mapRef.current, {zoomControl:true, attributionControl:true});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      {maxZoom:19, attribution:'&copy; OpenStreetMap contributors &copy; CARTO'}).addTo(this.map);
+    this.routeLine = L.polyline(this.route.concat([this.route[0]]), {color:'oklch(0.62 0.17 300)', weight:6, opacity:.45, lineJoin:'round'}).addTo(this.map);
+    this.map.fitBounds(this.routeLine.getBounds(), {padding:[40,40]});
+
+    this.stopLayer = L.layerGroup(this.stops.map(s=>
+      L.circleMarker(s.p,{radius:6,color:'#1c1917',weight:2,fillColor:'#fff',fillOpacity:1}).bindTooltip(s.n,{direction:'top'})));
+    this.eventLayer = L.layerGroup(this.events.map(e=>
+      L.circleMarker(e.p,{radius:7,weight:3,color:'#fff',
+        fillColor: e.k==='estop' ? 'oklch(0.60 0.19 25)' : e.k==='engage' ? 'oklch(0.60 0.15 155)' : 'oklch(0.75 0.15 75)',
+        fillOpacity:1}).bindPopup('<b>'+e.t+'</b><br>'+e.d)));
+    this.trailLine = L.polyline(this.route.concat([this.route[0]]), {color:'#1c1917', weight:2, opacity:.35, dashArray:'4 6'});
+
+    this.markers = {};
+    this.vehicles.forEach(v=>{
+      const m = L.marker(this.pos(v.t), {icon:this.icon(v), zIndexOffset: v.status==='offline'?0:200});
+      m.on('click', ()=>this.setState({view:'operator', sel:v.id}));
+      this.markers[v.id] = m;
+    });
+    this.syncLayers();
+    this.setState({ready:true});
+  }
+
+  icon(v){
+    const off = v.status==='offline';
+    const bg = v.id===this.state.sel ? '#1c1917' : '#fff';
+    const fg = v.id===this.state.sel ? '#fff' : '#1c1917';
+    return window.L.divIcon({className:'', iconSize:null, html:
+      '<div class="nw-pin" style="background:'+bg+';color:'+fg+';border:1px solid rgba(28,25,23,.14);opacity:'+(off?.55:1)+'">'+
+      '<span style="width:8px;height:8px;border-radius:50%;background:'+this.colors[v.status]+'"></span>'+v.id+
+      (off?'<span style="opacity:.6;font-family:\'IBM Plex Mono\',monospace;font-weight:400">14m</span>':
+        '<span style="opacity:.6;font-family:\'IBM Plex Mono\',monospace;font-weight:400">'+v.speed+'</span>')+'</div>'});
+  }
+
+  pos(t){
+    const r = this.route, n = r.length;
+    const x = ((t % 1) + 1) % 1 * n, i = Math.floor(x), f = x - i;
+    const a = r[i % n], b = r[(i+1) % n];
+    return [a[0] + (b[0]-a[0])*f, a[1] + (b[1]-a[1])*f];
+  }
+
+  step(){
+    if (!this.map) return;
+    this.vehicles.forEach(v=>{
+      if (v.v > 0) v.t += v.v;
+      const m = this.markers[v.id];
+      if (m) m.setLatLng(this.pos(v.t));
+    });
+  }
+
+  visible(v){ const f = this.state.filter; return f==='all' || f===v.id; }
+
+  syncLayers(){
+    if (!this.map) return;
+    const L = window.L, ly = this.state.layers, view = this.state.view;
+    const showEvents = ly.events && view !== 'rider';
+    this.stops.length && (ly.stops || view==='rider' ? this.stopLayer.addTo(this.map) : this.map.removeLayer(this.stopLayer));
+    showEvents ? this.eventLayer.addTo(this.map) : this.map.removeLayer(this.eventLayer);
+    ly.trail ? this.trailLine.addTo(this.map) : this.map.removeLayer(this.trailLine);
+    this.vehicles.forEach(v=>{
+      const m = this.markers[v.id];
+      const show = ly.live && this.visible(v);
+      if (show) { m.addTo(this.map); m.setIcon(this.icon(v)); } else if (this.map.hasLayer(m)) this.map.removeLayer(m);
+    });
+    const req = this.state.requested;
+    if (this.reqMarker) { this.map.removeLayer(this.reqMarker); this.reqMarker = null; }
+    if (req) {
+      const st = this.stops.find(x=>x.n===req.stop);
+      if (st) this.reqMarker = L.circleMarker(st.p, {radius:12, weight:3,
+        color: req.ack ? 'oklch(0.60 0.15 155)' : 'oklch(0.62 0.17 300)',
+        fillColor: req.ack ? 'oklch(0.60 0.15 155)' : 'oklch(0.62 0.17 300)', fillOpacity:.2})
+        .bindTooltip('Rider waiting · '+req.stop, {direction:'top', permanent:true}).addTo(this.map);
+    }
+    setTimeout(()=>this.map.invalidateSize(), 60);
+  }
+  componentDidUpdate(_, prev){
+    const el = this.mapRef.current;
+    if (el && window.L && (!this.map || this.map._container !== el)) {
+      if (this.map) { try { this.map.remove(); } catch(e) {} this.map = null; }
+      this.initMap();
+      return;
+    }
+    if (prev.layers !== this.state.layers || prev.filter !== this.state.filter ||
+        prev.view !== this.state.view || prev.sel !== this.state.sel ||
+        prev.requested !== this.state.requested) this.syncLayers();
+  }
+
+  tab(id, label){
+    const on = this.state.view === id;
+    return {on, style:'padding:6px 14px;border-radius:6px;cursor:pointer;font:'+(on?'600':'500')+' 12.5px Sora;color:'+(on?'#1c1917':'rgba(28,25,23,.55)')+';background:'+(on?'#fff':'transparent')+';box-shadow:'+(on?'0 1px 2px rgba(0,0,0,.08)':'none')};
+  }
+  chip(on){ return 'flex:none;padding:6px 12px;border-radius:999px;cursor:pointer;font:500 11.5px Sora;'+
+    (on ? 'background:#1c1917;color:#fff;border:1px solid #1c1917' : 'background:#fff;color:rgba(28,25,23,.6);border:1px solid rgba(28,25,23,.14)'); }
+
+  util = {
+    'NW-01':{pt:66,np:11.5,od:8.5,sbo:12,sbe:6,dt:4.2,ut:59.8},
+    'NW-02':{pt:63,np:12,od:9.5,sbo:12.5,sbe:6.2,dt:5.5,ut:59.3},
+    'NW-03':{pt:60,np:12.5,od:10,sbo:13,sbe:6.5,dt:9.9,ut:56.1},
+    'NW-04':{pt:55,np:12,od:10,sbo:12,sbe:6,dt:13.9,ut:59.1}};
+  cat = [['pt','Productive — in service','PT','oklch(0.36 0.13 300)'],
+    ['np','Non-Productive — deadhead','NP','oklch(0.62 0.05 200)'],
+    ['od','Operating Delay','OD','oklch(0.88 0.10 95)'],
+    ['sbo','Operating Standby — depot','SBO','oklch(0.74 0.15 70)'],
+    ['sbe','External Standby — blocked','SBE','oklch(0.68 0.15 55)'],
+    ['dt','Downtime — fault, maintenance','DT','oklch(0.60 0.19 25)'],
+    ['ut','Unscheduled — outside service','UT','rgba(28,25,23,.28)']];
+
+  scopeHours(){
+    const f = this.state.filter, ids = f==='all' ? Object.keys(this.util) : [f];
+    const out = {pt:0,np:0,od:0,sbo:0,sbe:0,dt:0,ut:0};
+    ids.forEach(id=>Object.keys(out).forEach(k=>{ out[k] += this.util[id][k]; }));
+    Object.keys(out).forEach(k=>{ out[k] = out[k] / ids.length; });
+    return out;
+  }
+  kpis(h){
+    const ct = 168, ut = h.ut, st = ct - ut, dt = h.dt, at = st - dt,
+      sb = h.sbo + h.sbe, ot = at - sb, wt = ot - h.od, pt = h.pt;
+    const p = x => (x*100).toFixed(1) + '%';
+    return {ct, st, at, ot, wt, pt, uptime:p(at/ct), pa:p(at/st), ma:p(ot/(ot+dt)),
+      ua:p(ot/at), au:p(ot/ct), eu:p(wt/st), oe:p(wt/ot), pe:p(pt/ot)};
+  }
+  stopFraction(name){
+    const s = this.stops.find(x=>x.n===name);
+    if (!s) return 0;
+    let best = 0, bd = Infinity;
+    this.route.forEach((r,i)=>{
+      const d = Math.abs(r[0]-s.p[0]) + Math.abs(r[1]-s.p[1]);
+      if (d < bd) { bd = d; best = i; }
+    });
+    return best / this.route.length;
+  }
+  etaFor(v, stopName){
+    if (v.v <= 0) return '—';
+    const frac = ((this.stopFraction(stopName) - (v.t % 1)) + 1) % 1;
+    const loopMin = 14;
+    return Math.max(1, Math.round(frac * loopMin)) + ' min';
+  }
+
+  renderVals(){
+    const s = this.state, self = this;
+    const dayNames = ['Mon 10','Tue 11','Wed 12','Thu 13','Fri 14','Sat 15','Sun 16'];
+    const dayFactor = [0.98,1.04,1.0,1.06,0.9,0.4,0.25];
+    const sel = this.vehicles.find(v=>v.id===s.sel) || this.vehicles[0];
+    const selOff = sel.status === 'offline';
+    const h = this.scopeHours(), k = this.kpis(h);
+
+    return {
+      mapRef: this.mapRef,
+      clock: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}),
+      tabFleet: this.tab('fleet').style, tabOperator: this.tab('operator').style,
+      tabRider: this.tab('rider').style, tabUtil: this.tab('util').style,
+      goFleet: ()=>this.setState({view:'fleet'}), goOperator: ()=>this.setState({view:'operator'}),
+      goRider: ()=>this.setState({view:'rider'}), goUtil: ()=>this.setState({view:'util'}),
+
+      days: dayNames.map((label,i)=>({label, pick:()=>this.setState({day:i}), style:this.chip(s.day===i)})),
+      filters: [{id:'all',label:'All vehicles'}].concat(this.vehicles.map(v=>({id:v.id,label:v.id})))
+        .map(f=>({label:f.label, pick:()=>this.setState({filter:f.id}), style:this.chip(s.filter===f.id)})),
+
+      showFleetPanel: s.view === 'fleet',
+      showSidePlaceholder: false,
+      activeLabel: this.vehicles.filter(v=>v.status!=='offline').length + ' of ' + this.vehicles.length + ' active',
+
+      vehicleRows: this.vehicles.filter(v=>this.visible(v)).map(v=>{
+        const off = v.status==='offline', selr = v.id===s.sel;
+        return {
+          id:v.id, num:v.num, note:v.note, badge:this.badges[v.status],
+          speed: off ? '—' : v.speed+' km/h', batt: off ? '—' : v.batt+'%', pax: off ? '—' : v.pax+' pax',
+          pick: ()=>this.setState({view:'operator', sel:v.id}),
+          rowStyle:'display:flex;gap:12px;padding:14px 18px;cursor:pointer;border-bottom:1px solid rgba(28,25,23,.07);border-left:3px solid '+(selr?'oklch(0.62 0.17 300)':'transparent')+';background:'+(selr?'oklch(0.62 0.17 300 / 0.045)':(off?'repeating-linear-gradient(135deg,rgba(28,25,23,.03) 0 6px,transparent 6px 12px)':'#fff'))+';opacity:'+(off?.62:1),
+          badgeStyle:'padding:2px 7px;border-radius:4px;font:600 10px Sora;letter-spacing:.03em;'+
+            (v.status==='engaged' ? 'background:oklch(0.66 0.15 155 / .14);color:oklch(0.45 0.13 155)'
+             : v.status==='manual' ? 'background:oklch(0.75 0.15 75 / .2);color:oklch(0.45 0.12 60)'
+             : 'background:rgba(28,25,23,.10);color:rgba(28,25,23,.62)'),
+          chipStyle:'width:44px;height:44px;border-radius:8px;background:rgba(28,25,23,.06);display:flex;align-items:center;justify-content:center;font:600 11px \'IBM Plex Mono\',monospace;color:rgba(28,25,23,.5)'
+        };
+      }),
+
+      layerRows: [['live','Live positions'],['events','Engage / disengage'],['stops','Stops'],['trail',"Today's trail"]].map(([k,label])=>{
+        const on = s.layers[k];
+        return {label, toggle: ()=>this.setState(st=>({layers:Object.assign({}, st.layers, {[k]: !st.layers[k]})})),
+          trackStyle:'width:30px;height:17px;border-radius:999px;position:relative;flex:none;background:'+(on?'oklch(0.62 0.17 300)':'rgba(28,25,23,.16)'),
+          knobStyle:'position:absolute;top:2px;'+(on?'right:2px':'left:2px')+';width:13px;height:13px;border-radius:50%;background:#fff'};
+      }),
+
+      kpiUptime: (61.7*dayFactor[s.day]).toFixed(1)+'%',
+      kpiEff: (67.4*dayFactor[s.day]).toFixed(1)+'%',
+      kpiDis: Math.max(0, Math.round(7*dayFactor[s.day])),
+
+      showMap: s.view !== 'util',
+      showUtil: s.view === 'util',
+      showOperatorPanel: s.view === 'operator',
+      showRiderPanel: s.view === 'rider',
+      dayLabel: dayNames[s.day],
+
+      opId: sel.id, opBadge: this.badges[sel.status],
+      opBadgeStyle: 'padding:3px 8px;border-radius:5px;font:600 10px Sora;letter-spacing:.03em;'+
+        (sel.status==='engaged' ? 'background:oklch(0.66 0.15 155 / .14);color:oklch(0.45 0.13 155)'
+         : sel.status==='manual' ? 'background:oklch(0.75 0.15 75 / .2);color:oklch(0.45 0.12 60)'
+         : 'background:rgba(28,25,23,.10);color:rgba(28,25,23,.62)'),
+      opSpeed: selOff ? '—' : sel.speed+' km/h',
+      opBatt: selOff ? '—' : sel.batt+'%',
+      opPax: selOff ? '—' : sel.pax+' / 11',
+      opPacket: selOff ? '14 min' : '3s',
+      autonomySegments: [[8,'engaged'],[1,'manual'],[6,'engaged'],[1,'estop'],[4,'engaged'],[2,'gap'],[5,'engaged'],[1,'manual'],[3,'engaged']]
+        .map(([w,k])=>({style:'flex:'+w+';background:'+(k==='engaged'?'oklch(0.66 0.15 155 / .55)':k==='manual'?'oklch(0.75 0.15 75)':k==='estop'?'oklch(0.60 0.19 25)':'rgba(28,25,23,.12)')})),
+      eventRows: this.events.map(e=>({
+        t:e.t, d:e.d,
+        title: e.k==='estop' ? 'Emergency stop' : e.k==='engage' ? 'Engaged' : 'Disengaged — operator takeover',
+        focus: ()=>{ if (this.map) { this.map.setView(e.p, 17); } },
+        dotStyle:'width:8px;height:8px;border-radius:50%;margin-top:4px;flex:none;background:'+
+          (e.k==='estop' ? 'oklch(0.60 0.19 25)' : e.k==='engage' ? 'oklch(0.60 0.15 155)' : 'oklch(0.75 0.15 75)')
+      })),
+
+      hasRequest: !!s.requested,
+      requestStop: s.requested ? s.requested.stop : '',
+      requestMeta: s.requested ? (s.requested.ack ? 'Acknowledged · driver notified' : 'Just now · ETA ' + this.etaFor(this.vehicles[0], s.requested.stop)) : '',
+      ackRequest: ()=>this.setState(st=>({requested: Object.assign({}, st.requested, {ack:true})})),
+      clearRequest: ()=>this.setState({requested:false}),
+
+      stopChips: this.stops.map(st=>({label:st.n, pick:()=>this.setState({stop:st.n}), style:this.chip(s.stop===st.n)})),
+      stopDistance: s.stop === 'Library' ? 'Nearest to you · 60 m away' : 'Selected stop · walk from your location',
+      sendRequest: ()=>this.setState({requested:{stop:s.stop, ack:false}}),
+      requestButtonStyle: 'display:flex;flex-direction:column;gap:5px;padding:16px;border-radius:10px;cursor:pointer;'+
+        (s.requested ? 'background:oklch(0.66 0.15 155 / .12);border:1px solid oklch(0.66 0.15 155 / .5);color:oklch(0.35 0.10 155)' : 'background:#1c1917;color:#fff'),
+      requestButtonTitle: s.requested ? 'Shuttle notified · ' + s.requested.stop : "I'm waiting at " + s.stop,
+      requestButtonSub: s.requested ? (s.requested.ack ? 'Operator acknowledged your request' : 'Waiting for the operator to acknowledge') : 'Sends a request to the next vehicle on Loop A',
+      arrivals: this.vehicles.filter(v=>v.v>0).map(v=>({num:v.num, route:'Loop A · '+s.stop, seats:(11-v.pax)+' seats free', eta:this.etaFor(v, s.stop)})),
+
+      utilScope: s.filter === 'all' ? 'Fleet average' : s.filter,
+      utilIsPie: s.utilMode !== 'tum', utilIsTum: s.utilMode === 'tum',
+      showPie: ()=>this.setState({utilMode:'pie'}), showTum: ()=>this.setState({utilMode:'tum'}),
+      pieTabStyle: 'padding:6px 12px;border-radius:6px;cursor:pointer;font:'+(s.utilMode!=='tum'?'600':'500')+' 12.5px Sora;'+(s.utilMode!=='tum'?'color:#1c1917;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08)':'color:rgba(28,25,23,.55)'),
+      tumTabStyle: 'padding:6px 12px;border-radius:6px;cursor:pointer;font:'+(s.utilMode==='tum'?'600':'500')+' 12.5px Sora;'+(s.utilMode==='tum'?'color:#1c1917;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08)':'color:rgba(28,25,23,.55)'),
+      uptime: k.uptime,
+      kpiCards: [['UPTIME', k.uptime, 'AT / CT'], ['PHYSICAL AVAILABILITY', k.pa, 'AT / ST'],
+        ['MECHANICAL AVAILABILITY', k.ma, 'OT / (OT + DT)'], ['USE OF AVAILABILITY', k.ua, 'OT / AT'],
+        ['EFFECTIVE UTILISATION', k.eu, 'WT / ST'], ['OPERATING EFFICIENCY', k.oe, 'WT / OT']]
+        .map(([label,value,formula])=>({label,value,formula})),
+      pieGradient: 'conic-gradient(' + (function(){
+        let acc = 0; const parts = [];
+        self.cat.forEach(c=>{ const deg = h[c[0]]/168*360; parts.push(c[3]+' '+acc.toFixed(2)+'deg '+(acc+deg).toFixed(2)+'deg'); acc += deg; });
+        return parts.join(',');
+      })() + ')',
+      legend: this.cat.map(c=>({label:c[1], short:c[2], hours:h[c[0]].toFixed(1)+' h', pct:(h[c[0]]/168*100).toFixed(1)+'%',
+        swatch:'width:11px;height:11px;border-radius:2px;flex:none;background:'+c[3]})),
+      tumRows: (function(){
+        const g = (flex, color, label, txt) => ({style:'flex:'+flex.toFixed(2)+';background:'+color+';border-radius:4px;display:flex;align-items:center;justify-content:'+(txt?'flex-start':'center')+';padding:0 '+(txt?'12px':'4px')+';overflow:hidden;white-space:nowrap;font-size:'+(txt?'11px':'9.5px'), label: label});
+        const ut = h.ut, st = 168-ut, dt = h.dt, at = st-dt, sb = h.sbo+h.sbe, ot = at-sb, wt = ot-h.od, ghost = 'rgba(28,25,23,.13)';
+        return [
+          {segs:[g(168,'oklch(0.72 0.09 300)','Calendar Time (CT) · 168 h',1)]},
+          {segs:[g(st,'oklch(0.66 0.13 300)','Scheduled Time (ST) · '+st.toFixed(1)+' h',1), g(ut,'rgba(28,25,23,.32)','Unscheduled (UT) · '+ut.toFixed(1)+' h',1)]},
+          {segs:[g(at,'oklch(0.60 0.15 300)','Available Time (AT) · '+at.toFixed(1)+' h',1), g(dt,'oklch(0.60 0.19 25)','DT'), g(ut,ghost,'')]},
+          {segs:[g(ot,'oklch(0.54 0.16 300)','Operating Time (OT) · '+ot.toFixed(1)+' h',1), g(sb,'oklch(0.78 0.14 75)','SB'), g(dt,'oklch(0.60 0.19 25 / .35)',''), g(ut,ghost,'')]},
+          {segs:[g(wt,'oklch(0.47 0.16 300)','Working Time (WT) · '+wt.toFixed(1)+' h',1), g(h.od,'oklch(0.88 0.10 95)','OD'), g(h.sbo,'oklch(0.74 0.15 70)','SBO'), g(h.sbe,'oklch(0.68 0.15 55)','SBE'), g(dt,'oklch(0.60 0.19 25 / .35)',''), g(ut,ghost,'')]},
+          {segs:[g(h.pt,'oklch(0.36 0.13 300)','Productive (PT) · '+h.pt.toFixed(1)+' h',1), g(h.np,'oklch(0.62 0.05 200)','NP'), g(h.od,'oklch(0.88 0.10 95 / .5)',''), g(h.sbo,'oklch(0.74 0.15 70 / .5)',''), g(h.sbe,'oklch(0.68 0.15 55 / .5)',''), g(dt,'oklch(0.60 0.19 25 / .35)',''), g(ut,ghost,'')]}
+        ];
+      })(),
+      utilTable: this.vehicles.map(v=>{
+        const kk = this.kpis(this.util[v.id]), on = s.filter === v.id;
+        return {id:v.id, uptime:kk.uptime, pa:kk.pa, ua:kk.ua, eu:kk.eu, oe:kk.oe,
+          pick: ()=>this.setState({filter: on ? 'all' : v.id}),
+          style:'display:grid;grid-template-columns:1.1fr repeat(5,minmax(72px,1fr));padding:13px 16px;cursor:pointer;align-items:center;font:500 12.5px Sora;border-bottom:1px solid rgba(28,25,23,.07);background:'+(on?'oklch(0.62 0.17 300 / .05)':(v.status==='offline'?'repeating-linear-gradient(135deg,rgba(28,25,23,.03) 0 6px,transparent 6px 12px)':'#fff')),
+          nameStyle:'font-weight:600;color:'+(v.status==='offline'?'rgba(28,25,23,.6)':'#1c1917')};
+      }).concat([{id:'Fleet average', uptime:k.uptime, pa:k.pa, ua:k.ua, eu:k.eu, oe:k.oe,
+        pick: ()=>this.setState({filter:'all'}),
+        style:'display:grid;grid-template-columns:1.1fr repeat(5,minmax(72px,1fr));padding:13px 16px;cursor:pointer;align-items:center;font:600 12.5px Sora;background:rgba(28,25,23,.03)',
+        nameStyle:'font-weight:600'}])
+    };
+  }
+}
+</script>
+</body>
+</html>
