@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nUWAy Fleet Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><img src="assets/uwa-crest.png" alt="The University of Western Australia crest"></div>
+        <div>
+          <div class="brand-title">nUWAy</div>
+          <div class="brand-subtitle">Fleet Control</div>
+        </div>
+      </div>
+
+      <nav class="side-nav" aria-label="Primary">
+        <button class="nav-item active" data-section="overview">
+          <span class="nav-icon">⌂</span><span>Overview</span>
+        </button>
+        <button class="nav-item" data-section="events">
+          <span class="nav-icon">⚠</span><span>Events</span>
+        </button>
+        <button class="nav-item" data-section="utilisation">
+          <span class="nav-icon">◔</span><span>Utilisation</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="connection-dot"></div>
+        <div>
+          <div class="sidebar-footer-label">Dashboard status</div>
+          <div class="sidebar-footer-value">Connected</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">UWA REV PROJECT</p>
+          <h1>Fleet Operations Dashboard</h1>
+        </div>
+        <div class="live-pill"><span class="pulse-dot"></span> LIVE</div>
+      </header>
+
+      <section class="filter-bar card">
+        <div class="filter-group">
+          <label for="vehicleFilter">Vehicle</label>
+          <select id="vehicleFilter">
+            <option value="all">All vehicles</option>
+          </select>
+        </div>
+
+        <div class="mode-switch" role="group" aria-label="Time mode">
+          <button class="mode-btn active" data-mode="live">Live</button>
+          <button class="mode-btn" data-mode="today">Today</button>
+          <button class="mode-btn" data-mode="calendar">Calendar</button>
+        </div>
+
+        <div class="filter-group calendar-group">
+          <label for="dateFilter">Date</label>
+          <input id="dateFilter" type="date" />
+        </div>
+
+        <div class="filter-summary" id="filterSummary">Showing: All vehicles · Live</div>
+      </section>
+
+      <section class="hero-grid">
+        <div class="map-card card">
+          <div class="card-heading map-heading">
+            <div>
+              <p class="eyebrow">LIVE OPERATIONS</p>
+              <h2>Fleet Map</h2>
+            </div>
+            <div class="map-toggles">
+              <label class="toggle"><input id="toggleRoutes" type="checkbox" checked><span></span>Routes</label>
+              <label class="toggle"><input id="toggleDisengagements" type="checkbox" checked><span></span>Disengagements</label>
+              <label class="toggle"><input id="toggleReengagements" type="checkbox" checked><span></span>Re-engagements</label>
+            </div>
+          </div>
+          <div id="map"></div>
+          <div class="map-legend">
+            <span><i class="legend-dot active"></i> Vehicle</span>
+            <span><i class="legend-dot offline"></i> Offline vehicle</span>
+            <span><i class="legend-disengage"></i> Disengagement</span>
+            <span><i class="legend-reengage"></i> Re-engagement</span>
+          </div>
+        </div>
+
+        <div class="right-stack">
+          <section class="card status-card">
+            <div class="card-heading">
+              <div>
+                <p class="eyebrow">CURRENT STATE</p>
+                <h2>Fleet Status</h2>
+              </div>
+              <span class="timestamp" id="lastRefresh">Updated now</span>
+            </div>
+            <div class="fleet-summary">
+              <div><strong id="fleetCount">4</strong><span>Vehicles</span></div>
+              <div><strong id="activeCount">3</strong><span>Active</span></div>
+              <div><strong id="offlineCount">1</strong><span>Offline</span></div>
+            </div>
+            <div id="vehicleList" class="vehicle-list"></div>
+          </section>
+
+          <section class="card tech-card">
+            <div class="card-heading">
+              <div>
+                <p class="eyebrow">SYSTEMS</p>
+                <h2>Technology Status</h2>
+              </div>
+            </div>
+            <div id="techStatus" class="tech-status"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="analytics-grid">
+        <article class="card metric-card">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">OPERATIONS</p>
+              <h2>Service Metrics</h2>
+            </div>
+          </div>
+          <div class="metrics-list" id="serviceMetrics"></div>
+        </article>
+
+        <article class="card metric-card">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">SAFETY</p>
+              <h2>Event Analysis</h2>
+            </div>
+          </div>
+          <div class="event-kpis" id="eventMetrics"></div>
+          <div class="mini-event-list" id="recentEvents"></div>
+        </article>
+
+        <article class="card metric-card utilisation-card">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">TIME USAGE MODEL</p>
+              <h2>Utilisation</h2>
+            </div>
+          </div>
+          <div class="utilisation-content">
+            <div class="chart-wrap"><canvas id="utilisationChart"></canvas></div>
+            <div class="util-kpis" id="utilKpis"></div>
+          </div>
+        </article>
+      </section>
+
+      <footer class="dashboard-footer">
+        Prototype dashboard · Dummy data only · UWA REV nUWAy fleet
+      </footer>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
