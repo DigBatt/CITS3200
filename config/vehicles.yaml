@@ -1,0 +1,15 @@
+# Vehicle identity scheme 
+
+vehicles:
+  - id: "1"
+    name: nUWAy 1
+    colour: "#d4741f"
+    positions_file: positions_1.csv
+
+  - id: "2"
+    name: nUWAy 2
+    colour: "#2f7d8f"
+    positions_file: positions_2.csv
+
+
+# This will eventually be integrated into the database properly 

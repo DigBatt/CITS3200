@@ -1,0 +1,11 @@
+/* 
+Dashboard layout and components.
+
+Mobile first: everything should stack, map takes a fixed viewport slice. At the
+   laptop breakpoint the panel becomes a sidebar and the map takes the rest --
+   S12 s second criterion is that the wide layout uses the extra width rather
+   than stretching the mobile one.
+
+Components: vehicle list, period controls, overlay toggles, metrics panel,
+   map status line, marker labels, event popups.
+*/
