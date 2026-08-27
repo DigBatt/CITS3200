@@ -1,0 +1,19 @@
+# Application configuration.
+data:
+  # Directory holding the per vehicle CSV files named in vehicles.yaml.
+  directory: data/sample
+
+liveness:
+  inactivity_threshold_seconds: 300 # when data is to be rendered as grey.
+  expected_poll_interval_seconds: 6
+
+display:
+  # timestamp info
+  timezone: Australia/Perth
+  utc_offset_hours: 8
+
+map:
+  # UWA Crawley, near the start of the recorded track.
+  centre: [-31.98133, 115.81597]
+  zoom: 16
+  refresh_interval_seconds: 15 # How often the dashboard refetches current positions in live.
