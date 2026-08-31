@@ -1,13 +1,25 @@
+<!DOCTYPE html>
 <!--
   Operator dashboard.
-
-  Structure to build here:
-    header    fleet name, a visible note that this is sample data
-    aside     vehicle filter, date + time range,
-              overlay toggles, uptime/utilisation panel
-
-  Controls come before the map in source order: on a phone they stack above it
-  and a keyboard user reaches them without traversing the map.
-
-  Leaflet CSS/JS from CDN, no build step.
 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>nUWAy Fleet Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+  <main>
+    <div id="map"></div>
+    <p id="status" class="map-status" role="status"></p>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="js/api.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
