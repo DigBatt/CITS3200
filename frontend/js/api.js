@@ -1,11 +1,11 @@
-// knows endpoint URLs.
-//
-//   getPositions()                     GET /api/positions
-//
-//
+async function getPositions({ vehicles, from, to } = {}) {
+  const params = new URLSearchParams();
+  if (vehicles) params.set('vehicles', vehicles);
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
 
-async function getPositions() {
-  const response = await fetch('/api/positions');
+  const query = params.toString();
+  const response = await fetch(`/api/positions${query ? `?${query}` : ''}`);
   const body = await response.json().catch(() => null);
 
   if (!response.ok) {

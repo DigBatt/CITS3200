@@ -1,14 +1,17 @@
 // Timeline period control.
 //
-// A date picker with optional start/end times within that day 
-// producing the from/to parameters in docs/api.md.<<< NOT IMPLEMENTED YET IN FILE, COMING LATER
+// Independent start and end date+time pickers, producing the from/to
+// parameters in docs/api.md. Unlike a single-day picker, start and end can
+// be on different days -- this is a full range, not "a day with times
+// narrowed inside it".
 //
-// Defaults to today when the page loads, per S06 s third criterion.
-// Dates are chosen and displayed in Perth time; the API accepts a bare date
-// and expands it to a Perth day, so send the date.
-
+// Defaults to today (00:00 start, live end) when the page loads.
+// Perth does not observe daylight saving, so its UTC offset is always
+// +08:00 -- no need to compute it per-date the way a DST-observing zone
+// would require.
 const PERTH_TZ = 'Australia/Perth';
- 
+const PERTH_OFFSET = '+08:00';
+
 /**
  * The current calendar date in Perth local time, as "YYYY-MM-DD".
  *
@@ -25,71 +28,145 @@ function getPerthDateString(date = new Date()) {
     day: '2-digit',
   }).format(date);
 }
- 
+
 /**
- * Mount a single-day calendar picker into `container`.
+ * Combine a "YYYY-MM-DD" date and an "HH:mm" time into a full ISO instant
+ * with the Perth offset attached, as params.py requires for any value that
+ * isn't a bare date.
+ */
+function toApiValue(dateStr, timeStr) {
+  const time = timeStr || '00:00';
+  return `${dateStr}T${time}:00${PERTH_OFFSET}`;
+}
+
+/**
+ * Mount a start/end date+time range control into `container`.
+ *
+ * Start and end are independent date+time pairs -- they are not assumed to
+ * fall on the same day. An optional "live" checkbox lets the end be left
+ * open, meaning "now"; when checked, the end date/time inputs are disabled
+ * and `to` is reported as `null` so the caller omits it from the request
+ * (the API then defaults `to` to now).
  *
  * @param {HTMLElement} container
  * @param {Object} [options]
- * @param {(date: string) => void} [options.onChange] - called with the
- *   newly selected "YYYY-MM-DD" (Perth) whenever the user picks a date.
- * @returns {{ getSelectedDate: () => string, reset: () => void }}
+ * @param {(range: { from: string, to: string|null, live: boolean }) => void} [options.onChange]
+ *   Called whenever the selection changes, with from/to values ready to
+ *   send to the API.
+ * @returns {{ getRange: () => object, reset: () => void, showNoData: () => void }}
  */
 function createTimelineControl(container, { onChange } = {}) {
   const todayStr = getPerthDateString();
- 
+
   container.innerHTML = `
     <div class="timeline-control">
-      <label for="timeline-date">Date</label>
-      <input type="date" id="timeline-date" value="${todayStr}" max="${todayStr}">
+      <fieldset>
+        <legend>Start</legend>
+        <label for="timeline-start-date">Date</label>
+        <input type="date" id="timeline-start-date" value="${todayStr}" max="${todayStr}">
+        <label for="timeline-start-time">Time</label>
+        <input type="time" id="timeline-start-time" value="00:00">
+      </fieldset>
+
+      <fieldset>
+        <legend>End</legend>
+        <label for="timeline-end-date">Date</label>
+        <input type="date" id="timeline-end-date" value="${todayStr}" max="${todayStr}">
+        <label for="timeline-end-time">Time</label>
+        <input type="time" id="timeline-end-time" value="23:59">
+        <label>
+          <input type="checkbox" id="timeline-live">
+          Live (end = now)
+        </label>
+      </fieldset>
+
       <p class="timeline-status" aria-live="polite"></p>
     </div>
   `;
- 
-  const input = container.querySelector('#timeline-date');
+
+  const startDateInput = container.querySelector('#timeline-start-date');
+  const startTimeInput = container.querySelector('#timeline-start-time');
+  const endDateInput = container.querySelector('#timeline-end-date');
+  const endTimeInput = container.querySelector('#timeline-end-time');
+  const liveCheckbox = container.querySelector('#timeline-live');
   const status = container.querySelector('.timeline-status');
- 
-  input.addEventListener('change', () => {
-    const selected = input.value;
-    if (!selected) return;
- 
-    // Belt and braces: the `max` attribute stops most browsers, but not all
-    // input methods respect it (e.g. typing a date directly).
-    if (selected > todayStr) {
+
+  function clampFutureDate(input) {
+    if (input.value > todayStr) {
       input.value = todayStr;
       status.textContent = 'Future dates are not available yet.';
-      onChange?.(todayStr);
-      return;
+      return true;
     }
- 
+    return false;
+  }
+
+  function currentRange() {
+    const from = toApiValue(startDateInput.value, startTimeInput.value);
+    const live = liveCheckbox.checked;
+    const to = live ? null : toApiValue(endDateInput.value, endTimeInput.value);
+    return { from, to, live };
+  }
+
+  function emitChange() {
+    // Keep status limited to explaining the range itself; clear it here
+    // unless a bad_range check below sets it.
+    if (!liveCheckbox.checked) {
+      const { from, to } = currentRange();
+      if (from > to) {
+        status.textContent = 'Start must be before end.';
+        onChange?.(null);
+        return;
+      }
+    }
     status.textContent = '';
-    onChange?.(selected);
+    onChange?.(currentRange());
+  }
+
+  startDateInput.addEventListener('change', () => {
+    clampFutureDate(startDateInput);
+    emitChange();
   });
- 
-  // Fire once immediately so the caller is told about the default (today)
-  // date on load, per S06's third criterion -- otherwise onChange only
-  // fires after the user manually changes the date.
-  onChange?.(todayStr);
- 
+  startTimeInput.addEventListener('change', emitChange);
+
+  endDateInput.addEventListener('change', () => {
+    clampFutureDate(endDateInput);
+    emitChange();
+  });
+  endTimeInput.addEventListener('change', emitChange);
+
+  liveCheckbox.addEventListener('change', () => {
+    endDateInput.disabled = liveCheckbox.checked;
+    endTimeInput.disabled = liveCheckbox.checked;
+    emitChange();
+  });
+
+  // Fire once immediately so the caller is told about the default range on
+  // load, rather than only after the user changes something.
+  emitChange();
+
   return {
-    getSelectedDate: () => input.value,
+    getRange: currentRange,
     reset: () => {
-      input.value = todayStr;
+      startDateInput.value = todayStr;
+      startTimeInput.value = '00:00';
+      endDateInput.value = todayStr;
+      endTimeInput.value = '23:59';
+      endDateInput.disabled = false;
+      endTimeInput.disabled = false;
+      liveCheckbox.checked = false;
       status.textContent = '';
     },
-    // Called by main.js when a fetch for the selected day comes back empty,
-    // so "no data" is stated rather than an unexplained blank map (S06 AC2,
-    // docs/api.md).
+    // Called by main.js when a fetch for the selected range comes back
+    // empty, so "no data" is stated rather than an unexplained blank map.
     showNoData: () => {
-      status.textContent = 'No data for this day.';
+      status.textContent = 'No data for this period.';
     },
   };
 }
- 
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { createTimelineControl, getPerthDateString };
 }
 if (typeof window !== 'undefined') {
   window.Timeline = { createTimelineControl, getPerthDateString };
 }
- 
