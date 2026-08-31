@@ -1,4 +1,4 @@
-/* 
+/*
 Dashboard layout and components.
 
 Mobile first: everything should stack, map takes a fixed viewport slice. At the
@@ -9,3 +9,25 @@ Mobile first: everything should stack, map takes a fixed viewport slice. At the
 Components: vehicle list, period controls, overlay toggles, metrics panel,
    map status line, marker labels, event popups.
 */
+
+main {
+  position: relative;
+  height: 100%;
+}
+
+#map {
+  height: 100%;
+}
+
+.map-status {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000; /* above Leaflet's panes */
+  margin: 0;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
