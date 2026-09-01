@@ -82,11 +82,11 @@ function perthToUtcIso(dateStr, timeStr = '00:00') {
  */
 function formatDisplay(dateStr, timeStr) {
   if (!dateStr) return '';
-  const [, month, day] = dateStr.split('-').map(Number);
+  const [year, month, day] = dateStr.split('-').map(Number);
   const [hour, minute] = timeStr.split(':').map(Number);
   const period = hour < 12 ? 'am' : 'pm';
   const hour12 = ((hour + 11) % 12) + 1;
-  return `${day} ${MONTH_ABBR[month - 1]}, ${hour12}:${String(minute).padStart(2, '0')} ${period}`;
+  return `${day} ${MONTH_ABBR[month - 1]} ${year}, ${hour12}:${String(minute).padStart(2, '0')} ${period}`;
 }
 
 /**
