@@ -163,7 +163,12 @@ function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_
 
   function updateSummary() {
     const startDisplay = formatDisplay(startDate.value, startTime.value);
-    const endDisplay = liveToggle.checked ? 'now' : formatDisplay(endDate.value, endTime.value);
+    // Real current date/time, not the word "now" -- refreshes on every
+    // poll tick while Live is on, so the summary visibly advances rather
+    // than sitting static.
+    const endDisplay = liveToggle.checked
+      ? formatDisplay(getPerthDateString(), getPerthTimeString())
+      : formatDisplay(endDate.value, endTime.value);
     summaryText.textContent = `${startDisplay} \u2192 ${endDisplay}`;
   }
 
