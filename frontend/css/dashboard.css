@@ -31,3 +31,137 @@ main {
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
+
+.timeline-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.timeline-row {
+  flex-wrap: wrap;
+}
+
+.timeline-row[hidden] {
+  display: none;
+}
+
+.timeline-row-label {
+  width: 2.5rem;
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.timeline-row input[type='date'] {
+  width: 160px;
+  flex: 0 0 auto;
+}
+
+.timeline-live {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.timeline-switch {
+  position: relative;
+  display: inline-block;
+  width: 2.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+.timeline-switch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.timeline-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  transition: background 0.15s ease;
+}
+
+.timeline-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: left 0.15s ease;
+}
+
+/* Colour matches nUWAy 2's vehicle marker (config/vehicles.yaml), reused
+   here as the app's one accent colour rather than introducing a new one. */
+.timeline-switch input:checked + .timeline-switch-track {
+  background: #2f7d8f;
+}
+
+.timeline-switch input:checked ~ .timeline-switch-knob {
+  left: 1.125rem;
+}
+
+.timeline-switch input:focus-visible + .timeline-switch-track {
+  outline: 2px solid #2f7d8f;
+  outline-offset: 2px;
+}
+
+.timeline-live-dot {
+  display: inline-block;
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #c0392b; /* broadcast red -- distinct from any vehicle colour */
+}
+
+.timeline-live-dot[hidden] {
+  display: none;
+}
+
+.timeline-live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #c0392b;
+  animation: timeline-pulse-ring 1.6s ease-out infinite;
+}
+
+@keyframes timeline-pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.timeline-summary {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.timeline-status {
+  margin: 0;
+  min-height: 1rem;
+  font-size: 0.8125rem;
+  color: #a35b00;
+}

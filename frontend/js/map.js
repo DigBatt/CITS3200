@@ -8,7 +8,7 @@ let map = null;
 const layers = { trails: null };
 
 function initMap() {
-  map = L.map('map');
+  map = L.map('map').setView([-31.98133, 115.81597], 16); // sets the initial to UWA campus
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors'
