@@ -1,27 +1,67 @@
 <!DOCTYPE html>
-<!--
-  Operator dashboard.
--->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>nUWAy Fleet Dashboard</title>
+  <title>nUWAy Shuttle Ops</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body>
-  <main>
-    <div id="timeline-container"></div>
-    <div id="map"></div>
-    <p id="status" class="map-status" role="status"></p>
-  </main>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><strong>nuway</strong><span>SHUTTLE OPS</span></div>
+      <nav class="tabs" aria-label="Dashboard sections">
+        <button class="tab active" data-view="fleet">Fleet</button>
+        <button class="tab" data-view="operator">Operator</button>
+        <button class="tab" data-view="rider">Rider</button>
+        <button class="tab" data-view="utilisation">Utilisation</button>
+      </nav>
+      <div class="topbar-spacer"></div>
+      <div class="live-state"><span class="dot" id="liveDot"></span><span id="liveLabel">Repository</span><span class="mono" id="clock">--:--:--</span></div>
+      <div class="avatar">REV</div>
+    </header>
+
+    <section class="filters" aria-label="Dashboard filters">
+      <span class="filter-label">TIME</span>
+      <div class="mode-switch" role="group" aria-label="Time mode">
+        <button class="chip mode active" data-mode="live">Live</button>
+        <button class="chip mode" data-mode="today">Today</button>
+        <button class="chip mode" data-mode="calendar">Calendar</button>
+      </div>
+      <input id="dateFilter" class="date-input" type="date" disabled aria-label="Historical date">
+      <span class="filter-divider"></span>
+      <span class="filter-label">VEHICLE</span>
+      <div id="vehicleChips" class="chip-row"></div>
+      <div class="filter-summary mono" id="filterSummary">Loading…</div>
+    </section>
+
+    <main>
+      <section id="mapWorkspace" class="workspace">
+        <aside class="side-panel">
+          <div id="fleetPanel" class="panel-view"></div>
+          <div id="operatorPanel" class="panel-view" hidden></div>
+          <div id="riderPanel" class="panel-view" hidden></div>
+        </aside>
+        <section class="map-wrap">
+          <div id="map"></div>
+          <p id="status" class="map-status" role="status" hidden></p>
+          <div class="map-legend" id="mapLegend"></div>
+          <div class="data-badge mono" id="dataBadge">MAP DATA</div>
+        </section>
+      </section>
+
+      <section id="utilisationView" class="util-view" hidden></section>
+    </main>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="js/api.js"></script>
   <script src="js/map.js"></script>
-  <script src="js/timeline.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

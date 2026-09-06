@@ -1,93 +1,73 @@
-"""
-Shared query parameter parsing for the read endpoints.
+"""Shared query parameter parsing for read endpoints."""
 
-The rules are specified in docs/api.md:
+from __future__ import annotations
 
-    ?vehicles=1,2   absent or empty means the whole fleet; unknown id is 400
-    ?from= &to=     an ISO 8601 instant, or a bare date meaning that whole
-                    day in Australia/Perth (a user picking a day from a
-                    calendar means their day, not a UTC day)
+from datetime import datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
+from flask import request
 
-Also owns the error shape: {"error": {"code", "message"}} with codes
-bad_timestamp, bad_range, unknown_vehicle, data_unavailable.
-"""
+from backend.models import parse_timestamp
 
 
-from datetime import datetime, time
-
-try:
-    from zoneinfo import ZoneInfo
-except ImportError:
-    from backports.zoneinfo import ZoneInfo
-
-PERTH_TZ = ZoneInfo("Australia/Perth")
-UTC_TZ = ZoneInfo("UTC")
+class ApiParameterError(ValueError):
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+        self.message = message
 
 
-def perth_date_to_utc_range(date_string):
-    date = datetime.strptime(date_string, "%Y-%m-%d").date()
+def parse_vehicle_ids(config) -> list[str] | None:
+    raw = (request.args.get("vehicles") or "").strip()
+    if not raw:
+        return None
 
-    start_perth = datetime.combine(date, time.min, tzinfo=PERTH_TZ)
-    end_perth = datetime.combine(date, time.max, tzinfo=PERTH_TZ)
+    ids = list(dict.fromkeys(part.strip() for part in raw.split(",") if part.strip()))
+    known = {v.id for v in config.vehicles}
+    unknown = [vehicle_id for vehicle_id in ids if vehicle_id not in known]
+    if unknown:
+        raise ApiParameterError(
+            "unknown_vehicle",
+            f"No vehicle with id '{unknown[0]}'. Known ids: {', '.join(sorted(known))}.",
+        )
+    return ids or None
 
-    start_utc = start_perth.astimezone(UTC_TZ)
-    end_utc = end_perth.astimezone(UTC_TZ)
 
-    return start_utc, end_utc
-
-def parse_time_value(value):
-    # bare date: YYYY-MM-DD
-    if len(value) == 10:
-        try:
-            datetime.strptime(value, "%Y-%m-%d")
-            return "date", value
-        except ValueError:
-            pass
-
-    # ISO 8601 timestamp
+def _is_bare_date(value: str) -> bool:
+    if len(value) != 10:
+        return False
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        return "timestamp", parsed
+        datetime.strptime(value, "%Y-%m-%d")
+        return True
     except ValueError:
-        raise ValueError("bad_timestamp")
+        return False
 
-def parse_time_bound(value, is_start):
-    value_type, parsed = parse_time_value(value)
 
-    if value_type == "date":
-        start_utc, end_utc = perth_date_to_utc_range(parsed)
+def _local_timezone(config):
+    try:
+        return ZoneInfo(config.timezone or "Australia/Perth")
+    except Exception:
+        return timezone(timedelta(hours=config.utc_offset_hours or 8))
 
-        if is_start:
-            return start_utc
-        else:
-            return end_utc
 
-    # Full ISO 8601 timestamp must contain timezone information
-    if parsed.tzinfo is None:
-        raise ValueError("bad_timestamp")
+def parse_range(config) -> tuple[datetime | None, datetime | None]:
+    raw_from = (request.args.get("from") or "").strip()
+    raw_to = (request.args.get("to") or "").strip()
+    local_tz = _local_timezone(config)
 
-    return parsed.astimezone(UTC_TZ)
+    def parse_bound(raw: str, *, is_end: bool) -> datetime | None:
+        if not raw:
+            return None
+        try:
+            if _is_bare_date(raw):
+                d = datetime.strptime(raw, "%Y-%m-%d").date()
+                local = datetime.combine(d, time.max if is_end else time.min, tzinfo=local_tz)
+                return local.astimezone(timezone.utc)
+            return parse_timestamp(raw)
+        except (ValueError, TypeError) as exc:
+            raise ApiParameterError("bad_timestamp", f"Invalid timestamp '{raw}'.") from exc
 
-def parse_time_range(from_value, to_value):
-    start = parse_time_bound(from_value, True)
-    end = parse_time_bound(to_value, False)
-
-    if start > end:
-        raise ValueError("bad_range")
-
+    start = parse_bound(raw_from, is_end=False)
+    end = parse_bound(raw_to, is_end=True)
+    if start is not None and end is not None and start > end:
+        raise ApiParameterError("bad_range", "The 'from' timestamp must not be after 'to'.")
     return start, end
-
-def parse_vehicle_ids(value, known_ids):
-    known_ids = list(known_ids)
-
-    # Missing or empty parameter means the whole fleet
-    if value is None or value.strip() == "":
-        return known_ids
-
-    vehicle_ids = [vehicle_id.strip() for vehicle_id in value.split(",")]
-
-    for vehicle_id in vehicle_ids:
-        if vehicle_id not in known_ids:
-            raise ValueError("unknown_vehicle")
-
-    return vehicle_ids
