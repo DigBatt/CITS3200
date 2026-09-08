@@ -14,11 +14,7 @@ bad_timestamp, bad_range, unknown_vehicle, data_unavailable.
 
 
 from datetime import datetime, time
-
-try:
-    from zoneinfo import ZoneInfo
-except ImportError:
-    from backports.zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo
 
 PERTH_TZ = ZoneInfo("Australia/Perth")
 UTC_TZ = ZoneInfo("UTC")
