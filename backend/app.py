@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from flask import Flask, jsonify, send_from_directory
 from backend.api.positions import bp as positions_bp
+from backend.api.vehicles import bp as vehicles_bp
 from backend.config import ConfigError, load_config
 from backend.repository import CsvRepository
 from backend.repository.base import RepositoryError
@@ -35,6 +36,7 @@ def create_app() -> Flask:
     app.config["REPOSITORY"] = CsvRepository.from_config(config)
 
     app.register_blueprint(positions_bp)
+    app.register_blueprint(vehicles_bp)
 
     @app.get("/")
     def index():
