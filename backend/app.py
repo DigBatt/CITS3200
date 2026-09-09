@@ -5,6 +5,7 @@ Run as `python -m backend.app`
 from __future__ import annotations
 from pathlib import Path
 from flask import Flask, jsonify, send_from_directory
+from backend.api.metrics import bp as metrics_bp
 from backend.api.positions import bp as positions_bp
 from backend.api.vehicles import bp as vehicles_bp
 from backend.config import ConfigError, load_config
@@ -37,6 +38,7 @@ def create_app() -> Flask:
 
     app.register_blueprint(positions_bp)
     app.register_blueprint(vehicles_bp)
+    app.register_blueprint(metrics_bp)
 
     @app.get("/")
     def index():

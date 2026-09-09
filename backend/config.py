@@ -31,6 +31,7 @@ class Config:
     map_centre: Optional[list[float]]
     map_zoom: Optional[int]
     refresh_interval_seconds: Optional[int]
+    utilisation: Optional[dict[str, Any]]
 
     def vehicle(self, vehicle_id: str) -> Optional[Vehicle]:
         return next((v for v in self.vehicles if v.id == vehicle_id), None)
@@ -79,6 +80,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
             map_centre=map_settings.get("centre"),
             map_zoom=map_settings.get("zoom"),
             refresh_interval_seconds=map_settings.get("refresh_interval_seconds"),
+            utilisation=app.get("utilisation"),
         )
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
         raise ConfigError(f"Could not read the config in {config_dir}: {exc}") from exc

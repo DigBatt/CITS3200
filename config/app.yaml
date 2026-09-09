@@ -17,3 +17,17 @@ map:
   centre: [-31.98133, 115.81597]
   zoom: 16
   refresh_interval_seconds: 15 # How often the dashboard refetches current positions in live.
+
+utilisation:
+  # Thresholds for the GMG time utilisation model (docs/GMG Time Utilisation Model.md).
+  stationary_speed_mps: 0.2   # below this the shuttle counts as stopped.
+  min_standby_seconds: 120    # a shorter stop at the depot is a delay, not standby.
+  max_gap_seconds: 30         # longer is not reporting.
+
+  depot:
+    # PLACEHOLDER,  Currently the start of the record.
+    centre: [-31.98133, 115.81597]
+    radius_m: 40
+
+  service_hours:
+    weekday: ["08:00", "17:00"]
