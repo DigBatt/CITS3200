@@ -9,6 +9,15 @@ function setStatus(message) {
 
 let timelineControl = null;
 
+// Turns a raw API error message into wording that matches the picker's own
+// Start/End labels, rather than the API's internal from/to param names.
+function humanizeError(message) {
+  if (message.includes("must not be after")) {
+    return "'Start time' must be before 'End time'.";
+  }
+  return message;
+}
+
 async function load(range) {
   setStatus('Loading positions...');
 
@@ -26,7 +35,10 @@ async function load(range) {
       setStatus(null);
     }
   } catch (error) {
-    setStatus(error.message);
+    // A failed request means there's no valid current selection -- the map
+    // shouldn't keep showing whatever trail was drawn before this attempt.
+    drawTracks([]);
+    setStatus(humanizeError(error.message));
   }
 }
 
