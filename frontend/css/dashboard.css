@@ -12,11 +12,13 @@ Components: vehicle list, period controls, overlay toggles, metrics panel,
 
 main {
   position: relative;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 #map {
-  height: 100%;
+  position: absolute;
+  inset: 0;
 }
 
 .map-status {
@@ -66,7 +68,6 @@ main {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  cursor: pointer;
 }
 
 .timeline-switch {
@@ -164,4 +165,1206 @@ main {
   min-height: 1rem;
   font-size: 0.8125rem;
   color: #a35b00;
+}
+
+/*
+Dashboard chrome carried over from drafts/kynan/Nuway Prototype.dc.html.
+
+Everything below is visual structure only: vehicle rows, KPI cards, the
+event log, the utilisation pie/time-model, etc. are all static placeholder
+markup (see `data-stub`/`data-endpoint` attributes in index.html) until
+wired up to live data from the backend. Layout only -- does not touch any
+`.timeline-*` rule above, which stays owned by the date-range picker.
+*/
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: Sora, system-ui, sans-serif;
+  background: #faf9f7;
+  color: #1c1917;
+}
+
+/* ---- Header: brand, view tabs, live clock, avatar ---- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid rgba(28, 25, 23, 0.1);
+}
+
+.app-header-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.app-header-brand-name {
+  font: 700 16px Sora, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.app-header-brand-tag {
+  font: 500 10px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.45);
+  letter-spacing: 0.08em;
+}
+
+.app-tabs {
+  display: flex;
+  gap: 2px;
+  background: rgba(28, 25, 23, 0.05);
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.app-tab {
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font: 500 12.5px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.55);
+  background: transparent;
+  border: none;
+}
+
+.app-tab.is-active {
+  font-weight: 600;
+  color: #1c1917;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.app-header-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.app-live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid rgba(28, 25, 23, 0.14);
+  border-radius: 7px;
+  font: 500 12px Sora, sans-serif;
+}
+
+.app-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(0.66 0.15 155);
+}
+
+.app-live-clock {
+  font: 400 11px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+.app-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: oklch(0.62 0.17 300);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 11px Sora, sans-serif;
+  flex: none;
+}
+
+/* ---- Filter bar: vehicle chips ---- */
+
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  overflow-x: auto;
+  background: #fff;
+  border-bottom: 1px solid rgba(28, 25, 23, 0.08);
+  align-items: center;
+}
+
+.filter-bar-label {
+  flex: none;
+  font: 500 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+.chip-row {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font: 500 11.5px Sora, sans-serif;
+  background: #fff;
+  color: rgba(28, 25, 23, 0.6);
+  border: 1px solid rgba(28, 25, 23, 0.14);
+}
+
+.chip.is-active {
+  background: #1c1917;
+  color: #fff;
+  border-color: #1c1917;
+}
+
+/* ---- Main content: fleet/operator/rider view vs. utilisation view ---- */
+
+.dashboard-view {
+  height: 100%;
+  min-height: 0;
+}
+
+#view-map {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+#view-map[hidden] {
+  display: none;
+}
+
+.view-utilisation {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 16px;
+  overflow-y: auto;
+}
+
+.view-utilisation[hidden] {
+  display: none;
+}
+
+/* ---- Sidebar: fleet / operator / rider panels ---- */
+
+.sidebar {
+  flex: 1 1 300px;
+  min-width: 280px;
+  max-width: 100%;
+  background: #fff;
+  border-right: 1px solid rgba(28, 25, 23, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+.panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+}
+
+.panel-title {
+  font: 600 12px Sora, sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.panel-subtitle {
+  font: 400 11px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+/* ---- Vehicle rows (fleet panel) ---- */
+
+.vehicle-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.vehicle-row {
+  display: flex;
+  gap: 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(28, 25, 23, 0.07);
+  border-left: 3px solid transparent;
+  background: #fff;
+}
+
+.vehicle-row.is-selected {
+  border-left-color: oklch(0.62 0.17 300);
+  background: oklch(0.62 0.17 300 / 4.5%);
+}
+
+.vehicle-row.is-offline {
+  opacity: 0.62;
+  background: repeating-linear-gradient(135deg, rgba(28, 25, 23, 0.03) 0 6px, transparent 6px 12px);
+}
+
+.vehicle-row-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vehicle-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vehicle-id {
+  font: 600 13.5px Sora, sans-serif;
+}
+
+.vehicle-badge {
+  padding: 2px 7px;
+  border-radius: 4px;
+  font: 600 10px Sora, sans-serif;
+  letter-spacing: 0.03em;
+}
+
+.badge-engaged {
+  background: oklch(0.66 0.15 155 / 14%);
+  color: oklch(0.45 0.13 155);
+}
+
+.badge-manual {
+  background: oklch(0.75 0.15 75 / 20%);
+  color: oklch(0.45 0.12 60);
+}
+
+.badge-idle,
+.badge-offline {
+  background: rgba(28, 25, 23, 0.1);
+  color: rgba(28, 25, 23, 0.62);
+}
+
+.vehicle-note {
+  font: 400 11.5px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.55);
+}
+
+.vehicle-stats {
+  display: flex;
+  gap: 14px;
+  font: 400 11px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+.vehicle-chip-num {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(28, 25, 23, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 11px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.5);
+  flex: none;
+}
+
+/* ---- Map layer toggles (fleet panel) ---- */
+
+.layer-toggles {
+  padding: 14px 18px;
+  border-top: 1px solid rgba(28, 25, 23, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.layer-toggles-label {
+  font: 600 11px Sora, sans-serif;
+  letter-spacing: 0.04em;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+.layer-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  font: 500 12px Sora, sans-serif;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 30px;
+  height: 17px;
+  flex: none;
+}
+
+.toggle-switch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(28, 25, 23, 0.16);
+  transition: background 0.15s ease;
+}
+
+.toggle-switch input:checked + .toggle-track {
+  background: oklch(0.62 0.17 300);
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s ease;
+}
+
+.toggle-switch input:checked ~ .toggle-knob {
+  left: 15px;
+}
+
+/* ---- Fleet KPI mini-cards ---- */
+
+.kpi-mini-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px;
+  background: rgba(28, 25, 23, 0.09);
+  border-top: 1px solid rgba(28, 25, 23, 0.09);
+}
+
+.kpi-mini {
+  background: #fff;
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpi-mini-label {
+  font: 500 9.5px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+.kpi-mini-value {
+  font: 600 18px Sora, sans-serif;
+}
+
+/* ---- Operator panel ---- */
+
+.operator-header {
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid rgba(28, 25, 23, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.operator-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.operator-id {
+  font: 600 18px Sora, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.operator-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: rgba(28, 25, 23, 0.09);
+  border: 1px solid rgba(28, 25, 23, 0.09);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.operator-metric {
+  background: #fff;
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.operator-metric-value {
+  font: 600 16px 'IBM Plex Mono', monospace;
+}
+
+.request-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 13px;
+  border: 1px solid oklch(0.75 0.15 75 / 45%);
+  background: oklch(0.75 0.15 75 / 10%);
+  border-radius: 8px;
+}
+
+.request-card[hidden] {
+  display: none;
+}
+
+.request-card-title {
+  font: 600 11.5px Sora, sans-serif;
+  color: oklch(0.42 0.12 60);
+}
+
+.request-card-meta {
+  font: 400 11px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.6);
+}
+
+.request-actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 2px;
+}
+
+.btn-dark,
+.btn-outline {
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font: 600 11.5px Sora, sans-serif;
+  border: 1px solid transparent;
+}
+
+.btn-dark {
+  background: #1c1917;
+  color: #fff;
+}
+
+.btn-outline {
+  background: #fff;
+  border-color: rgba(28, 25, 23, 0.16);
+  font-weight: 500;
+  color: #1c1917;
+}
+
+.autonomy-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.autonomy-label {
+  font: 600 11px Sora, sans-serif;
+  letter-spacing: 0.04em;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+.autonomy-bar {
+  display: flex;
+  height: 24px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: rgba(28, 25, 23, 0.06);
+}
+
+.autonomy-segment.seg-engaged {
+  background: oklch(0.66 0.15 155 / 55%);
+}
+
+.autonomy-segment.seg-manual {
+  background: oklch(0.75 0.15 75);
+}
+
+.autonomy-segment.seg-estop {
+  background: oklch(0.6 0.19 25);
+}
+
+.autonomy-segment.seg-gap {
+  background: rgba(28, 25, 23, 0.12);
+}
+
+.autonomy-scale {
+  display: flex;
+  justify-content: space-between;
+  font: 400 10px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.4);
+}
+
+/* ---- Event log ---- */
+
+.event-log-header {
+  padding: 14px 18px 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.event-log-export {
+  font: 400 11px Sora, sans-serif;
+  color: oklch(0.5 0.15 300);
+  cursor: pointer;
+}
+
+.event-row {
+  display: flex;
+  gap: 11px;
+  padding: 11px 18px;
+  border-top: 1px solid rgba(28, 25, 23, 0.07);
+  cursor: pointer;
+}
+
+.event-time {
+  font: 400 11px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.45);
+  width: 44px;
+  flex: none;
+}
+
+.event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex: none;
+}
+
+.event-dot.dot-manual {
+  background: oklch(0.75 0.15 75);
+}
+
+.event-dot.dot-engage {
+  background: oklch(0.6 0.15 155);
+}
+
+.event-dot.dot-estop {
+  background: oklch(0.6 0.19 25);
+}
+
+.event-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.event-title {
+  font: 600 12px Sora, sans-serif;
+}
+
+.event-desc {
+  font: 400 11px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.55);
+}
+
+/* ---- Rider panel ---- */
+
+.panel-rider {
+  gap: 14px;
+  padding: 18px;
+}
+
+.rider-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rider-title {
+  font: 700 15px Sora, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.rider-sub {
+  font: 400 12px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.55);
+}
+
+.stop-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  border-radius: 10px;
+}
+
+.stop-picker-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 500 10.5px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+.stop-picker-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: oklch(0.62 0.17 300);
+}
+
+.stop-distance {
+  font: 400 11px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+.request-button {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #1c1917;
+  color: #fff;
+  border: none;
+  text-align: left;
+  width: 100%;
+}
+
+.request-button-title {
+  font: 600 15px Sora, sans-serif;
+}
+
+.request-button-sub {
+  font: 400 11.5px Sora, sans-serif;
+  opacity: 0.7;
+}
+
+.arrivals {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.arrivals-label {
+  font: 600 12px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.55);
+}
+
+.arrival-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(28, 25, 23, 0.08);
+}
+
+.arrival-num {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: rgba(28, 25, 23, 0.06);
+  color: rgba(28, 25, 23, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 11.5px 'IBM Plex Mono', monospace;
+  flex: none;
+}
+
+.arrival-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.arrival-route {
+  font: 600 13px Sora, sans-serif;
+}
+
+.arrival-seats {
+  font: 400 11.5px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.55);
+}
+
+.arrival-eta {
+  font: 600 14px 'IBM Plex Mono', monospace;
+}
+
+.rider-note {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(28, 25, 23, 0.04);
+  font: 400 11.5px/1.5 Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.6);
+}
+
+/* ---- Map pane: legend + route note overlaid on the Leaflet map ---- */
+
+.map-pane {
+  flex: 3 1 460px;
+  min-width: 300px;
+  min-height: 420px;
+  position: relative;
+}
+
+.map-legend {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 400;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 11px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-radius: 8px;
+  font: 400 10.5px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.6);
+}
+
+.map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.map-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.map-legend-dot.dot-engaged {
+  background: oklch(0.66 0.15 155);
+}
+
+.map-legend-dot.dot-manual {
+  background: oklch(0.75 0.15 75);
+}
+
+.map-legend-dot.dot-estop {
+  background: oklch(0.6 0.19 25);
+}
+
+.map-legend-dot.dot-offline {
+  background: rgba(28, 25, 23, 0.4);
+}
+
+.map-route-note {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 400;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-radius: 7px;
+  font: 400 10px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+/* map.status is defined above; it now sits inside .map-pane rather than
+   directly under <main>, which is still its nearest positioned ancestor
+   equivalent since .map-pane is position:relative. */
+
+/* ---- Utilisation view ---- */
+
+.util-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.util-scope-label {
+  font: 600 14px Sora, sans-serif;
+}
+
+.util-toolbar-note {
+  font: 400 11px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+.util-tabs {
+  display: flex;
+  gap: 2px;
+  background: rgba(28, 25, 23, 0.05);
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.util-tab {
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font: 500 12.5px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.55);
+  background: transparent;
+  border: none;
+}
+
+.util-tab.is-active {
+  font-weight: 600;
+  color: #1c1917;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.util-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.util-kpi-card {
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.util-kpi-label {
+  font: 500 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+.util-kpi-value {
+  font: 600 26px Sora, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.util-kpi-formula {
+  font: 400 10px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+.util-pie-card {
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  align-items: center;
+}
+
+.util-pie-card[hidden] {
+  display: none;
+}
+
+.util-pie {
+  flex: none;
+  position: relative;
+  width: 230px;
+  height: 230px;
+  border-radius: 50%;
+  /* STUB: static wedge split -- replace with a conic-gradient computed
+     from /api/metrics buckets. */
+  background: conic-gradient(
+    oklch(0.36 0.13 300) 0deg 130.7deg,
+    oklch(0.62 0.05 200) 130.7deg 156deg,
+    oklch(0.88 0.1 95) 156deg 176.4deg,
+    oklch(0.74 0.15 70) 176.4deg 202.9deg,
+    oklch(0.68 0.15 55) 202.9deg 216.2deg,
+    oklch(0.6 0.19 25) 216.2deg 234.2deg,
+    rgba(28, 25, 23, 0.28) 234.2deg 360deg
+  );
+}
+
+.util-pie-center {
+  position: absolute;
+  inset: 58px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.util-pie-value {
+  font: 600 28px Sora, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.util-pie-label {
+  font: 500 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+.util-pie-sub {
+  font: 400 9.5px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.4);
+}
+
+.util-legend {
+  flex: 1 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.util-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 500 12.5px Sora, sans-serif;
+}
+
+.util-legend-label {
+  flex: 1;
+}
+
+.util-legend-hours {
+  font-family: 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.55);
+}
+
+.util-legend-pct {
+  font-family: 'IBM Plex Mono', monospace;
+  width: 52px;
+  text-align: right;
+}
+
+.util-legend-swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.swatch-pt {
+  background: oklch(0.36 0.13 300);
+}
+
+.swatch-np {
+  background: oklch(0.62 0.05 200);
+}
+
+.swatch-od {
+  background: oklch(0.88 0.1 95);
+}
+
+.swatch-sbo {
+  background: oklch(0.74 0.15 70);
+}
+
+.swatch-sbe {
+  background: oklch(0.68 0.15 55);
+}
+
+.swatch-dt {
+  background: oklch(0.6 0.19 25);
+}
+
+.swatch-ut {
+  background: rgba(28, 25, 23, 0.28);
+}
+
+.util-tum-card {
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.util-tum-card[hidden] {
+  display: none;
+}
+
+.util-tum-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font: 600 11px Sora, sans-serif;
+  color: #fff;
+}
+
+.util-tum-row {
+  display: flex;
+  gap: 4px;
+  height: 32px;
+}
+
+.util-tum-seg {
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 9.5px;
+}
+
+.util-tum-seg.seg-ct,
+.util-tum-seg.seg-st,
+.util-tum-seg.seg-at,
+.util-tum-seg.seg-ot,
+.util-tum-seg.seg-wt,
+.util-tum-seg.seg-pt {
+  justify-content: flex-start;
+  padding: 0 12px;
+  font-size: 11px;
+}
+
+.seg-ct {
+  background: oklch(0.72 0.09 300);
+}
+
+.seg-st {
+  background: oklch(0.66 0.13 300);
+}
+
+.seg-ut {
+  background: rgba(28, 25, 23, 0.32);
+}
+
+.seg-at {
+  background: oklch(0.6 0.15 300);
+}
+
+.seg-dt {
+  background: oklch(0.6 0.19 25);
+}
+
+.seg-dt-ghost {
+  background: oklch(0.6 0.19 25 / 35%);
+}
+
+.seg-ghost {
+  background: rgba(28, 25, 23, 0.13);
+}
+
+.seg-ot {
+  background: oklch(0.54 0.16 300);
+}
+
+.seg-sb {
+  background: oklch(0.78 0.14 75);
+}
+
+.seg-wt {
+  background: oklch(0.47 0.16 300);
+}
+
+.seg-od {
+  background: oklch(0.88 0.1 95);
+}
+
+.seg-od-ghost {
+  background: oklch(0.88 0.1 95 / 50%);
+}
+
+.seg-sbo {
+  background: oklch(0.74 0.15 70);
+}
+
+.seg-sbo-ghost {
+  background: oklch(0.74 0.15 70 / 50%);
+}
+
+.seg-sbe {
+  background: oklch(0.68 0.15 55);
+}
+
+.seg-sbe-ghost {
+  background: oklch(0.68 0.15 55 / 50%);
+}
+
+.seg-pt {
+  background: oklch(0.36 0.13 300);
+}
+
+.seg-np {
+  background: oklch(0.62 0.05 200);
+}
+
+.util-tum-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font: 400 10.5px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.6);
+  padding-top: 4px;
+}
+
+.util-tum-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.util-table {
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.util-table-header {
+  display: grid;
+  grid-template-columns: 1.1fr repeat(5, minmax(72px, 1fr));
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(28, 25, 23, 0.1);
+  font: 500 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+.util-table-row {
+  display: grid;
+  grid-template-columns: 1.1fr repeat(5, minmax(72px, 1fr));
+  padding: 13px 16px;
+  cursor: pointer;
+  align-items: center;
+  font: 500 12.5px Sora, sans-serif;
+  border-bottom: 1px solid rgba(28, 25, 23, 0.07);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.util-table-row.is-offline {
+  background: repeating-linear-gradient(135deg, rgba(28, 25, 23, 0.03) 0 6px, transparent 6px 12px);
+}
+
+.util-table-row.util-table-average {
+  font-weight: 600;
+  background: rgba(28, 25, 23, 0.03);
+  cursor: default;
+}
+
+.util-table-name {
+  font-family: Sora, sans-serif;
+  font-weight: 600;
 }

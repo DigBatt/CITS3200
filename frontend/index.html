@@ -7,21 +7,483 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>nUWAy Fleet Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body>
-  <main>
+  <div class="app-shell">
+
+    <!-- ============ Header: brand, view tabs, live clock ============ -->
+    <header class="app-header">
+      <div class="app-header-brand">
+        <span class="app-header-brand-name">nuway</span>
+        <span class="app-header-brand-tag">SHUTTLE OPS</span>
+      </div>
+      <nav class="app-tabs" id="app-tabs" aria-label="Dashboard view">
+        <button type="button" class="app-tab is-active" data-view="fleet">Fleet</button>
+        <button type="button" class="app-tab" data-view="operator">Operator</button>
+        <button type="button" class="app-tab" data-view="rider">Rider</button>
+        <button type="button" class="app-tab" data-view="utilisation">Utilisation</button>
+      </nav>
+      <div class="app-header-spacer"></div>
+      <!-- STUB: wire to a real liveness/heartbeat signal -->
+      <div class="app-live-indicator" data-stub="connection-status">
+        <span class="app-live-dot"></span>
+        <span>Live</span>
+        <span class="app-live-clock" id="app-clock"></span>
+      </div>
+      <!-- STUB: wire to signed-in operator -->
+      <div class="app-avatar" data-stub="current-user">JD</div>
+    </header>
+
+    <!-- ============ Teammate's date/time range control -- untouched ============ -->
     <div id="timeline-container"></div>
-    <div id="map"></div>
-    <p id="status" class="map-status" role="status"></p>
-  </main>
+
+    <!-- ============ Vehicle filter chips (visual stub; not wired) ============ -->
+    <div class="filter-bar" data-stub="vehicle-filter" data-endpoint="/api/vehicles">
+      <span class="filter-bar-label">VEHICLE</span>
+      <div class="chip-row" id="vehicle-filter-chips">
+        <button type="button" class="chip is-active" data-vehicle="all">All vehicles</button>
+        <button type="button" class="chip" data-vehicle="NW-01">NW-01</button>
+        <button type="button" class="chip" data-vehicle="NW-02">NW-02</button>
+        <button type="button" class="chip" data-vehicle="NW-03">NW-03</button>
+        <button type="button" class="chip" data-vehicle="NW-04">NW-04</button>
+      </div>
+    </div>
+
+    <main>
+      <!-- ============ Fleet / Operator / Rider share the map ============ -->
+      <div class="dashboard-view" id="view-map">
+        <aside class="sidebar">
+
+          <!-- ---- Fleet panel ---- -->
+          <div class="panel" id="panel-fleet" data-stub="fleet-panel" data-endpoint="/api/vehicles">
+            <div class="panel-header">
+              <span class="panel-title">Vehicles</span>
+              <span class="panel-subtitle" data-stub="active-count">3 of 4 active</span>
+            </div>
+
+            <div class="vehicle-list">
+              <div class="vehicle-row is-selected" data-vehicle-row="NW-01">
+                <div class="vehicle-row-main">
+                  <div class="vehicle-row-top">
+                    <span class="vehicle-id">NW-01</span>
+                    <span class="vehicle-badge badge-engaged">ENGAGED</span>
+                  </div>
+                  <div class="vehicle-note">Loop A &middot; approaching Library</div>
+                  <div class="vehicle-stats">
+                    <span>18 km/h</span><span>82%</span><span>6 pax</span>
+                  </div>
+                </div>
+                <div class="vehicle-chip-num">01</div>
+              </div>
+
+              <div class="vehicle-row" data-vehicle-row="NW-02">
+                <div class="vehicle-row-main">
+                  <div class="vehicle-row-top">
+                    <span class="vehicle-id">NW-02</span>
+                    <span class="vehicle-badge badge-manual">MANUAL</span>
+                  </div>
+                  <div class="vehicle-note">Loop A &middot; disengaged 2 min ago</div>
+                  <div class="vehicle-stats">
+                    <span>24 km/h</span><span>74%</span><span>2 pax</span>
+                  </div>
+                </div>
+                <div class="vehicle-chip-num">02</div>
+              </div>
+
+              <div class="vehicle-row" data-vehicle-row="NW-03">
+                <div class="vehicle-row-main">
+                  <div class="vehicle-row-top">
+                    <span class="vehicle-id">NW-03</span>
+                    <span class="vehicle-badge badge-idle">IDLE</span>
+                  </div>
+                  <div class="vehicle-note">Depot &middot; charging</div>
+                  <div class="vehicle-stats">
+                    <span>0 km/h</span><span>41%</span><span>0 pax</span>
+                  </div>
+                </div>
+                <div class="vehicle-chip-num">03</div>
+              </div>
+
+              <div class="vehicle-row is-offline" data-vehicle-row="NW-04">
+                <div class="vehicle-row-main">
+                  <div class="vehicle-row-top">
+                    <span class="vehicle-id">NW-04</span>
+                    <span class="vehicle-badge badge-offline">NO SIGNAL</span>
+                  </div>
+                  <div class="vehicle-note">Last packet 14 min ago</div>
+                  <div class="vehicle-stats">
+                    <span>&mdash;</span><span>&mdash;</span><span>&mdash;</span>
+                  </div>
+                </div>
+                <div class="vehicle-chip-num">04</div>
+              </div>
+            </div>
+
+            <!-- STUB: layer toggles are visual only -- not yet wired to map.js layers -->
+            <div class="layer-toggles" data-stub="map-layer-toggles">
+              <span class="layer-toggles-label">MAP LAYERS</span>
+              <label class="layer-toggle-row">
+                <span>Live positions</span>
+                <span class="toggle-switch">
+                  <input type="checkbox" checked>
+                  <span class="toggle-track"></span>
+                  <span class="toggle-knob"></span>
+                </span>
+              </label>
+              <label class="layer-toggle-row">
+                <span>Engage / disengage</span>
+                <span class="toggle-switch">
+                  <input type="checkbox" checked>
+                  <span class="toggle-track"></span>
+                  <span class="toggle-knob"></span>
+                </span>
+              </label>
+              <label class="layer-toggle-row">
+                <span>Stops</span>
+                <span class="toggle-switch">
+                  <input type="checkbox" checked>
+                  <span class="toggle-track"></span>
+                  <span class="toggle-knob"></span>
+                </span>
+              </label>
+              <label class="layer-toggle-row">
+                <span>Today's trail</span>
+                <span class="toggle-switch">
+                  <input type="checkbox">
+                  <span class="toggle-track"></span>
+                  <span class="toggle-knob"></span>
+                </span>
+              </label>
+            </div>
+
+            <!-- STUB: fleet-wide KPIs, see /api/metrics -->
+            <div class="kpi-mini-grid" data-stub="fleet-kpis" data-endpoint="/api/metrics">
+              <div class="kpi-mini">
+                <span class="kpi-mini-label">UPTIME</span>
+                <span class="kpi-mini-value">61.7%</span>
+              </div>
+              <div class="kpi-mini">
+                <span class="kpi-mini-label">EFF. UTIL.</span>
+                <span class="kpi-mini-value">67.4%</span>
+              </div>
+              <div class="kpi-mini">
+                <span class="kpi-mini-label">DISENGAGE</span>
+                <span class="kpi-mini-value">7</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ---- Operator panel ---- -->
+          <div class="panel" id="panel-operator" data-stub="operator-panel" data-endpoint="/api/vehicles" hidden>
+            <div class="operator-header">
+              <div class="operator-title-row">
+                <span class="operator-id">NW-01</span>
+                <span class="vehicle-badge badge-engaged">ENGAGED</span>
+              </div>
+
+              <div class="operator-metrics-grid">
+                <div class="operator-metric">
+                  <span class="kpi-mini-label">SPEED</span>
+                  <span class="operator-metric-value">18 km/h</span>
+                </div>
+                <div class="operator-metric">
+                  <span class="kpi-mini-label">BATTERY</span>
+                  <span class="operator-metric-value">82%</span>
+                </div>
+                <div class="operator-metric">
+                  <span class="kpi-mini-label">OCCUPANCY</span>
+                  <span class="operator-metric-value">6 / 11</span>
+                </div>
+                <div class="operator-metric">
+                  <span class="kpi-mini-label">LAST PACKET</span>
+                  <span class="operator-metric-value">3s</span>
+                </div>
+              </div>
+
+              <!-- STUB: rider request card -- no backend yet, hidden until wired -->
+              <div class="request-card" data-stub="rider-request" hidden>
+                <span class="request-card-title">Rider waiting &middot; Library</span>
+                <span class="request-card-meta">Just now &middot; ETA 4 min</span>
+                <div class="request-actions">
+                  <button type="button" class="btn-dark">Acknowledge</button>
+                  <button type="button" class="btn-outline">Dismiss</button>
+                </div>
+              </div>
+
+              <div class="autonomy-block" data-stub="autonomy-timeline" data-endpoint="/api/events">
+                <span class="autonomy-label">AUTONOMY OVER THE DAY</span>
+                <div class="autonomy-bar">
+                  <span class="autonomy-segment seg-engaged" style="flex:8"></span>
+                  <span class="autonomy-segment seg-manual" style="flex:1"></span>
+                  <span class="autonomy-segment seg-engaged" style="flex:6"></span>
+                  <span class="autonomy-segment seg-estop" style="flex:1"></span>
+                  <span class="autonomy-segment seg-engaged" style="flex:4"></span>
+                  <span class="autonomy-segment seg-gap" style="flex:2"></span>
+                  <span class="autonomy-segment seg-engaged" style="flex:5"></span>
+                  <span class="autonomy-segment seg-manual" style="flex:1"></span>
+                  <span class="autonomy-segment seg-engaged" style="flex:3"></span>
+                </div>
+                <div class="autonomy-scale">
+                  <span>06</span><span>10</span><span>14</span><span>18</span><span>20</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- STUB: engage/disengage/e-stop log -- backend/api/events.py not implemented yet -->
+            <div class="event-log" data-stub="event-log" data-endpoint="/api/events">
+              <div class="event-log-header">
+                <span class="panel-title">Event log &middot; Wed 12</span>
+                <span class="event-log-export">Export CSV</span>
+              </div>
+              <div class="event-row">
+                <span class="event-time">14:02</span>
+                <span class="event-dot dot-manual"></span>
+                <div class="event-body">
+                  <span class="event-title">Disengaged &mdash; operator takeover</span>
+                  <span class="event-desc">Pedestrian in lane &middot; 41s manual</span>
+                </div>
+              </div>
+              <div class="event-row">
+                <span class="event-time">13:47</span>
+                <span class="event-dot dot-engage"></span>
+                <div class="event-body">
+                  <span class="event-title">Engaged</span>
+                  <span class="event-desc">Engaged at depot exit</span>
+                </div>
+              </div>
+              <div class="event-row">
+                <span class="event-time">13:31</span>
+                <span class="event-dot dot-estop"></span>
+                <div class="event-body">
+                  <span class="event-title">Emergency stop</span>
+                  <span class="event-desc">Emergency stop &middot; cleared by operator</span>
+                </div>
+              </div>
+              <div class="event-row">
+                <span class="event-time">12:20</span>
+                <span class="event-dot dot-manual"></span>
+                <div class="event-body">
+                  <span class="event-title">Disengaged &mdash; operator takeover</span>
+                  <span class="event-desc">Parked vehicle blocking &middot; 88s manual</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ---- Rider panel ---- -->
+          <div class="panel panel-rider" id="panel-rider" data-stub="rider-panel" hidden>
+            <div class="rider-intro">
+              <span class="rider-title">nuway shuttle</span>
+              <span class="rider-sub">Let the shuttle know you're waiting</span>
+            </div>
+
+            <div class="stop-picker">
+              <div class="stop-picker-label">
+                <span class="stop-picker-dot"></span>
+                <span>PICK YOUR STOP</span>
+              </div>
+              <div class="chip-row" id="stop-chips">
+                <button type="button" class="chip is-active" data-stop="Library">Library</button>
+                <button type="button" class="chip" data-stop="Sports Hall">Sports Hall</button>
+                <button type="button" class="chip" data-stop="Union">Union</button>
+                <button type="button" class="chip" data-stop="Depot">Depot</button>
+              </div>
+              <span class="stop-distance">Nearest to you &middot; 60 m away</span>
+            </div>
+
+            <!-- STUB: no backend for rider requests yet -->
+            <button type="button" class="request-button" data-stub="send-request">
+              <span class="request-button-title">I'm waiting at Library</span>
+              <span class="request-button-sub">Sends a request to the next vehicle on Loop A</span>
+            </button>
+
+            <div class="arrivals" data-stub="arrivals" data-endpoint="/api/positions">
+              <span class="arrivals-label">Next arrivals</span>
+              <div class="arrival-row">
+                <span class="arrival-num">01</span>
+                <div class="arrival-body">
+                  <span class="arrival-route">Loop A &middot; Library</span>
+                  <span class="arrival-seats">5 seats free</span>
+                </div>
+                <span class="arrival-eta">4 min</span>
+              </div>
+              <div class="arrival-row">
+                <span class="arrival-num">02</span>
+                <div class="arrival-body">
+                  <span class="arrival-route">Loop A &middot; Library</span>
+                  <span class="arrival-seats">9 seats free</span>
+                </div>
+                <span class="arrival-eta">11 min</span>
+              </div>
+            </div>
+
+            <p class="rider-note">Your request appears instantly in the Operator view. Nothing is stored against you unless you sign in.</p>
+          </div>
+        </aside>
+
+        <div class="map-pane">
+          <div id="map"></div>
+
+          <div class="map-legend">
+            <span class="map-legend-item"><span class="map-legend-dot dot-engaged"></span>engaged</span>
+            <span class="map-legend-item"><span class="map-legend-dot dot-manual"></span>manual / disengage</span>
+            <span class="map-legend-item"><span class="map-legend-dot dot-estop"></span>e-stop</span>
+            <span class="map-legend-item"><span class="map-legend-dot dot-offline"></span>no signal</span>
+          </div>
+          <div class="map-route-note">placeholder route &mdash; swap for real GPS</div>
+
+          <p id="status" class="map-status" role="status"></p>
+        </div>
+      </div>
+
+      <!-- ============ Utilisation view (no map) ============ -->
+      <section class="dashboard-view view-utilisation" id="view-utilisation" hidden data-stub="utilisation-view" data-endpoint="/api/metrics">
+        <div class="util-toolbar">
+          <span class="util-scope-label">Fleet average &middot; week 10&ndash;16 Aug 2026</span>
+          <div class="util-tabs" id="util-tabs">
+            <button type="button" class="util-tab is-active" data-util-mode="pie">Pie</button>
+            <button type="button" class="util-tab" data-util-mode="tum">Time model</button>
+          </div>
+          <span class="util-toolbar-note">GMG 2020 categories &middot; use the vehicle chips above to scope</span>
+        </div>
+
+        <div class="util-kpi-grid">
+          <div class="util-kpi-card">
+            <span class="util-kpi-label">UPTIME</span>
+            <span class="util-kpi-value">72.9%</span>
+            <span class="util-kpi-formula">AT / CT</span>
+          </div>
+          <div class="util-kpi-card">
+            <span class="util-kpi-label">PHYSICAL AVAILABILITY</span>
+            <span class="util-kpi-value">90.5%</span>
+            <span class="util-kpi-formula">AT / ST</span>
+          </div>
+          <div class="util-kpi-card">
+            <span class="util-kpi-label">MECHANICAL AVAILABILITY</span>
+            <span class="util-kpi-value">93.5%</span>
+            <span class="util-kpi-formula">OT / (OT + DT)</span>
+          </div>
+          <div class="util-kpi-card">
+            <span class="util-kpi-label">USE OF AVAILABILITY</span>
+            <span class="util-kpi-value">85.0%</span>
+            <span class="util-kpi-formula">OT / AT</span>
+          </div>
+          <div class="util-kpi-card">
+            <span class="util-kpi-label">EFFECTIVE UTILISATION</span>
+            <span class="util-kpi-value">67.4%</span>
+            <span class="util-kpi-formula">WT / ST</span>
+          </div>
+          <div class="util-kpi-card">
+            <span class="util-kpi-label">OPERATING EFFICIENCY</span>
+            <span class="util-kpi-value">79.3%</span>
+            <span class="util-kpi-formula">WT / OT</span>
+          </div>
+        </div>
+
+        <div class="util-pie-card" id="util-pie-card">
+          <div class="util-pie" id="util-pie">
+            <div class="util-pie-center">
+              <span class="util-pie-value">72.9%</span>
+              <span class="util-pie-label">UPTIME</span>
+              <span class="util-pie-sub">AT / CT</span>
+            </div>
+          </div>
+          <div class="util-legend">
+            <div class="util-legend-item"><span class="util-legend-swatch swatch-pt"></span><span class="util-legend-label">Productive &mdash; in service</span><span class="util-legend-hours">61.0 h</span><span class="util-legend-pct">36.3%</span></div>
+            <div class="util-legend-item"><span class="util-legend-swatch swatch-np"></span><span class="util-legend-label">Non-Productive &mdash; deadhead</span><span class="util-legend-hours">12.0 h</span><span class="util-legend-pct">7.1%</span></div>
+            <div class="util-legend-item"><span class="util-legend-swatch swatch-od"></span><span class="util-legend-label">Operating Delay</span><span class="util-legend-hours">9.5 h</span><span class="util-legend-pct">5.7%</span></div>
+            <div class="util-legend-item"><span class="util-legend-swatch swatch-sbo"></span><span class="util-legend-label">Operating Standby &mdash; depot</span><span class="util-legend-hours">12.4 h</span><span class="util-legend-pct">7.4%</span></div>
+            <div class="util-legend-item"><span class="util-legend-swatch swatch-sbe"></span><span class="util-legend-label">External Standby &mdash; blocked</span><span class="util-legend-hours">6.2 h</span><span class="util-legend-pct">3.7%</span></div>
+            <div class="util-legend-item"><span class="util-legend-swatch swatch-dt"></span><span class="util-legend-label">Downtime &mdash; fault, maintenance</span><span class="util-legend-hours">8.4 h</span><span class="util-legend-pct">5.0%</span></div>
+            <div class="util-legend-item"><span class="util-legend-swatch swatch-ut"></span><span class="util-legend-label">Unscheduled &mdash; outside service</span><span class="util-legend-hours">58.6 h</span><span class="util-legend-pct">34.9%</span></div>
+          </div>
+        </div>
+
+        <div class="util-tum-card" id="util-tum-card" hidden>
+          <span class="panel-title">Time Usage Model &middot; Calendar Time 168 h</span>
+          <div class="util-tum-rows">
+            <div class="util-tum-row">
+              <span class="util-tum-seg seg-ct" style="flex:168">Calendar Time (CT) &middot; 168 h</span>
+            </div>
+            <div class="util-tum-row">
+              <span class="util-tum-seg seg-st" style="flex:109.4">Scheduled Time (ST) &middot; 109.4 h</span>
+              <span class="util-tum-seg seg-ut" style="flex:58.6">Unscheduled (UT) &middot; 58.6 h</span>
+            </div>
+            <div class="util-tum-row">
+              <span class="util-tum-seg seg-at" style="flex:99">Available Time (AT) &middot; 99.0 h</span>
+              <span class="util-tum-seg seg-dt" style="flex:8.4">DT</span>
+              <span class="util-tum-seg seg-ghost" style="flex:58.6"></span>
+            </div>
+            <div class="util-tum-row">
+              <span class="util-tum-seg seg-ot" style="flex:84.2">Operating Time (OT) &middot; 84.2 h</span>
+              <span class="util-tum-seg seg-sb" style="flex:14.8">SB</span>
+              <span class="util-tum-seg seg-dt-ghost" style="flex:8.4"></span>
+              <span class="util-tum-seg seg-ghost" style="flex:58.6"></span>
+            </div>
+            <div class="util-tum-row">
+              <span class="util-tum-seg seg-wt" style="flex:74.7">Working Time (WT) &middot; 74.7 h</span>
+              <span class="util-tum-seg seg-od" style="flex:9.5">OD</span>
+              <span class="util-tum-seg seg-sbo" style="flex:12.4">SBO</span>
+              <span class="util-tum-seg seg-sbe" style="flex:6.2">SBE</span>
+              <span class="util-tum-seg seg-dt-ghost" style="flex:8.4"></span>
+              <span class="util-tum-seg seg-ghost" style="flex:58.6"></span>
+            </div>
+            <div class="util-tum-row">
+              <span class="util-tum-seg seg-pt" style="flex:61">Productive (PT) &middot; 61.0 h</span>
+              <span class="util-tum-seg seg-np" style="flex:12">NP</span>
+              <span class="util-tum-seg seg-od-ghost" style="flex:9.5"></span>
+              <span class="util-tum-seg seg-sbo-ghost" style="flex:12.4"></span>
+              <span class="util-tum-seg seg-sbe-ghost" style="flex:6.2"></span>
+              <span class="util-tum-seg seg-dt-ghost" style="flex:8.4"></span>
+              <span class="util-tum-seg seg-ghost" style="flex:58.6"></span>
+            </div>
+          </div>
+          <div class="util-tum-legend">
+            <span><span class="util-legend-swatch swatch-pt"></span>PT 61.0 h</span>
+            <span><span class="util-legend-swatch swatch-np"></span>NP 12.0 h</span>
+            <span><span class="util-legend-swatch swatch-od"></span>OD 9.5 h</span>
+            <span><span class="util-legend-swatch swatch-sbo"></span>SBO 12.4 h</span>
+            <span><span class="util-legend-swatch swatch-sbe"></span>SBE 6.2 h</span>
+            <span><span class="util-legend-swatch swatch-dt"></span>DT 8.4 h</span>
+            <span><span class="util-legend-swatch swatch-ut"></span>UT 58.6 h</span>
+          </div>
+        </div>
+
+        <div class="util-table" data-stub="util-table" data-endpoint="/api/metrics">
+          <div class="util-table-header">
+            <span>VEHICLE</span><span>UPTIME</span><span>PHYS. AVAIL.</span><span>USE OF AVAIL.</span><span>EFF. UTIL.</span><span>OP. EFF.</span>
+          </div>
+          <div class="util-table-row">
+            <span class="util-table-name">NW-Shuttle-01</span><span>74.6%</span><span>92.0%</span><span>86.2%</span><span>69.8%</span><span>80.4%</span>
+          </div>
+          <div class="util-table-row">
+            <span class="util-table-name">NW-Shuttle-02</span><span>73.9%</span><span>91.2%</span><span>85.1%</span><span>68.1%</span><span>78.6%</span>
+          </div>
+          <div class="util-table-row">
+            <span class="util-table-name">NW-Shuttle-03</span><span>71.4%</span><span>89.6%</span><span>83.9%</span><span>65.9%</span><span>77.2%</span>
+          </div>
+          <div class="util-table-row is-offline">
+            <span class="util-table-name">NW-Shuttle-04</span><span>65.8%</span><span>85.1%</span><span>80.7%</span><span>60.3%</span><span>73.5%</span>
+          </div>
+          <div class="util-table-row util-table-average">
+            <span class="util-table-name">Fleet average</span><span>72.9%</span><span>90.5%</span><span>85.0%</span><span>67.4%</span><span>79.3%</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="js/api.js"></script>
   <script src="js/map.js"></script>
   <script src="js/timeline.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/panels.js"></script>
 </body>
 </html>
