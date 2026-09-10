@@ -124,15 +124,15 @@ function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_
         <input type="date" id="timeline-end-date" value="${todayStr}" max="${todayStr}" autocomplete="off">
         <input type="time" id="timeline-end-time" value="${nowStr}" autocomplete="off">
       </div>
-      <label class="timeline-live">
-        <span class="timeline-switch">
-          <input type="checkbox" id="timeline-live" checked>
+      <div class="timeline-live">
+        <label class="timeline-switch" for="timeline-live">
+          <input type="checkbox" id="timeline-live" checked aria-labelledby="timeline-live-label">
           <span class="timeline-switch-track"></span>
           <span class="timeline-switch-knob"></span>
-        </span>
-        <span>Live (end = now)</span>
+        </label>
+        <span id="timeline-live-label">Live (end = now)</span>
         <span class="timeline-live-dot" aria-hidden="true"></span>
-      </label>
+      </div>
       <p class="timeline-summary">Showing <strong id="timeline-summary-text"></strong></p>
       <p class="timeline-status" aria-live="polite"></p>
     </div>
