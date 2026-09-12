@@ -8,6 +8,7 @@ function setStatus(message) {
 }
 
 let timelineControl = null;
+let selectedVehicles = null;
 
 // Turns a raw API error message into wording that matches the picker's own
 // Start/End labels, rather than the API's internal from/to param names.
@@ -23,6 +24,7 @@ async function load(range) {
 
   try {
     const data = await getPositions({
+      vehicles: selectedVehicles,
       from: range?.from,
       to: range?.to,
     });
@@ -48,5 +50,20 @@ document.addEventListener('DOMContentLoaded', () => {
   timelineControl = Timeline.createTimelineControl(
     document.getElementById('timeline-container'),
     { onChange: (range) => { if (range) load(range); } }
+  );
+
+  createVehicleControl(
+    document.getElementById('vehicle-filter-chips'),
+    {
+      onChange: (vehicles) => {
+        selectedVehicles = vehicles;
+
+        const range = timelineControl?.getRange();
+
+        if (range) {
+          load(range);
+        }
+      }
+    }
   );
 });
