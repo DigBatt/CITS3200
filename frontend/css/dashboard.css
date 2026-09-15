@@ -170,10 +170,9 @@ main {
 /*
 Dashboard chrome carried over from drafts/kynan/Nuway Prototype.dc.html.
 
-Everything below is visual structure only: vehicle rows, KPI cards, the
-event log, the utilisation pie/time-model, etc. are all static placeholder
-markup (see `data-stub`/`data-endpoint` attributes in index.html) until
-wired up to live data from the backend. Layout only -- does not touch any
+Vehicle rows, the map legend and the utilisation view are rendered by
+js/vehicles.js and js/utilisation.js; the operator and rider panels stay
+empty until the API has events and stops. Layout only -- does not touch any
 `.timeline-*` rule above, which stays owned by the date-range picker.
 */
 
@@ -347,6 +346,18 @@ wired up to live data from the backend. Layout only -- does not touch any
   overflow-y: auto;
 }
 
+/* Utilisation palette: one colour per time category, read by utilisation.js. */
+.view-utilisation {
+  --util-ct: oklch(0.72 0.09 300);
+  --util-ot: oklch(0.54 0.16 300);
+  --util-wt: oklch(0.44 0.16 300);
+  --util-od: oklch(0.66 0.15 55);
+  --util-sb: oklch(0.56 0.08 200);
+  --util-nr: oklch(0.6 0.01 60);
+  --util-st: oklch(0.52 0.1 245);
+  --util-ut: oklch(0.68 0.02 245);
+}
+
 .view-utilisation[hidden] {
   display: none;
 }
@@ -441,7 +452,8 @@ wired up to live data from the backend. Layout only -- does not touch any
   letter-spacing: 0.03em;
 }
 
-.badge-engaged {
+.badge-engaged,
+.badge-active {
   background: oklch(0.66 0.15 155 / 14%);
   color: oklch(0.45 0.13 155);
 }
@@ -452,7 +464,8 @@ wired up to live data from the backend. Layout only -- does not touch any
 }
 
 .badge-idle,
-.badge-offline {
+.badge-offline,
+.badge-inactive {
   background: rgba(28, 25, 23, 0.1);
   color: rgba(28, 25, 23, 0.62);
 }
@@ -480,6 +493,17 @@ wired up to live data from the backend. Layout only -- does not touch any
   font: 600 11px 'IBM Plex Mono', monospace;
   color: rgba(28, 25, 23, 0.5);
   flex: none;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 14px 18px;
+  font: 400 11.5px/1.5 Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+.panel-rider .empty-state {
+  padding: 0;
 }
 
 /* ---- Map layer toggles (fleet panel) ---- */
@@ -943,6 +967,10 @@ wired up to live data from the backend. Layout only -- does not touch any
   color: rgba(28, 25, 23, 0.6);
 }
 
+.map-legend[hidden] {
+  display: none;
+}
+
 .map-legend-item {
   display: flex;
   align-items: center;
@@ -969,19 +997,6 @@ wired up to live data from the backend. Layout only -- does not touch any
 
 .map-legend-dot.dot-offline {
   background: rgba(28, 25, 23, 0.4);
-}
-
-.map-route-note {
-  position: absolute;
-  right: 12px;
-  top: 12px;
-  z-index: 400;
-  padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(28, 25, 23, 0.1);
-  border-radius: 7px;
-  font: 400 10px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.5);
 }
 
 /* map.status is defined above; it now sits inside .map-pane rather than
@@ -1084,17 +1099,7 @@ wired up to live data from the backend. Layout only -- does not touch any
   width: 230px;
   height: 230px;
   border-radius: 50%;
-  /* STUB: static wedge split -- replace with a conic-gradient computed
-     from /api/metrics buckets. */
-  background: conic-gradient(
-    oklch(0.36 0.13 300) 0deg 130.7deg,
-    oklch(0.62 0.05 200) 130.7deg 156deg,
-    oklch(0.88 0.1 95) 156deg 176.4deg,
-    oklch(0.74 0.15 70) 176.4deg 202.9deg,
-    oklch(0.68 0.15 55) 202.9deg 216.2deg,
-    oklch(0.6 0.19 25) 216.2deg 234.2deg,
-    rgba(28, 25, 23, 0.28) 234.2deg 360deg
-  );
+  background: rgba(28, 25, 23, 0.08);
 }
 
 .util-pie-center {
@@ -1161,34 +1166,6 @@ wired up to live data from the backend. Layout only -- does not touch any
   flex: none;
 }
 
-.swatch-pt {
-  background: oklch(0.36 0.13 300);
-}
-
-.swatch-np {
-  background: oklch(0.62 0.05 200);
-}
-
-.swatch-od {
-  background: oklch(0.88 0.1 95);
-}
-
-.swatch-sbo {
-  background: oklch(0.74 0.15 70);
-}
-
-.swatch-sbe {
-  background: oklch(0.68 0.15 55);
-}
-
-.swatch-dt {
-  background: oklch(0.6 0.19 25);
-}
-
-.swatch-ut {
-  background: rgba(28, 25, 23, 0.28);
-}
-
 .util-tum-card {
   background: #fff;
   border: 1px solid rgba(28, 25, 23, 0.1);
@@ -1228,87 +1205,24 @@ wired up to live data from the backend. Layout only -- does not touch any
   font-size: 9.5px;
 }
 
-.util-tum-seg.seg-ct,
-.util-tum-seg.seg-st,
-.util-tum-seg.seg-at,
-.util-tum-seg.seg-ot,
-.util-tum-seg.seg-wt,
-.util-tum-seg.seg-pt {
+.util-tum-seg.is-major {
   justify-content: flex-start;
   padding: 0 12px;
   font-size: 11px;
 }
 
-.seg-ct {
-  background: oklch(0.72 0.09 300);
+.util-tum-seg.is-ghost {
+  background: rgba(28, 25, 23, 0.08);
+  color: rgba(28, 25, 23, 0.55);
+  font-weight: 500;
 }
 
-.seg-st {
-  background: oklch(0.66 0.13 300);
-}
-
-.seg-ut {
-  background: rgba(28, 25, 23, 0.32);
-}
-
-.seg-at {
-  background: oklch(0.6 0.15 300);
-}
-
-.seg-dt {
-  background: oklch(0.6 0.19 25);
-}
-
-.seg-dt-ghost {
-  background: oklch(0.6 0.19 25 / 35%);
-}
-
-.seg-ghost {
-  background: rgba(28, 25, 23, 0.13);
-}
-
-.seg-ot {
-  background: oklch(0.54 0.16 300);
-}
-
-.seg-sb {
-  background: oklch(0.78 0.14 75);
-}
-
-.seg-wt {
-  background: oklch(0.47 0.16 300);
-}
-
-.seg-od {
-  background: oklch(0.88 0.1 95);
-}
-
-.seg-od-ghost {
-  background: oklch(0.88 0.1 95 / 50%);
-}
-
-.seg-sbo {
-  background: oklch(0.74 0.15 70);
-}
-
-.seg-sbo-ghost {
-  background: oklch(0.74 0.15 70 / 50%);
-}
-
-.seg-sbe {
-  background: oklch(0.68 0.15 55);
-}
-
-.seg-sbe-ghost {
-  background: oklch(0.68 0.15 55 / 50%);
-}
-
-.seg-pt {
-  background: oklch(0.36 0.13 300);
-}
-
-.seg-np {
-  background: oklch(0.62 0.05 200);
+.util-tum-caption {
+  margin-top: 6px;
+  font: 500 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(28, 25, 23, 0.5);
 }
 
 .util-tum-legend {
