@@ -1,15 +1,5 @@
 // Utilisation: the fleet panel's KPI tiles and the Utilisation view, both
 // drawn from /api/metrics for the current selection.
-//
-// Only what the telemetry supports is shown: the four measured states, which
-// together tile calendar time, scheduled time from the service roster, and
-// the three KPIs built from those. The KPIs the backend cannot compute
-// (uptime, the availabilities, production effectiveness) and the buckets they
-// need are never read.
-//
-// With more than one vehicle the figures are pooled: buckets are summed and
-// the KPIs recomputed from the sums, so each vehicle weighs in by its time
-// rather than each ratio counting equally. Hours are then vehicle-hours.
 
 (function () {
   // Colours are the --util-* custom properties in dashboard.css.
@@ -22,11 +12,11 @@
 
   const KPIS = [
     { key: 'asset_utilisation', label: 'ASSET UTILISATION', short: 'ASSET UTIL.', formula: 'OT / CT' },
-    { key: 'effective_utilisation', label: 'EFFECTIVE UTILISATION', short: 'EFF. UTIL.', formula: 'WT / ST' },
+    { key: 'effective_utilisation', label: 'EFFECTIVE UTILISATION', short: 'EFF. UTIL.', formula: 'WT in ST / ST' },
     { key: 'operating_efficiency', label: 'OPERATING EFFICIENCY', short: 'OP. EFF.', formula: 'WT / OT' },
   ];
 
-  const BUCKETS = ['calendar_seconds', 'operating_seconds', 'scheduled_seconds', 'unscheduled_seconds', ...STATES.map((s) => s.key)];
+  const BUCKETS = ['calendar_seconds', 'operating_seconds', 'scheduled_seconds', 'scheduled_working_seconds', 'unscheduled_seconds', ...STATES.map((s) => s.key)];
 
   const EMPTY = { buckets: {}, kpis: {}, unavailable: {} };
 
@@ -45,7 +35,7 @@
 
     const kpis = {
       asset_utilisation: ratio(buckets.operating_seconds, buckets.calendar_seconds),
-      effective_utilisation: ratio(buckets.working_seconds, buckets.scheduled_seconds),
+      effective_utilisation: ratio(buckets.scheduled_working_seconds, buckets.scheduled_seconds),
       operating_efficiency: ratio(buckets.working_seconds, buckets.operating_seconds),
     };
 

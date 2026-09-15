@@ -13,6 +13,9 @@ function setStatus(message) {
 let timelineControl = null;
 let currentRange = null;
 let latestLoad = 0;
+// The selection the map view was last fitted to. Live polls repeat it (their
+// `to` is always null), so they redraw without moving the map.
+let lastFitted = null;
 
 // Turns a raw API error message into wording that matches the picker's own
 // Start/End labels, rather than the API's internal from/to param names.
@@ -41,7 +44,9 @@ async function load() {
   if (request !== latestLoad) return;
 
   if (positions.status === 'fulfilled') {
-    const drawn = drawTracks(positions.value.vehicles);
+    const selection = JSON.stringify(query);
+    const drawn = drawTracks(positions.value.vehicles, { fit: selection !== lastFitted });
+    if (drawn > 0) lastFitted = selection;
 
     if (drawn === 0) {
       timelineControl?.showNoData();

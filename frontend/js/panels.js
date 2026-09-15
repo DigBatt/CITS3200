@@ -1,8 +1,3 @@
-// Dashboard chrome carried over from drafts/kynan/Nuway Prototype.dc.html.
-//
-// Purely visual: switches which view, panel or utilisation chart is shown.
-// The data in them is rendered by vehicles.js and utilisation.js.
-
 document.addEventListener('DOMContentLoaded', () => {
   const tabs = document.querySelectorAll('#app-tabs .app-tab');
   const viewMap = document.getElementById('view-map');
@@ -24,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     viewMap.hidden = false;
     viewUtilisation.hidden = true;
+    showMap();
     Object.entries(panels).forEach(([name, panel]) => {
       panel.hidden = name !== view;
     });
