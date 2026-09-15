@@ -272,9 +272,9 @@ def _apply_min_standby(merged: Sequence[Span], settings: Settings) -> list[Span]
     return _merge(demoted)
 
 
-def scheduled_seconds(start: datetime, end: datetime, settings: Settings) -> Optional[float]:
+def service_periods(start: datetime, end: datetime, settings: Settings) -> Optional[list[tuple[datetime, datetime]]]:
     """
-    Service hours overlapping the window, in seconds.
+    Service hours overlapping the window, each clipped to it.
 
     Hours are read in the display timezone, since a roster is written in local
     time. Only `weekday` is understood, so a weekend day contributes nothing;
@@ -288,27 +288,49 @@ def scheduled_seconds(start: datetime, end: datetime, settings: Settings) -> Opt
 
     Returns
     -------
-    float or None
-        None when no service hours or no timezone are configured, which leaves
-        scheduled time genuinely unknown rather than zero.
+    list of (datetime, datetime) or None
+        Ascending, non-empty (opens, closes) pairs. None when no service hours
+        or no timezone are configured, which leaves scheduled time genuinely
+        unknown rather than zero.
     """
     if not settings.service_hours or settings.timezone is None:
         return None
 
     tz = ZoneInfo(settings.timezone)
-    total = 0.0
+    periods: list[tuple[datetime, datetime]] = []
     day: date = start.astimezone(tz).date()
     last: date = end.astimezone(tz).date()
 
     while day <= last:
         hours = settings.service_hours.get("weekday") if day.weekday() < 5 else None
         if hours:
-            opens = datetime.combine(day, hours[0], tzinfo=tz)
-            closes = datetime.combine(day, hours[1], tzinfo=tz)
-            total += max(0.0, (min(closes, end) - max(opens, start)).total_seconds())
+            opens = max(datetime.combine(day, hours[0], tzinfo=tz), start)
+            closes = min(datetime.combine(day, hours[1], tzinfo=tz), end)
+            if closes > opens:
+                periods.append((opens, closes))
         day += timedelta(days=1)
 
-    return total
+    return periods
+
+
+def scheduled_seconds(start: datetime, end: datetime, settings: Settings) -> Optional[float]:
+    """
+    Service hours overlapping the window, in seconds.
+
+    Returns
+    -------
+    float or None
+        None when scheduled time is unknown, see `service_periods`.
+    """
+    periods = service_periods(start, end, settings)
+    return None if periods is None else sum(((closes - opens).total_seconds() for opens, closes in periods), 0.0)
+
+
+def seconds_within(span: Span, periods: Sequence[tuple[datetime, datetime]]) -> float:
+    """
+    How much of a span falls inside the given periods.
+    """
+    return sum((max(0.0, (min(span.end, closes) - max(span.start, opens)).total_seconds()) for opens, closes in periods), 0.0)
 
 
 def summarise(
@@ -337,8 +359,9 @@ def summarise(
     ValueError
         If a required threshold is unset, or the window is empty.
     """
+    classified = spans(positions, start, end, settings)
     totals = {state: 0.0 for state in State}
-    for span in spans(positions, start, end, settings):
+    for span in classified:
         totals[span.state] += span.seconds
 
     calendar = (end - start).total_seconds()
@@ -347,6 +370,14 @@ def summarise(
     standby = totals[State.STANDBY]
     operating = working + delay
     scheduled = scheduled_seconds(start, end, settings)
+    periods = service_periods(start, end, settings)
+    # GMG nests working time inside scheduled time, so effective utilisation
+    # counts only the working time that fell within service hours.
+    scheduled_working = (
+        None
+        if periods is None
+        else sum((seconds_within(span, periods) for span in classified if span.state == State.WORKING), 0.0)
+    )
 
     result = Utilisation(vehicle_id=vehicle_id, window_start=start, window_end=end)
     result.buckets = {
@@ -357,6 +388,7 @@ def summarise(
         "not_reporting_seconds": totals[State.NOT_REPORTING],
         "operating_seconds": operating,
         "scheduled_seconds": scheduled,
+        "scheduled_working_seconds": scheduled_working,
         "unscheduled_seconds": calendar - scheduled if scheduled is not None else None,
         "downtime_seconds": None,
         "available_seconds": None,
@@ -365,7 +397,7 @@ def summarise(
     result.kpis = {
         "asset_utilisation": operating / calendar,
         "operating_efficiency": working / operating if operating else None,
-        "effective_utilisation": working / scheduled if scheduled else None,
+        "effective_utilisation": scheduled_working / scheduled if scheduled else None,
         **{name: None for name in BLOCKED_KPIS},
     }
 
@@ -375,6 +407,7 @@ def summarise(
             "needs scheduled time; config/app.yaml does not set utilisation.service_hours"
         )
         result.unavailable["scheduled_seconds"] = result.unavailable["effective_utilisation"]
+        result.unavailable["scheduled_working_seconds"] = result.unavailable["effective_utilisation"]
     if not operating:
         result.unavailable["operating_efficiency"] = "no operating time in this window"
     if not settings.has_depot:
