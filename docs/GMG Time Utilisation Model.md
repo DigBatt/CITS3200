@@ -29,36 +29,37 @@
 * **Not derivable from datasets as need fault/maintenance log**
 
 ### Operating Time
+* Available and under the control of a human _or a system_. `OT = AT − SB`.
+* Conventionally gross operating hours (GOH).
+* The "or system" wording is what makes the model work for autonomous fleets.
+* `timestamp`, `timestamp_unix`, `position` to determine when away from depot
+
+### Standby
 * Available but not operating. `SB = SBO + SBE`
 * **Operating standby (SBO)** — No immediate intent to run, for reasons within management control: no operator, shift change, crib breaks, meetings, training, no assignment issued.
 * **External standby (SBE)** — Available, required and committed, but blocked by causes outside operating management's influence: client suspends work, work area closed by geotech or water, site-wide weather or power loss, workforce shortage. For a contractor this is the "off hours" state used for billing.
-* `timestamp`, `timestampt_unix`, `position` to determine when away from from depot
-
-### Standby
-* Available and under the control of a human _or a system_. `OT = AT − SB`. 
-* Conventionally gross operating hours (GOH).
-* The "or system" wording is what makes the model work for autonomous fleets.
 * `timestamp`, `timestamp_unix`, `position` Partially possible by investigating when stationary at depot during service hours
-### Working Time
-* Running but temporarily stopped by delays inherent to the operation or the immediate physical conditions.
-* Within the operator's control conventionally, or the control system's control autonomously.
-* Waiting for assignment, stuck, spill cleanup with operator aboard, loss of GPS or site wireless, safety stops.
 
-### Operating Delay
+### Working Time
 * Operating as assigned and performing its intended function, covering activities that do and don't directly produce.
 * `WT = OT − OD`
 * Conventionally net operating hours (NOH)
-* `timestamp`, `timestamp_unix`, `position`, partially possible - unplanned stops 
+
+### Operating Delay
+* Running but temporarily stopped by delays inherent to the operation or the immediate physical conditions.
+* Within the operator's control conventionally, or the control system's control autonomously.
+* Waiting for assignment, stuck, spill cleanup with operator aboard, loss of GPS or site wireless, safety stops.
+* `timestamp`, `timestamp_unix`, `position`, partially possible - unplanned stops
 
 ### Productive Time
-* Unavoidable activity that doesn't directly produce but enables safe, efficient operation to continue. 
-* Face cleanup, moving trailing cables, tramming, travel empty, waiting at the loading unit.
+* Performing its intended function on activities that directly contribute to production.
+* `PT = WT − NP`
+* If NP can't be isolated, fold the two together and report at working time.
 * `timestamp`, `timestamp_unix`, possible if \# of students in bus is counted
 
 ### Non-Productive Time
-* Performing its intended function on activities that directly contribute to production. 
-* `PT = WT − NP`
-* If NP can't be isolated, fold the two together and report at working time.
+* Unavoidable activity that doesn't directly produce but enables safe, efficient operation to continue.
+* Face cleanup, moving trailing cables, tramming, travel empty, waiting at the loading unit.
 * `timestamp`, `timestamp_unix`, possible if \# of students in bus is counted
 
 ## KPIs
@@ -94,9 +95,6 @@
 
 #### Asset Utilisation
 * `OT / CT`
-
-#### Operating Efficiency
-* `WT / OT`
 
 #### Production Effectiveness
 * `PT / OT`
