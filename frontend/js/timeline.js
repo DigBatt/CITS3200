@@ -21,6 +21,14 @@ const PERTH_UTC_OFFSET_HOURS = 8; // WA does not observe DST.
 const DEFAULT_LIVE_POLL_MS = 15000; // matches config/app.yaml refresh_interval_seconds
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// TEMPORARY dev convenience: defaults Start to the sample
+// data's actual window instead of today, so tracks render immediately on
+// load without needing to touch the picker first. Only the sample CSVs
+// exist right now (no live telemetry yet) -- remove this once real
+// position data is flowing in, reverting Start's default to today.
+const DEV_DEFAULT_START_DATE = '2025-09-04';
+const DEV_DEFAULT_START_TIME = '08:00';
+
 /**
  * The current calendar date in Perth local time, as "YYYY-MM-DD".
  *
@@ -116,8 +124,8 @@ function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_
     <div class="timeline-control">
       <div class="timeline-row">
         <span class="timeline-row-label">Start</span>
-        <input type="date" id="timeline-start-date" value="${todayStr}" max="${todayStr}" autocomplete="off">
-        <input type="time" id="timeline-start-time" value="00:00" autocomplete="off">
+        <input type="date" id="timeline-start-date" value="${DEV_DEFAULT_START_DATE}" max="${todayStr}" autocomplete="off">
+        <input type="time" id="timeline-start-time" value="${DEV_DEFAULT_START_TIME}" autocomplete="off">
       </div>
       <div class="timeline-row" id="timeline-end-row">
         <span class="timeline-row-label">End</span>
@@ -222,8 +230,8 @@ function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_
   return {
     getRange: currentRange,
     reset: () => {
-      startDate.value = todayStr;
-      startTime.value = '00:00';
+      startDate.value = DEV_DEFAULT_START_DATE;
+      startTime.value = DEV_DEFAULT_START_TIME;
       endDate.value = todayStr;
       endTime.value = getPerthTimeString();
       liveToggle.checked = true;
