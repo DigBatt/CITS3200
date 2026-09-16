@@ -113,7 +113,8 @@ function formatDisplay(dateStr, timeStr) {
  * @returns {{
  *   getRange: () => {from: string|null, to: string|null, live: boolean},
  *   reset: () => void,
- *   showNoData: () => void
+ *   showNoData: () => void,
+ *   clearStatus: () => void
  * }}
  */
 function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_POLL_MS } = {}) {
@@ -243,6 +244,11 @@ function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_
     // (S06 AC2, docs/api.md).
     showNoData: () => {
       status.textContent = 'No data for this period.';
+    },
+    // Called by main.js once a fetch comes back with data, e.g. after the
+    // vehicle filter changes, so an earlier "no data" does not linger.
+    clearStatus: () => {
+      status.textContent = '';
     },
   };
 }

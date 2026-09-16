@@ -7,6 +7,8 @@
 let map = null;
 const layers = { trails: null };
 
+let pendingFit = null;
+
 function initMap() {
   map = L.map('map').setView([-31.98133, 115.81597], 16); // sets the initial to UWA campus
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -16,11 +18,9 @@ function initMap() {
   layers.trails = L.layerGroup().addTo(map);
 }
 
-// Draws one trail per vehicle and a marker at its last known position, then
-// fits the view to everything drawn. Returns the number of vehicles with
-// something to draw, so the caller can say when there is nothing.
-function drawTracks(vehicles) {
+function drawTracks(vehicles, { fit = true } = {}) {
   layers.trails.clearLayers();
+  if (fit) pendingFit = null;
   const bounds = L.latLngBounds([]);
   let drawn = 0;
 
@@ -42,6 +42,24 @@ function drawTracks(vehicles) {
     bounds.extend(points);
   }
 
-  if (drawn > 0) map.fitBounds(bounds, { padding: [24, 24] });
+  if (drawn > 0 && fit) fitTo(bounds);
   return drawn;
+}
+
+// A hidden map measures 0x0, and fitting to that zooms all the way in, so a
+// fit made while the map is hidden waits for showMap().
+function fitTo(bounds) {
+  if (map.getContainer().clientWidth === 0) {
+    pendingFit = bounds;
+    return;
+  }
+  pendingFit = null;
+  map.fitBounds(bounds, { padding: [24, 24] });
+}
+
+// Call when the map becomes visible again: it re-measures the container,
+// which may have been resized while hidden, then applies any waiting fit.
+function showMap() {
+  map.invalidateSize();
+  if (pendingFit) fitTo(pendingFit);
 }

@@ -1,12 +1,3 @@
-// Dashboard chrome carried over from drafts/kynan/Nuway Prototype.dc.html.
-//
-// Purely visual: switches which panel/section is shown. None of this reads
-// or writes real vehicle data yet -- see the `data-stub`/`data-endpoint`
-// attributes in index.html for where live wiring will attach later.
-//
-// Deliberately independent of main.js/map.js/timeline.js/api.js so the
-// existing date-range picker (and its data flow) is untouched.
-
 document.addEventListener('DOMContentLoaded', () => {
   const tabs = document.querySelectorAll('#app-tabs .app-tab');
   const viewMap = document.getElementById('view-map');
@@ -28,30 +19,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     viewMap.hidden = false;
     viewUtilisation.hidden = true;
+    showMap();
     Object.entries(panels).forEach(([name, panel]) => {
       panel.hidden = name !== view;
     });
   }
 
   tabs.forEach((tab) => tab.addEventListener('click', () => setView(tab.dataset.view)));
-
-  // Vehicle filter chips: single-select, visual only for now.
-  const vehicleChips = document.getElementById('vehicle-filter-chips');
-  vehicleChips?.addEventListener('click', (event) => {
-    const chip = event.target.closest('.chip');
-    if (!chip) return;
-    vehicleChips.querySelectorAll('.chip').forEach((c) => c.classList.remove('is-active'));
-    chip.classList.add('is-active');
-  });
-
-  // Rider stop chips: single-select, visual only for now.
-  const stopChips = document.getElementById('stop-chips');
-  stopChips?.addEventListener('click', (event) => {
-    const chip = event.target.closest('.chip');
-    if (!chip) return;
-    stopChips.querySelectorAll('.chip').forEach((c) => c.classList.remove('is-active'));
-    chip.classList.add('is-active');
-  });
 
   // Utilisation view: Pie / Time model toggle.
   const utilTabs = document.querySelectorAll('#util-tabs .util-tab');
