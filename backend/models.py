@@ -49,6 +49,7 @@ class Vehicle:
     name: Optional[str] = None
     colour: Optional[str] = None
     positions_file: Optional[str] = None
+    source_url: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {"id": self.id, "name": self.name, "colour": self.colour}

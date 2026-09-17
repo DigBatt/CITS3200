@@ -23,13 +23,34 @@ The dashboard runs on the committed sample data with no client access and no
 further setup. None of it is a live feed, and only one of the two sample
 files contains real measurements, see [data/README.md](data/README.md).
 
+## Live data
+
+The logger polls each vehicle's REV tracking endpoint (`source_url` in
+`config/vehicles.yaml`) and appends new snapshots to `data/live/`.
+
+```bash
+python -m backend.logger           # run until Ctrl+C
+```
+
+To view it, set `data.directory: data/live` in `config/app.yaml` and run
+`python -m backend.app` in a second terminal. The endpoints only hold each
+bus's latest position, so history starts when the logger does.
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
 ## Layout
 
 ```
 config/      vehicle identity and app settings.
 docs/        the API contract, the database schema, notes on the source data
 data/        committed sample data.
-backend/     Flask app, storage behind an interface, API blueprints.
+backend/     Flask app, storage behind an interface, API blueprints, live logger.
+tests/       pytest suite.
 frontend/    Leaflet dashboard.
 drafts/      Sprint 1 prototypes, reference only so not part of the build.
 GPS_Report/  client supplied telemetry and ROS 2 sample nodes.

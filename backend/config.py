@@ -24,6 +24,7 @@ class Config:
 
     vehicles: list[Vehicle]
     data_directory: Optional[Path]
+    live_directory: Optional[Path]
     inactivity_threshold_seconds: Optional[int]
     expected_poll_interval_seconds: Optional[int]
     timezone: Optional[str]
@@ -32,6 +33,7 @@ class Config:
     map_zoom: Optional[int]
     refresh_interval_seconds: Optional[int]
     utilisation: Optional[dict[str, Any]]
+    logger: Optional[dict[str, Any]]
 
     def vehicle(self, vehicle_id: str) -> Optional[Vehicle]:
         return next((v for v in self.vehicles if v.id == vehicle_id), None)
@@ -59,6 +61,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
         map_settings = app.get("map") or {}
 
         directory = data.get("directory")
+        live_directory = data.get("live_directory")
 
         vehicles = [
             Vehicle(
@@ -66,6 +69,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
                 name=entry.get("name"),
                 colour=entry.get("colour"),
                 positions_file=entry.get("positions_file"),
+                source_url=entry.get("source_url"),
             )
             for entry in fleet.get("vehicles") or []
         ]
@@ -73,6 +77,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
         return Config(
             vehicles=vehicles,
             data_directory=PROJECT_ROOT / directory if directory else None,
+            live_directory=PROJECT_ROOT / live_directory if live_directory else None,
             inactivity_threshold_seconds=liveness.get("inactivity_threshold_seconds"),
             expected_poll_interval_seconds=liveness.get("expected_poll_interval_seconds"),
             timezone=display.get("timezone"),
@@ -81,6 +86,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
             map_zoom=map_settings.get("zoom"),
             refresh_interval_seconds=map_settings.get("refresh_interval_seconds"),
             utilisation=app.get("utilisation"),
+            logger=app.get("logger"),
         )
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
         raise ConfigError(f"Could not read the config in {config_dir}: {exc}") from exc

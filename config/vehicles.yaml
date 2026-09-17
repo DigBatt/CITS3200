@@ -1,15 +1,30 @@
 # Vehicle identity scheme 
 
+# source_url is the REV tracking endpoint the live logger polls. It returns
+# the latest snapshot only. Bus 1 has no number in its URL.
+
 vehicles:
   - id: "1"
     name: nUWAy 1
     colour: "#d4741f"
     positions_file: positions_1.csv
+    source_url: https://revproject.com/tracking/gps_pos.php
 
   - id: "2"
     name: nUWAy 2
     colour: "#2f7d8f"
     positions_file: positions_2.csv
+    source_url: https://revproject.com/tracking/gps_pos2.php
 
+  - id: "3"
+    name: nUWAy 3
+    colour: "#7a5ea8"
+    positions_file: positions_3.csv
+    source_url: https://revproject.com/tracking/gps_pos3.php
 
-# This will eventually be integrated into the database properly 
+  - id: "4"
+    name: nUWAy 4
+    colour: "#4f8a3c"
+    positions_file: positions_4.csv
+    source_url: https://revproject.com/tracking/gps_pos4.php
+

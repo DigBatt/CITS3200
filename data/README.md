@@ -12,5 +12,11 @@
 ## Adding a vehicle
 
 Drop `positions_<id>.csv` into the data directory and add an entry to
-`config/vehicles.yaml`. That is the whole procedure.
+`config/vehicles.yaml`. That is the whole procedure. Give the entry a
+`source_url` if the live logger should poll it.
+
+## Live data
+
+The live logger appends to `data.live_directory` (`data/live/`), which is not
+committed. Point `data.directory` at it in `config/app.yaml` to view live data.
 

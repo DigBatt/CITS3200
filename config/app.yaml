@@ -2,6 +2,8 @@
 data:
   # Directory holding the per vehicle CSV files named in vehicles.yaml.
   directory: data/sample
+  # Where the live logger appends. Set `directory` to this to view live data.
+  live_directory: data/live
 
 liveness:
   inactivity_threshold_seconds: 300 # when data is to be rendered as grey.
@@ -31,3 +33,13 @@ utilisation:
 
   service_hours:
     weekday: ["08:00", "17:00"]
+
+logger:
+  poll_interval_seconds: 30
+  timeout_seconds: 60
+  # The REV server answers 406 to non-browser user agents.
+  user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+  # Fixes outside this box are stored as no fix. Roughly Western Australia.
+  bounds:
+    latitude: [-36.0, -13.0]
+    longitude: [112.0, 130.0]
