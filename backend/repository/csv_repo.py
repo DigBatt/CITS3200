@@ -19,12 +19,18 @@ Column mapping:
 
 from __future__ import annotations
 import csv
+import io
+import logging
+import os
 import threading
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional, Sequence
-from backend.models import Position, Vehicle, parse_timestamp
+from backend.models import Position, Vehicle, format_timestamp, parse_timestamp
 from backend.repository.base import Repository, RepositoryError, in_range, normalise
+
+log = logging.getLogger(__name__)
 
 COLUMN_MAP = {
     "timestamp": "timestamp",
@@ -39,7 +45,32 @@ COLUMN_MAP = {
     "battery_percent": "battery_percent",
 }
 
+#: Header of files written by `add_positions`.
+FIELDNAMES = [
+    "timestamp",
+    "latitude",
+    "longitude",
+    "altitude_m",
+    "heading_deg",
+    "speed_mps",
+    "gps_status",
+    "battery_percent",
+]
+
 _FLOAT_FIELDS = ("latitude", "longitude", "altitude_m", "heading_deg", "speed_mps", "battery_percent")
+
+
+@dataclass
+class _FileState:
+    """
+    What has been read of one file so far.
+    """
+
+    stamp: tuple[int, int, int]  # (inode, mtime_ns, size)
+    offset: int  # bytes consumed
+    header: list[str]
+    by_timestamp: dict[datetime, Position]
+    positions: list[Position]  # ascending. this what callers get
 
 
 class CsvRepository(Repository):
@@ -60,7 +91,7 @@ class CsvRepository(Repository):
         self._files = {
             v.id: self.data_directory / (v.positions_file or f"positions_{v.id}.csv") for v in self._vehicles
         }
-        self._cache: dict[str, tuple[Any, list[Position]]] = {}
+        self._cache: dict[str, _FileState] = {}
         self._lock = threading.Lock()
 
     @classmethod
@@ -116,6 +147,92 @@ class CsvRepository(Repository):
             result[vehicle_id] = positions[-1] if positions else None
         return result
 
+    def add_positions(self, positions: Sequence[Position]) -> int:
+        """
+        See `Repository.add_positions`.
+
+        Rows are appended in the order given, one batch per vehicle file. A
+        new file gets the FIELDNAMES header first.
+        """
+        grouped: dict[str, list[Position]] = {}
+        for position in positions:
+            if position.vehicle_id not in self._files:
+                raise RepositoryError(f"No vehicle with id {position.vehicle_id!r}")
+            grouped.setdefault(position.vehicle_id, []).append(position)
+
+        with self._lock:
+            for vehicle_id, rows in grouped.items():
+                self._append(self._files[vehicle_id], rows)
+        return sum(len(rows) for rows in grouped.values())
+
+    def _append(self, path: Path, rows: Sequence[Position]) -> None:
+        """
+        Append rows to one file in a single write.
+
+        Parameters
+        ----------
+        path : Path
+        rows : sequence of Position
+
+        Raises
+        ------
+        RepositoryError
+            If the file has a header other than FIELDNAMES, or the write fails.
+        """
+        buffer = io.StringIO()
+        writer = csv.writer(buffer, lineterminator="\n")
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if not path.exists() or path.stat().st_size == 0:
+                writer.writerow(FIELDNAMES)
+            elif self._check_appendable(path):
+                buffer.write("\n")  # a crashed write left a partial line so readers skip it
+            writer.writerows(self._position_to_row(p) for p in rows)
+            with open(path, "a", newline="", encoding="utf-8") as handle:
+                handle.write(buffer.getvalue())
+                handle.flush()
+                os.fsync(handle.fileno())
+        except OSError as exc:
+            raise RepositoryError(f"Could not write {path}: {exc}") from exc
+
+    @staticmethod
+    def _check_appendable(path: Path) -> bool:
+        """
+        Check an existing file can take appended rows.
+
+        Parameters
+        ----------
+        path : Path
+            A non-empty file.
+
+        Returns
+        -------
+        bool
+            True if the file does not end in a newline.
+
+        Raises
+        ------
+        RepositoryError
+            If its header is not FIELDNAMES, since appended values would land
+            in the wrong columns.
+        """
+        with open(path, "rb") as handle:
+            first = handle.readline()
+            handle.seek(-1, os.SEEK_END)
+            unterminated = handle.read(1) != b"\n"
+        header = next(csv.reader([first.decode("utf-8-sig")]), [])
+        if [column.strip().lower() for column in header] != FIELDNAMES:
+            raise RepositoryError(f"{path} has a header other than {','.join(FIELDNAMES)}; not appending")
+        return unterminated
+
+    @staticmethod
+    def _position_to_row(position: Position) -> list[Any]:
+        """
+        One CSV row in FIELDNAMES order, None as a blank cell.
+        """
+        values = [getattr(position, field) for field in FIELDNAMES[1:]]
+        return [format_timestamp(position.timestamp)] + ["" if v is None else v for v in values]
+
     def _positions_for(self, vehicle_id: str) -> list[Position]:
         """
         Every row for one vehicle.
@@ -135,23 +252,31 @@ class CsvRepository(Repository):
 
         try:
             stat = path.stat()
-            stamp = (stat.st_mtime_ns, stat.st_size)
         except FileNotFoundError:
-            stamp = None
+            with self._lock:
+                self._cache.pop(vehicle_id, None)
+            return []
+        stamp = (stat.st_ino, stat.st_mtime_ns, stat.st_size)
 
         with self._lock:
-            cached = self._cache.get(vehicle_id)
-            if cached is not None and cached[0] == stamp:
-                return cached[1]
+            state = self._cache.get(vehicle_id)
+            if state is not None and state.stamp == stamp:
+                return state.positions
+            # Only a longer file with the same inode was appended to. Anything
+            # else was replaced or rewritten and is read from the start.
+            appended = state is not None and stat.st_ino == state.stamp[0] and stat.st_size > state.offset
+            state = self._read(path, vehicle_id, state if appended else None, stamp)
+            if state is None:
+                self._cache.pop(vehicle_id, None)
+                return []
+            self._cache[vehicle_id] = state
+            return state.positions
 
-        positions = [] if stamp is None else self._read_file(path, vehicle_id)
-        with self._lock:
-            self._cache[vehicle_id] = (stamp, positions)
-        return positions
-
-    def _read_file(self, path: Path, vehicle_id: str) -> list[Position]:
+    def _read(
+        self, path: Path, vehicle_id: str, state: Optional[_FileState], stamp: tuple[int, int, int]
+    ) -> Optional[_FileState]:
         """
-        Parse one CSV.
+        Parse a file from the start, or from where `state` left off.
 
         Parameters
         ----------
@@ -159,35 +284,69 @@ class CsvRepository(Repository):
             File to read.
         vehicle_id : str
             Id to stamp the rows with; the file does not carry it.
+        state : _FileState or None
+            The previous read of this file, if it has only been appended to.
+        stamp : tuple
+            The file's current (inode, mtime_ns, size).
 
         Returns
         -------
-        list of Position
-            Ascending by timestamp, duplicate timestamps collapsed, unreadable
-            rows skipped.
+        _FileState or None
+            None if the file has no complete header line yet. Duplicate
+            timestamps collapse to the last row, rows that will not parse or
+            do not have one cell per header column are skipped, and a final
+            line with no newline is left for the next read.
 
         Raises
         ------
         RepositoryError
             If the file cannot be read at all.
         """
+        offset = state.offset if state else 0
         try:
-            with open(path, newline="", encoding="utf-8-sig") as handle:
-                rows = list(csv.DictReader(handle))
-        except OSError as exc:
+            with open(path, "rb") as handle:
+                handle.seek(offset)
+                data = handle.read()
+            end = data.rfind(b"\n") + 1
+            text = data[:end].decode("utf-8-sig" if offset == 0 else "utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
             raise RepositoryError(f"Could not read {path}: {exc}") from exc
 
-        by_timestamp: dict[datetime, Position] = {}
+        lines = csv.reader(io.StringIO(text, newline=""))
+        header = state.header if state else next(lines, None)
+        if not header:
+            return None
+
+        by_timestamp = state.by_timestamp if state else {}
+        last = state.positions[-1].timestamp if state and state.positions else None
+        added: list[Position] = []
+        in_order = True
         skipped = 0
-        for line_number, row in enumerate(rows, start=2):  # header is line 1
+        for values in lines:
+            if not any(value.strip() for value in values):
+                continue  # blank line
+            if len(values) != len(header):
+                skipped += 1  # truncated by a crashed write, or malformed
+                continue
             try:
-                position = self._row_to_position(row, vehicle_id)
-            except (ValueError, KeyError, TypeError) as exc:
+                position = self._row_to_position(dict(zip(header, values)), vehicle_id)
+            except (ValueError, KeyError, TypeError):
                 skipped += 1
                 continue
+            if last is not None and position.timestamp <= last:
+                in_order = False
+            last = position.timestamp
             by_timestamp[position.timestamp] = position
+            added.append(position)
 
-        return [by_timestamp[key] for key in sorted(by_timestamp)]
+        if skipped:
+            log.warning("%s: skipped %d unreadable rows", path, skipped)
+
+        if state is not None and in_order:
+            positions = state.positions + added
+        else:
+            positions = [by_timestamp[key] for key in sorted(by_timestamp)]
+        return _FileState(stamp, offset + end, header, by_timestamp, positions)
 
     def _row_to_position(self, row: dict[str, Optional[str]], vehicle_id: str) -> Position:
         """
@@ -196,7 +355,7 @@ class CsvRepository(Repository):
         Parameters
         ----------
         row : dict
-            One row from `csv.DictReader`.
+            Header to cell for one row.
         vehicle_id : str
 
         Returns

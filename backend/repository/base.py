@@ -109,6 +109,29 @@ class Repository(ABC):
             None where the vehicle has no data.
         """
 
+    def add_positions(self, positions: Sequence[Position]) -> int:
+        """
+        Store new positions.
+
+        Parameters
+        ----------
+        positions : sequence of Position
+            Rows to store, any mix of vehicles.
+
+        Returns
+        -------
+        int
+            How many rows were written.
+
+        Raises
+        ------
+        NotImplementedError
+            If this store is read-only.
+        RepositoryError
+            If a row names a vehicle the store does not know, or the write fails.
+        """
+        raise NotImplementedError(f"{type(self).__name__} is read-only")
+
     def get_events(
         self,
         vehicle_ids: Optional[Sequence[str]] = None,
