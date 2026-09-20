@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>nUWAy Admin — Sign in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="login-page">
+  <div class="login-card">
+    <div class="login-brand">
+      <span class="login-brand-name">nuway</span>
+      <span class="login-brand-tag">ADMIN</span>
+    </div>
+
+    <p class="login-title">Administrator sign-in</p>
+
+    <div class="form-group">
+      <label class="form-label" for="login-password">PASSWORD</label>
+      <input type="password" class="form-input" id="login-password"
+             placeholder="Enter admin password" autocomplete="current-password">
+    </div>
+
+    <div class="login-error" id="login-error">Incorrect password. Please try again.</div>
+
+    <button type="button" class="btn-primary" id="btn-login">Sign in</button>
+
+    <p class="login-note">One shared administrator account &mdash; see the install guide for credentials.</p>
+  </div>
+
+  <script>
+  // STUB: replace with POST /api/admin/login once S13 (auth backend) is done.
+  // At that point, remove sessionStorage and check the server-side session cookie instead.
+  async function attemptLogin() {
+    const password = document.getElementById('login-password').value;
+    const errorEl  = document.getElementById('login-error');
+
+    if (!password) return;
+
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+
+      if (res.ok) {
+        sessionStorage.setItem('admin_session', '1');
+        window.location.href = '/admin';
+      } else {
+        errorEl.classList.add('visible');
+        document.getElementById('login-password').value = '';
+        document.getElementById('login-password').focus();
+      }
+    } catch {
+      // Backend not yet available — fall through to dev bypass below.
+      // Remove this catch block once S13 is implemented.
+      errorEl.textContent = 'Could not reach the server. Is the backend running?';
+      errorEl.classList.add('visible');
+    }
+  }
+
+  document.getElementById('btn-login').addEventListener('click', attemptLogin);
+  document.getElementById('login-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') attemptLogin();
+  });
+  </script>
+</body>
+</html>
