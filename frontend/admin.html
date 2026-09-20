@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>nUWAy Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    /* ---- Admin-specific styles ---- */
+
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      font-family: Sora, system-ui, sans-serif;
+      background: #faf9f7;
+      color: #1c1917;
+    }
+
+    /* Header */
+    .app-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 10px 16px;
+      background: #fff;
+      border-bottom: 1px solid rgba(28, 25, 23, 0.1);
+    }
+
+    .app-header-brand {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .app-header-brand-name {
+      font: 700 16px Sora, sans-serif;
+      letter-spacing: -0.02em;
+    }
+
+    .app-header-brand-tag {
+      font: 500 10px 'IBM Plex Mono', monospace;
+      color: rgba(28, 25, 23, 0.45);
+      letter-spacing: 0.08em;
+    }
+
+    .app-header-spacer { flex: 1; min-width: 8px; }
+
+    .app-tabs {
+      display: flex;
+      gap: 2px;
+      background: rgba(28, 25, 23, 0.05);
+      padding: 3px;
+      border-radius: 8px;
+    }
+
+    .app-tab {
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font: 500 12.5px Sora, sans-serif;
+      color: rgba(28, 25, 23, 0.55);
+      background: transparent;
+      border: none;
+    }
+
+    .app-tab.is-active {
+      font-weight: 600;
+      color: #1c1917;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+
+    .app-tab:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+    }
+
+    /* Sign out button */
+    .btn-signout {
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font: 500 12px Sora, sans-serif;
+      background: transparent;
+      border: 1px solid rgba(28, 25, 23, 0.16);
+      color: rgba(28, 25, 23, 0.7);
+    }
+
+    .btn-signout:hover { background: rgba(28, 25, 23, 0.04); }
+
+    /* Main content area */
+    .admin-main {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    /* Tab panels */
+    .admin-panel {
+      padding: 24px;
+      max-width: 860px;
+    }
+
+    .admin-panel[hidden] { display: none; }
+
+    /* Section header */
+    .admin-section-title {
+      font: 700 18px Sora, sans-serif;
+      letter-spacing: -0.02em;
+      margin: 0 0 4px;
+    }
+
+    .admin-section-sub {
+      font: 400 12.5px Sora, sans-serif;
+      color: rgba(28, 25, 23, 0.5);
+      margin: 0 0 22px;
+    }
+
+    /* Card */
+    .admin-card {
+      background: #fff;
+      border: 1px solid rgba(28, 25, 23, 0.1);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .admin-card-title {
+      font: 600 12px Sora, sans-serif;
+      letter-spacing: 0.03em;
+      color: rgba(28, 25, 23, 0.5);
+      margin: 0 0 14px;
+    }
+
+    /* Stub / coming-soon notice */
+    .stub-notice {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: rgba(28, 25, 23, 0.04);
+      border: 1px dashed rgba(28, 25, 23, 0.16);
+      font: 400 12.5px Sora, sans-serif;
+      color: rgba(28, 25, 23, 0.55);
+    }
+
+    .stub-notice-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(28, 25, 23, 0.25);
+      flex: none;
+    }
+
+    /* Form elements */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .form-label {
+      font: 600 11px Sora, sans-serif;
+      letter-spacing: 0.04em;
+      color: rgba(28, 25, 23, 0.55);
+    }
+
+    .form-input,
+    .form-select,
+    .form-textarea {
+      padding: 9px 11px;
+      border: 1px solid rgba(28, 25, 23, 0.16);
+      border-radius: 7px;
+      font: 400 13px Sora, sans-serif;
+      background: #fff;
+      color: #1c1917;
+      width: 100%;
+    }
+
+    .form-input:focus,
+    .form-select:focus,
+    .form-textarea:focus {
+      outline: 2px solid #2f7d8f;
+      outline-offset: 1px;
+      border-color: transparent;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 600px) {
+      .form-row { grid-template-columns: 1fr; }
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .btn-primary {
+      padding: 8px 16px;
+      border-radius: 7px;
+      cursor: pointer;
+      font: 600 12.5px Sora, sans-serif;
+      background: #1c1917;
+      color: #fff;
+      border: none;
+    }
+
+    .btn-primary:hover { background: #2d2926; }
+
+    .btn-outline {
+      padding: 8px 14px;
+      border-radius: 7px;
+      cursor: pointer;
+      font: 500 12.5px Sora, sans-serif;
+      background: #fff;
+      border: 1px solid rgba(28, 25, 23, 0.16);
+      color: #1c1917;
+    }
+
+    /* Downtime table */
+    .downtime-table {
+      width: 100%;
+      border-collapse: collapse;
+      font: 400 12.5px Sora, sans-serif;
+    }
+
+    .downtime-table th {
+      text-align: left;
+      padding: 10px 12px;
+      font: 600 10px Sora, sans-serif;
+      letter-spacing: 0.05em;
+      color: rgba(28, 25, 23, 0.5);
+      border-bottom: 1px solid rgba(28, 25, 23, 0.1);
+    }
+
+    .downtime-table td {
+      padding: 12px;
+      border-bottom: 1px solid rgba(28, 25, 23, 0.07);
+      vertical-align: top;
+    }
+
+    .downtime-table tr:last-child td { border-bottom: none; }
+
+    .downtime-table .row-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-xs {
+      padding: 4px 9px;
+      border-radius: 5px;
+      cursor: pointer;
+      font: 500 11px Sora, sans-serif;
+      border: 1px solid rgba(28, 25, 23, 0.14);
+      background: #fff;
+      color: #1c1917;
+    }
+
+    .btn-xs.danger {
+      color: oklch(0.45 0.16 25);
+      border-color: oklch(0.75 0.1 25 / 40%);
+    }
+
+    .btn-xs.danger:hover {
+      background: oklch(0.75 0.1 25 / 10%);
+    }
+
+    .mono { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; }
+
+    /* Overlap warning */
+    .form-warning {
+      display: none;
+      padding: 10px 13px;
+      border-radius: 7px;
+      background: oklch(0.75 0.15 75 / 12%);
+      border: 1px solid oklch(0.75 0.15 75 / 45%);
+      font: 400 12px Sora, sans-serif;
+      color: oklch(0.42 0.12 60);
+      margin-bottom: 10px;
+    }
+
+    .form-warning.visible { display: block; }
+
+    /* Empty state */
+    .empty-state {
+      margin: 0;
+      padding: 14px 0;
+      font: 400 12px Sora, sans-serif;
+      color: rgba(28, 25, 23, 0.45);
+    }
+
+    /* Route selector (operator tab) */
+    .route-select-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .route-select-label {
+      font: 600 11px Sora, sans-serif;
+      letter-spacing: 0.04em;
+      color: rgba(28, 25, 23, 0.55);
+      white-space: nowrap;
+    }
+
+    /* Stops list */
+    .stops-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .stop-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(28, 25, 23, 0.07);
+    }
+
+    .stop-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #2f7d8f;
+      flex: none;
+    }
+
+    .stop-name { font: 600 13px Sora, sans-serif; flex: 1; }
+
+    .stop-coords {
+      font: 400 11px 'IBM Plex Mono', monospace;
+      color: rgba(28, 25, 23, 0.45);
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ============ Header ============ -->
+  <header class="app-header">
+    <div class="app-header-brand">
+      <span class="app-header-brand-name">nuway</span>
+      <span class="app-header-brand-tag">ADMIN</span>
+    </div>
+
+    <nav class="app-tabs" id="admin-tabs" aria-label="Admin sections">
+      <button type="button" class="app-tab is-active" data-tab="operator">Operator view</button>
+      <button type="button" class="app-tab" data-tab="downtime">Downtime</button>
+      <button type="button" class="app-tab" data-tab="snapshots">Snapshots</button>
+      <button type="button" class="app-tab" data-tab="stops">Stops &amp; routes</button>
+    </nav>
+
+    <div class="app-header-spacer"></div>
+
+    <button type="button" class="btn-signout" id="btn-signout">Sign out</button>
+  </header>
+
+  <!-- ============ Main ============ -->
+  <main class="admin-main">
+
+    <!-- ---- Operator view ---- -->
+    <div class="admin-panel" id="tab-operator">
+      <h1 class="admin-section-title">Operator view</h1>
+      <p class="admin-section-sub">See what an operator sees on any route. Rider requests appear here as they come in.</p>
+
+      <div class="admin-card">
+        <div class="route-select-row">
+          <span class="route-select-label">ROUTE</span>
+          <!-- Populated by js/admin.js once /api/routes exists -->
+          <select class="form-select" id="route-selector" style="max-width:220px" disabled>
+            <option value="">— not yet available —</option>
+          </select>
+        </div>
+
+        <div class="stub-notice">
+          <span class="stub-notice-dot"></span>
+          Operator view is available once stops and routes are configured (S06, S09). This selector will populate automatically.
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- Downtime ---- -->
+    <div class="admin-panel" id="tab-downtime" hidden>
+      <h1 class="admin-section-title">Downtime</h1>
+      <p class="admin-section-sub">Record when a shuttle was out of service so availability figures stay accurate.</p>
+
+      <!-- Add / edit form -->
+      <div class="admin-card">
+        <p class="admin-card-title" id="downtime-form-title">ADD DOWNTIME RECORD</p>
+
+        <div class="form-warning" id="downtime-overlap-warning">
+          ⚠ This period overlaps an existing downtime record for the selected vehicle. Check the list below before saving.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="dt-vehicle">VEHICLE</label>
+          <!-- Populated from /api/vehicles by admin.js -->
+          <select class="form-select" id="dt-vehicle">
+            <option value="">Loading vehicles…</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="dt-start">START</label>
+            <input type="datetime-local" class="form-input" id="dt-start">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="dt-end">END</label>
+            <input type="datetime-local" class="form-input" id="dt-end">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="dt-reason">REASON</label>
+          <input type="text" class="form-input" id="dt-reason" placeholder="e.g. scheduled maintenance">
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-primary" id="btn-downtime-save">Save record</button>
+          <button type="button" class="btn-outline" id="btn-downtime-cancel" hidden>Cancel edit</button>
+        </div>
+      </div>
+
+      <!-- Records list -->
+      <div class="admin-card">
+        <p class="admin-card-title">RECORDED DOWNTIME</p>
+        <table class="downtime-table" id="downtime-table">
+          <thead>
+            <tr>
+              <th>Vehicle</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Reason</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="downtime-tbody">
+            <!-- Rows injected by admin.js -->
+            <tr><td colspan="5"><p class="empty-state">No downtime records yet.</p></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ---- Snapshots ---- -->
+    <div class="admin-panel" id="tab-snapshots" hidden>
+      <h1 class="admin-section-title">Daily snapshots</h1>
+      <p class="admin-section-sub">Choose which metrics the system saves each day, and download past snapshots.</p>
+
+      <div class="admin-card">
+        <p class="admin-card-title">METRIC SELECTION</p>
+        <div class="stub-notice">
+          <span class="stub-notice-dot"></span>
+          Snapshot configuration (S16) and daily generation (S17) are not yet implemented. This panel will let you choose which metrics are captured and download past snapshots once they are.
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">PAST SNAPSHOTS</p>
+        <p class="empty-state">No snapshots recorded yet.</p>
+      </div>
+    </div>
+
+    <!-- ---- Stops & routes ---- -->
+    <div class="admin-panel" id="tab-stops" hidden>
+      <h1 class="admin-section-title">Stops &amp; routes</h1>
+      <p class="admin-section-sub">Stops and routes are defined in <code>config/vehicles.yaml</code>. Changes take effect on restart with no code change required.</p>
+
+      <div class="admin-card">
+        <p class="admin-card-title">CONFIGURED STOPS</p>
+        <!-- Populated from /api/stops by admin.js once S06 is done -->
+        <div id="stops-list-container">
+          <div class="stub-notice">
+            <span class="stub-notice-dot"></span>
+            Stop configuration (S06) is not yet implemented. Stops will appear here once the API endpoint is available.
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">CONFIGURED ROUTES</p>
+        <div id="routes-list-container">
+          <div class="stub-notice">
+            <span class="stub-notice-dot"></span>
+            Routes will appear here once stops are configured (S06).
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ---- Auth guard ----
+// Redirect to login if no admin session. Replace with a real
+// /api/admin/me check once S13 (auth backend) is implemented.
+// function checkAuth() {
+//   // STUB: swap this for a fetch('/api/admin/me') call once S13 exists.
+//   const loggedIn = sessionStorage.getItem('admin_session');
+//   if (!loggedIn) {
+//     window.location.href = '/admin-login.html';
+//   }
+// }
+// checkAuth();
+// TODO: restore once S13 auth backend is implemented^^
+
+document.getElementById('btn-signout').addEventListener('click', () => {
+  // STUB: call POST /api/admin/logout once S13 exists.
+  sessionStorage.removeItem('admin_session');
+  window.location.href = '/admin-login.html';
+});
+
+// ---- Tab switching ----
+const tabs = document.querySelectorAll('.app-tab[data-tab]');
+const panels = document.querySelectorAll('.admin-panel[id^="tab-"]');
+
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => t.classList.remove('is-active'));
+    panels.forEach(p => p.hidden = true);
+    tab.classList.add('is-active');
+    document.getElementById('tab-' + tab.dataset.tab).hidden = false;
+  });
+});
+
+// ---- Load vehicles into the downtime form ----
+async function loadVehicles() {
+  try {
+    const data = await fetch('/api/vehicles').then(r => r.json());
+    const sel = document.getElementById('dt-vehicle');
+    sel.innerHTML = '';
+    (data.vehicles ?? []).forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.id;
+      opt.textContent = v.name ? `${v.name} (${v.id})` : v.id;
+      sel.appendChild(opt);
+    });
+    if (!sel.options.length) {
+      sel.innerHTML = '<option value="">No vehicles configured</option>';
+    }
+  } catch {
+    document.getElementById('dt-vehicle').innerHTML =
+      '<option value="">Could not load vehicles</option>';
+  }
+}
+loadVehicles();
+
+// ---- Downtime records (in-memory until POST /api/downtime exists) ----
+// Replace this array with fetch calls to /api/downtime once S18 backend is done.
+let downtimeRecords = [];
+let editingId = null;
+
+function renderDowntime() {
+  const tbody = document.getElementById('downtime-tbody');
+  if (!downtimeRecords.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><p class="empty-state">No downtime records yet.</p></td></tr>';
+    return;
+  }
+  tbody.innerHTML = downtimeRecords.map(r => `
+    <tr data-id="${r.id}">
+      <td class="mono">${r.vehicle}</td>
+      <td class="mono">${fmtLocal(r.start)}</td>
+      <td class="mono">${fmtLocal(r.end)}</td>
+      <td>${escHtml(r.reason)}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn-xs" onclick="startEdit('${r.id}')">Edit</button>
+          <button class="btn-xs danger" onclick="deleteRecord('${r.id}')">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function fmtLocal(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('en-AU', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function genId() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+// Overlap detection (S18 acceptance criterion)
+function hasOverlap(vehicleId, start, end, excludeId = null) {
+  return downtimeRecords.some(r => {
+    if (r.id === excludeId || r.vehicle !== vehicleId) return false;
+    return start < new Date(r.end) && end > new Date(r.start);
+  });
+}
+
+document.getElementById('btn-downtime-save').addEventListener('click', () => {
+  const vehicle = document.getElementById('dt-vehicle').value;
+  const start   = document.getElementById('dt-start').value;
+  const end     = document.getElementById('dt-end').value;
+  const reason  = document.getElementById('dt-reason').value.trim();
+  const warning = document.getElementById('downtime-overlap-warning');
+
+  if (!vehicle || !start || !end || !reason) {
+    alert('Please fill in all fields.');
+    return;
+  }
+
+  const startDate = new Date(start);
+  const endDate   = new Date(end);
+
+  // S18: end must be after start
+  if (endDate <= startDate) {
+    alert("End time must be after start time.");
+    return;
+  }
+
+  // S18: warn on overlap
+  if (hasOverlap(vehicle, startDate, endDate, editingId)) {
+    warning.classList.add('visible');
+  } else {
+    warning.classList.remove('visible');
+  }
+
+  if (editingId) {
+    const rec = downtimeRecords.find(r => r.id === editingId);
+    if (rec) { rec.vehicle = vehicle; rec.start = start; rec.end = end; rec.reason = reason; }
+    editingId = null;
+  } else {
+    downtimeRecords.push({ id: genId(), vehicle, start, end, reason });
+  }
+
+  clearDowntimeForm();
+  renderDowntime();
+
+  // TODO: replace with POST/PATCH /api/downtime once backend is ready
+});
+
+document.getElementById('btn-downtime-cancel').addEventListener('click', () => {
+  editingId = null;
+  clearDowntimeForm();
+});
+
+function clearDowntimeForm() {
+  document.getElementById('dt-start').value = '';
+  document.getElementById('dt-end').value   = '';
+  document.getElementById('dt-reason').value = '';
+  document.getElementById('downtime-form-title').textContent = 'ADD DOWNTIME RECORD';
+  document.getElementById('btn-downtime-cancel').hidden = true;
+  document.getElementById('downtime-overlap-warning').classList.remove('visible');
+}
+
+function startEdit(id) {
+  const rec = downtimeRecords.find(r => r.id === id);
+  if (!rec) return;
+  editingId = id;
+  document.getElementById('dt-vehicle').value = rec.vehicle;
+  document.getElementById('dt-start').value   = rec.start;
+  document.getElementById('dt-end').value     = rec.end;
+  document.getElementById('dt-reason').value  = rec.reason;
+  document.getElementById('downtime-form-title').textContent = 'EDIT DOWNTIME RECORD';
+  document.getElementById('btn-downtime-cancel').hidden = false;
+  document.getElementById('tab-downtime').scrollIntoView({ behavior: 'smooth' });
+}
+
+function deleteRecord(id) {
+  if (!confirm('Delete this downtime record?')) return;
+  downtimeRecords = downtimeRecords.filter(r => r.id !== id);
+  renderDowntime();
+  // TODO: DELETE /api/downtime/:id once backend is ready
+}
+
+renderDowntime();
+</script>
+</body>
+</html>
