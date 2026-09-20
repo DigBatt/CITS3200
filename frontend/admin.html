@@ -1,4 +1,10 @@
 <!DOCTYPE html>
+<!--
+  Administration page (S14). Downtime, snapshots, the operator view and the
+  configured stops and routes are reached from the tabs here, so no separate
+  URLs are needed. Functions whose stories are not yet complete render as
+  unavailable rather than being omitted.
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -13,7 +19,7 @@
 <body>
 <div class="app-shell">
 
-  <!-- ============ Header ============ -->
+  <!-- ============ Header: brand, section tabs, dashboard link, sign out ============ -->
   <header class="app-header">
     <div class="app-header-brand">
       <span class="app-header-brand-name">nuway</span>
@@ -28,6 +34,8 @@
     </nav>
 
     <div class="app-header-spacer"></div>
+
+    <!-- Return to dashboard and sign out -->
     <a href="/" class="btn-signout">Return to Dashboard</a>
     <button type="button" class="btn-signout" id="btn-signout">Sign out</button>
   </header>
@@ -35,7 +43,7 @@
   <!-- ============ Main ============ -->
   <main class="admin-main">
 
-    <!-- ---- Operator view ---- -->
+    <!-- ---- Operator view (S15): route selector populates once S06/S09 land ---- -->
     <div class="admin-panel" id="tab-operator">
       <h1 class="admin-section-title">Operator view</h1>
       <p class="admin-section-sub">See what an operator sees on any route. Rider requests appear here as they come in.</p>
@@ -55,11 +63,12 @@
       </div>
     </div>
 
-    <!-- ---- Downtime ---- -->
+    <!-- ---- Downtime (S18-S20): stored in memory until /api/downtime exists ---- -->
     <div class="admin-panel" id="tab-downtime" hidden>
       <h1 class="admin-section-title">Downtime</h1>
       <p class="admin-section-sub">Record when a shuttle was out of service so availability figures stay accurate.</p>
 
+      <!-- Add / edit form -->
       <div class="admin-card">
         <p class="admin-card-title" id="downtime-form-title">ADD DOWNTIME RECORD</p>
 
@@ -69,6 +78,7 @@
 
         <div class="form-group">
           <label class="form-label" for="dt-vehicle">VEHICLE</label>
+          <!-- Populated from /api/vehicles by js/admin.js -->
           <select class="form-select" id="dt-vehicle">
             <option value="">Loading vehicles…</option>
           </select>
@@ -96,6 +106,7 @@
         </div>
       </div>
 
+      <!-- Records list -->
       <div class="admin-card">
         <p class="admin-card-title">RECORDED DOWNTIME</p>
         <table class="downtime-table" id="downtime-table">
@@ -109,13 +120,14 @@
             </tr>
           </thead>
           <tbody id="downtime-tbody">
+            <!-- Rows injected by js/admin.js -->
             <tr><td colspan="5"><p class="empty-state">No downtime records yet.</p></td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- ---- Snapshots ---- -->
+    <!-- ---- Snapshots (S16, S17): not yet implemented ---- -->
     <div class="admin-panel" id="tab-snapshots" hidden>
       <h1 class="admin-section-title">Daily snapshots</h1>
       <p class="admin-section-sub">Choose which metrics the system saves each day, and download past snapshots.</p>
@@ -134,13 +146,14 @@
       </div>
     </div>
 
-    <!-- ---- Stops & routes ---- -->
+    <!-- ---- Stops & routes (S06): read from configuration ---- -->
     <div class="admin-panel" id="tab-stops" hidden>
       <h1 class="admin-section-title">Stops &amp; routes</h1>
       <p class="admin-section-sub">Stops and routes are defined in <code>config/vehicles.yaml</code>. Changes take effect on restart with no code change required.</p>
 
       <div class="admin-card">
         <p class="admin-card-title">CONFIGURED STOPS</p>
+        <!-- Populated from /api/stops by js/admin.js once S06 is done -->
         <div id="stops-list-container">
           <div class="stub-notice">
             <span class="stub-notice-dot"></span>
@@ -163,177 +176,6 @@
   </main>
 </div>
 
-<script>
-// ---- Auth guard ----
-// function checkAuth() {
-//   const loggedIn = sessionStorage.getItem('admin_session');
-//   if (!loggedIn) {
-//     window.location.href = '/admin-login';
-//   }
-// }
-// checkAuth();
-// TODO: restore once S13 auth backend is implemented
-
-document.getElementById('btn-signout').addEventListener('click', () => {
-  sessionStorage.removeItem('admin_session');
-  window.location.href = '/';
-});
-
-// ---- Tab switching ----
-const tabs = document.querySelectorAll('.app-tab[data-tab]');
-const panels = document.querySelectorAll('.admin-panel[id^="tab-"]');
-
-tabs.forEach(tab => {
-  tab.addEventListener('click', () => {
-    tabs.forEach(t => t.classList.remove('is-active'));
-    panels.forEach(p => p.hidden = true);
-    tab.classList.add('is-active');
-    document.getElementById('tab-' + tab.dataset.tab).hidden = false;
-  });
-});
-
-// ---- Load vehicles into the downtime form ----
-async function loadVehicles() {
-  try {
-    const data = await fetch('/api/vehicles').then(r => r.json());
-    const sel = document.getElementById('dt-vehicle');
-    sel.innerHTML = '';
-    (data.vehicles ?? []).forEach(v => {
-      const opt = document.createElement('option');
-      opt.value = v.id;
-      opt.textContent = v.name ? `${v.name} (${v.id})` : v.id;
-      sel.appendChild(opt);
-    });
-    if (!sel.options.length) {
-      sel.innerHTML = '<option value="">No vehicles configured</option>';
-    }
-  } catch {
-    document.getElementById('dt-vehicle').innerHTML =
-      '<option value="">Could not load vehicles</option>';
-  }
-}
-loadVehicles();
-
-// ---- Downtime records (in-memory until POST /api/downtime exists) ----
-let downtimeRecords = [];
-let editingId = null;
-
-function renderDowntime() {
-  const tbody = document.getElementById('downtime-tbody');
-  if (!downtimeRecords.length) {
-    tbody.innerHTML = '<tr><td colspan="5"><p class="empty-state">No downtime records yet.</p></td></tr>';
-    return;
-  }
-  tbody.innerHTML = downtimeRecords.map(r => `
-    <tr data-id="${r.id}">
-      <td class="mono">${r.vehicle}</td>
-      <td class="mono">${fmtLocal(r.start)}</td>
-      <td class="mono">${fmtLocal(r.end)}</td>
-      <td>${escHtml(r.reason)}</td>
-      <td>
-        <div class="row-actions">
-          <button class="btn-xs" onclick="startEdit('${r.id}')">Edit</button>
-          <button class="btn-xs danger" onclick="deleteRecord('${r.id}')">Delete</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
-}
-
-function fmtLocal(iso) {
-  const d = new Date(iso);
-  return d.toLocaleString('en-AU', { dateStyle: 'short', timeStyle: 'short' });
-}
-
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function genId() {
-  return Math.random().toString(36).slice(2, 10);
-}
-
-function hasOverlap(vehicleId, start, end, excludeId = null) {
-  return downtimeRecords.some(r => {
-    if (r.id === excludeId || r.vehicle !== vehicleId) return false;
-    return start < new Date(r.end) && end > new Date(r.start);
-  });
-}
-
-document.getElementById('btn-downtime-save').addEventListener('click', () => {
-  const vehicle = document.getElementById('dt-vehicle').value;
-  const start   = document.getElementById('dt-start').value;
-  const end     = document.getElementById('dt-end').value;
-  const reason  = document.getElementById('dt-reason').value.trim();
-  const warning = document.getElementById('downtime-overlap-warning');
-
-  if (!vehicle || !start || !end || !reason) {
-    alert('Please fill in all fields.');
-    return;
-  }
-
-  const startDate = new Date(start);
-  const endDate   = new Date(end);
-
-  if (endDate <= startDate) {
-    alert("End time must be after start time.");
-    return;
-  }
-
-  if (hasOverlap(vehicle, startDate, endDate, editingId)) {
-    warning.classList.add('visible');
-  } else {
-    warning.classList.remove('visible');
-  }
-
-  if (editingId) {
-    const rec = downtimeRecords.find(r => r.id === editingId);
-    if (rec) { rec.vehicle = vehicle; rec.start = start; rec.end = end; rec.reason = reason; }
-    editingId = null;
-  } else {
-    downtimeRecords.push({ id: genId(), vehicle, start, end, reason });
-  }
-
-  clearDowntimeForm();
-  renderDowntime();
-  // TODO: replace with POST/PATCH /api/downtime once backend is ready
-});
-
-document.getElementById('btn-downtime-cancel').addEventListener('click', () => {
-  editingId = null;
-  clearDowntimeForm();
-});
-
-function clearDowntimeForm() {
-  document.getElementById('dt-start').value = '';
-  document.getElementById('dt-end').value   = '';
-  document.getElementById('dt-reason').value = '';
-  document.getElementById('downtime-form-title').textContent = 'ADD DOWNTIME RECORD';
-  document.getElementById('btn-downtime-cancel').hidden = true;
-  document.getElementById('downtime-overlap-warning').classList.remove('visible');
-}
-
-function startEdit(id) {
-  const rec = downtimeRecords.find(r => r.id === id);
-  if (!rec) return;
-  editingId = id;
-  document.getElementById('dt-vehicle').value = rec.vehicle;
-  document.getElementById('dt-start').value   = rec.start;
-  document.getElementById('dt-end').value     = rec.end;
-  document.getElementById('dt-reason').value  = rec.reason;
-  document.getElementById('downtime-form-title').textContent = 'EDIT DOWNTIME RECORD';
-  document.getElementById('btn-downtime-cancel').hidden = false;
-  document.getElementById('tab-downtime').scrollIntoView({ behavior: 'smooth' });
-}
-
-function deleteRecord(id) {
-  if (!confirm('Delete this downtime record?')) return;
-  downtimeRecords = downtimeRecords.filter(r => r.id !== id);
-  renderDowntime();
-  // TODO: DELETE /api/downtime/:id once backend is ready
-}
-
-renderDowntime();
-</script>
+<script src="js/admin.js"></script>
 </body>
 </html>

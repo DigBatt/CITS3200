@@ -1,4 +1,8 @@
 <!DOCTYPE html>
+<!--
+  Administrator sign-in (S13). One shared account; the password is checked
+  by /api/admin/login, which is not implemented yet.
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -32,42 +36,6 @@
     <p class="login-note">One shared administrator account &mdash; see the install guide for credentials.</p>
   </div>
 
-  <script>
-  // STUB: replace with POST /api/admin/login once S13 (auth backend) is done.
-  // At that point, remove sessionStorage and check the server-side session cookie instead.
-  async function attemptLogin() {
-    const password = document.getElementById('login-password').value;
-    const errorEl  = document.getElementById('login-error');
-
-    if (!password) return;
-
-    try {
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-
-      if (res.ok) {
-        sessionStorage.setItem('admin_session', '1');
-        window.location.href = '/admin';
-      } else {
-        errorEl.classList.add('visible');
-        document.getElementById('login-password').value = '';
-        document.getElementById('login-password').focus();
-      }
-    } catch {
-      // Backend not yet available — fall through to dev bypass below.
-      // Remove this catch block once S13 is implemented.
-      errorEl.textContent = 'Could not reach the server. Is the backend running?';
-      errorEl.classList.add('visible');
-    }
-  }
-
-  document.getElementById('btn-login').addEventListener('click', attemptLogin);
-  document.getElementById('login-password').addEventListener('keydown', e => {
-    if (e.key === 'Enter') attemptLogin();
-  });
-  </script>
+  <script src="js/admin-login.js"></script>
 </body>
 </html>
