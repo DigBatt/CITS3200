@@ -358,6 +358,8 @@
       <span class="app-header-brand-tag">ADMIN</span>
     </div>
 
+    <a href="/" style="font: 500 12px Sora, sans-serif; color: rgba(28,25,23,0.45); text-decoration: none;">Dashboard</a>
+
     <nav class="app-tabs" id="admin-tabs" aria-label="Admin sections">
       <button type="button" class="app-tab is-active" data-tab="operator">Operator view</button>
       <button type="button" class="app-tab" data-tab="downtime">Downtime</button>
@@ -381,7 +383,6 @@
       <div class="admin-card">
         <div class="route-select-row">
           <span class="route-select-label">ROUTE</span>
-          <!-- Populated by js/admin.js once /api/routes exists -->
           <select class="form-select" id="route-selector" style="max-width:220px" disabled>
             <option value="">— not yet available —</option>
           </select>
@@ -409,7 +410,6 @@
 
         <div class="form-group">
           <label class="form-label" for="dt-vehicle">VEHICLE</label>
-          <!-- Populated from /api/vehicles by admin.js -->
           <select class="form-select" id="dt-vehicle">
             <option value="">Loading vehicles…</option>
           </select>
@@ -451,7 +451,6 @@
             </tr>
           </thead>
           <tbody id="downtime-tbody">
-            <!-- Rows injected by admin.js -->
             <tr><td colspan="5"><p class="empty-state">No downtime records yet.</p></td></tr>
           </tbody>
         </table>
@@ -484,7 +483,6 @@
 
       <div class="admin-card">
         <p class="admin-card-title">CONFIGURED STOPS</p>
-        <!-- Populated from /api/stops by admin.js once S06 is done -->
         <div id="stops-list-container">
           <div class="stub-notice">
             <span class="stub-notice-dot"></span>
@@ -515,7 +513,7 @@
 //   // STUB: swap this for a fetch('/api/admin/me') call once S13 exists.
 //   const loggedIn = sessionStorage.getItem('admin_session');
 //   if (!loggedIn) {
-//     window.location.href = '/admin-login.html';
+//     window.location.href = '/admin-login';
 //   }
 // }
 // checkAuth();
@@ -524,7 +522,7 @@
 document.getElementById('btn-signout').addEventListener('click', () => {
   // STUB: call POST /api/admin/logout once S13 exists.
   sessionStorage.removeItem('admin_session');
-  window.location.href = '/admin-login.html';
+  window.location.href = '/admin-login';  // ← FIXED
 });
 
 // ---- Tab switching ----
@@ -655,6 +653,11 @@ document.getElementById('btn-downtime-save').addEventListener('click', () => {
 document.getElementById('btn-downtime-cancel').addEventListener('click', () => {
   editingId = null;
   clearDowntimeForm();
+});
+
+document.getElementById('btn-signout').addEventListener('click', () => {
+  sessionStorage.removeItem('admin_session');
+  window.location.href = '/';  // ← change to /
 });
 
 function clearDowntimeForm() {

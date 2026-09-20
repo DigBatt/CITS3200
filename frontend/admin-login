@@ -154,7 +154,7 @@
 
       if (res.ok) {
         sessionStorage.setItem('admin_session', '1');
-        window.location.href = '/admin.html';
+        window.location.href = '/admin';
       } else {
         errorEl.classList.add('visible');
         document.getElementById('login-password').value = '';
