@@ -1,4 +1,4 @@
-/* ---- Admin page styles for ADMIN PAGE & ADMIN LOGIN PAGE ---- */
+/* ---- Admin page styles for the ADMIN PAGES ---- */
 
 .app-shell {
   display: flex;
@@ -78,9 +78,14 @@
   background: transparent;
   border: 1px solid rgba(28, 25, 23, 0.16);
   color: rgba(28, 25, 23, 0.7);
+  text-decoration: none;
 }
 
-.btn-signout:hover { background: rgba(28, 25, 23, 0.04); }
+.btn-signout:hover { 
+    background: rgba(28, 25, 23, 0.04); 
+    color: #1c1917;
+
+}
 
 /* Main content area */
 .admin-main {
@@ -401,3 +406,4 @@
   margin: 0;
   text-align: center;
 }
+
