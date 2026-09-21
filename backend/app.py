@@ -47,6 +47,14 @@ def create_app() -> Flask:
         """
         return send_from_directory(FRONTEND, "index.html")
 
+    @app.get("/admin")
+    def admin():
+        return send_from_directory(FRONTEND, "admin.html")
+
+    @app.get("/admin-login")
+    def admin_login():
+        return send_from_directory(FRONTEND, "admin-login.html")
+
     @app.errorhandler(RepositoryError)
     @app.errorhandler(ConfigError)
     def unavailable(exc):

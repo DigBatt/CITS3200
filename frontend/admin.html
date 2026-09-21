@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<!--
+  Administration page (S14). Downtime, snapshots, the operator view and the
+  configured stops and routes are reached from the tabs here, so no separate
+  URLs are needed. Functions whose stories are not yet complete render as
+  unavailable rather than being omitted.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>nUWAy Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ============ Header: brand, section tabs, dashboard link, sign out ============ -->
+  <header class="app-header">
+    <div class="app-header-brand">
+      <span class="app-header-brand-name">nuway</span>
+      <span class="app-header-brand-tag">ADMIN</span>
+    </div>
+
+    <nav class="app-tabs" id="admin-tabs" aria-label="Admin sections">
+      <button type="button" class="app-tab is-active" data-tab="operator">Operator view</button>
+      <button type="button" class="app-tab" data-tab="downtime">Downtime</button>
+      <button type="button" class="app-tab" data-tab="snapshots">Snapshots</button>
+      <button type="button" class="app-tab" data-tab="stops">Stops &amp; routes</button>
+    </nav>
+
+    <div class="app-header-spacer"></div>
+
+    <!-- Return to dashboard and sign out -->
+    <a href="/" class="btn-signout">Return to Dashboard</a>
+    <button type="button" class="btn-signout" id="btn-signout">Sign out</button>
+  </header>
+
+  <!-- ============ Main ============ -->
+  <main class="admin-main">
+
+    <!-- ---- Operator view (S15): route selector populates once S06/S09 land ---- -->
+    <div class="admin-panel" id="tab-operator">
+      <h1 class="admin-section-title">Operator view</h1>
+      <p class="admin-section-sub">See what an operator sees on any route. Rider requests appear here as they come in.</p>
+
+      <div class="admin-card">
+        <div class="route-select-row">
+          <span class="route-select-label">ROUTE</span>
+          <select class="form-select" id="route-selector" style="max-width:220px" disabled>
+            <option value="">— not yet available —</option>
+          </select>
+        </div>
+
+        <div class="stub-notice">
+          <span class="stub-notice-dot"></span>
+          Operator view is available once stops and routes are configured (S06, S09). This selector will populate automatically.
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- Downtime (S18-S20): stored in memory until /api/downtime exists ---- -->
+    <div class="admin-panel" id="tab-downtime" hidden>
+      <h1 class="admin-section-title">Downtime</h1>
+      <p class="admin-section-sub">Record when a shuttle was out of service so availability figures stay accurate.</p>
+
+      <!-- Add / edit form -->
+      <div class="admin-card">
+        <p class="admin-card-title" id="downtime-form-title">ADD DOWNTIME RECORD</p>
+
+        <div class="form-warning" id="downtime-overlap-warning">
+          ⚠ This period overlaps an existing downtime record for the selected vehicle. Check the list below before saving.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="dt-vehicle">VEHICLE</label>
+          <!-- Populated from /api/vehicles by js/admin.js -->
+          <select class="form-select" id="dt-vehicle">
+            <option value="">Loading vehicles…</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="dt-start">START</label>
+            <input type="datetime-local" class="form-input" id="dt-start">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="dt-end">END</label>
+            <input type="datetime-local" class="form-input" id="dt-end">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="dt-reason">REASON</label>
+          <input type="text" class="form-input" id="dt-reason" placeholder="e.g. scheduled maintenance">
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-primary" id="btn-downtime-save">Save record</button>
+          <button type="button" class="btn-outline" id="btn-downtime-cancel" hidden>Cancel edit</button>
+        </div>
+      </div>
+
+      <!-- Records list -->
+      <div class="admin-card">
+        <p class="admin-card-title">RECORDED DOWNTIME</p>
+        <table class="downtime-table" id="downtime-table">
+          <thead>
+            <tr>
+              <th>Vehicle</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Reason</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="downtime-tbody">
+            <!-- Rows injected by js/admin.js -->
+            <tr><td colspan="5"><p class="empty-state">No downtime records yet.</p></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ---- Snapshots (S16, S17): not yet implemented ---- -->
+    <div class="admin-panel" id="tab-snapshots" hidden>
+      <h1 class="admin-section-title">Daily snapshots</h1>
+      <p class="admin-section-sub">Choose which metrics the system saves each day, and download past snapshots.</p>
+
+      <div class="admin-card">
+        <p class="admin-card-title">METRIC SELECTION</p>
+        <div class="stub-notice">
+          <span class="stub-notice-dot"></span>
+          Snapshot configuration (S16) and daily generation (S17) are not yet implemented. This panel will let you choose which metrics are captured and download past snapshots once they are.
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">PAST SNAPSHOTS</p>
+        <p class="empty-state">No snapshots recorded yet.</p>
+      </div>
+    </div>
+
+    <!-- ---- Stops & routes (S06): read from configuration ---- -->
+    <div class="admin-panel" id="tab-stops" hidden>
+      <h1 class="admin-section-title">Stops &amp; routes</h1>
+      <p class="admin-section-sub">Stops and routes are defined in <code>config/vehicles.yaml</code>. Changes take effect on restart with no code change required.</p>
+
+      <div class="admin-card">
+        <p class="admin-card-title">CONFIGURED STOPS</p>
+        <!-- Populated from /api/stops by js/admin.js once S06 is done -->
+        <div id="stops-list-container">
+          <div class="stub-notice">
+            <span class="stub-notice-dot"></span>
+            Stop configuration (S06) is not yet implemented. Stops will appear here once the API endpoint is available.
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">CONFIGURED ROUTES</p>
+        <div id="routes-list-container">
+          <div class="stub-notice">
+            <span class="stub-notice-dot"></span>
+            Routes will appear here once stops are configured (S06).
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="js/admin.js"></script>
+</body>
+</html>
