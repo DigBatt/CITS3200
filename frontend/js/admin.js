@@ -1,7 +1,10 @@
 // Admin page logic: auth guard, tab switching, and downtime records.
 //
-// Downtime is held in memory until the /api/downtime endpoints exist (S18).
-// Each TODO below marks where the fetch call replaces the local array.
+// Downtime is stored by the backend (S18). Every change goes to /api/downtime
+// and the table is redrawn from the response, so nothing is held only here.
+//
+// The datetime-local inputs are wall clock with no zone; the API speaks UTC.
+// toIso and toInput below are the only places that conversion happens.
 
 // ---- Auth guard ----
 // Redirect to the sign-in page if there is no admin session.
@@ -59,6 +62,41 @@ loadVehicles();
 let downtimeRecords = [];
 let editingId = null;
 
+// The API's error shape is { error: { code, message } }.
+async function api(path, options) {
+  const response = await fetch(path, options);
+  if (response.status === 204) return null;
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
+  }
+  return body;
+}
+
+// A local wall time from the form, as the UTC instant the API stores.
+function toIso(value) {
+  return new Date(value).toISOString();
+}
+
+// A stored UTC instant, as the local wall time the form shows.
+function toInput(iso) {
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+async function loadDowntime() {
+  const tbody = document.getElementById('downtime-tbody');
+  try {
+    downtimeRecords = (await api('/api/downtime')).records;
+    renderDowntime();
+  } catch (err) {
+    tbody.innerHTML =
+      `<tr><td colspan="5"><p class="empty-state">Could not load downtime records: ${escHtml(err.message)}</p></td></tr>`;
+  }
+}
+
 function renderDowntime() {
   const tbody = document.getElementById('downtime-tbody');
   if (!downtimeRecords.length) {
@@ -68,7 +106,7 @@ function renderDowntime() {
   }
   tbody.innerHTML = downtimeRecords.map(r => `
     <tr data-id="${r.id}">
-      <td class="mono">${r.vehicle}</td>
+      <td class="mono">${escHtml(r.vehicle_id)}</td>
       <td class="mono">${fmtLocal(r.start)}</td>
       <td class="mono">${fmtLocal(r.end)}</td>
       <td>${escHtml(r.reason)}</td>
@@ -88,66 +126,52 @@ function fmtLocal(iso) {
 }
 
 function escHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function genId() {
-  return Math.random().toString(36).slice(2, 10);
-}
-
-// S18: two periods overlap when each starts before the other ends.
-function hasOverlap(vehicleId, start, end, excludeId = null) {
-  return downtimeRecords.some(r => {
-    if (r.id === excludeId || r.vehicle !== vehicleId) return false;
-    return start < new Date(r.end) && end > new Date(r.start);
-  });
-}
-
-document.getElementById('btn-downtime-save').addEventListener('click', () => {
+document.getElementById('btn-downtime-save').addEventListener('click', async () => {
   const vehicle = document.getElementById('dt-vehicle').value;
   const start   = document.getElementById('dt-start').value;
   const end     = document.getElementById('dt-end').value;
   const reason  = document.getElementById('dt-reason').value.trim();
   const warning = document.getElementById('downtime-overlap-warning');
+  const button  = document.getElementById('btn-downtime-save');
 
   if (!vehicle || !start || !end || !reason) {
     alert('Please fill in all fields.');
     return;
   }
 
-  const startDate = new Date(start);
-  const endDate   = new Date(end);
-
-  // S18: an end earlier than its start is rejected rather than stored.
-  if (endDate <= startDate) {
+  // S18: an end earlier than its start is rejected rather than stored. The
+  // server enforces this too; checking here saves a round trip.
+  if (new Date(end) <= new Date(start)) {
     alert('End time must be after start time.');
     return;
   }
 
-  // S18: an overlapping period warns before it is stored.
-  if (hasOverlap(vehicle, startDate, endDate, editingId)) {
-    warning.classList.add('visible');
-  } else {
-    warning.classList.remove('visible');
-  }
+  const body = JSON.stringify({ vehicle_id: vehicle, start: toIso(start), end: toIso(end), reason });
+  const request = {
+    method: editingId ? 'PATCH' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  };
 
-  if (editingId) {
-    const rec = downtimeRecords.find(r => r.id === editingId);
-    if (rec) {
-      rec.vehicle = vehicle;
-      rec.start = start;
-      rec.end = end;
-      rec.reason = reason;
-    }
+  button.disabled = true;
+  try {
+    const path = editingId ? `/api/downtime/${editingId}` : '/api/downtime';
+    const saved = await api(path, request);
+
+    // S18: an overlapping period warns, but the record is already stored.
+    warning.classList.toggle('visible', saved.overlaps.length > 0);
+
     editingId = null;
-  } else {
-    downtimeRecords.push({ id: genId(), vehicle, start, end, reason });
+    clearDowntimeForm(saved.overlaps.length > 0);
+    await loadDowntime();
+  } catch (err) {
+    alert(`Could not save the record: ${err.message}`);
+  } finally {
+    button.disabled = false;
   }
-
-  clearDowntimeForm();
-  renderDowntime();
-
-  // TODO: POST /api/downtime (new) or PATCH /api/downtime/:id (edit) once S18 lands.
 });
 
 document.getElementById('btn-downtime-cancel').addEventListener('click', () => {
@@ -155,34 +179,42 @@ document.getElementById('btn-downtime-cancel').addEventListener('click', () => {
   clearDowntimeForm();
 });
 
-function clearDowntimeForm() {
+function clearDowntimeForm(keepWarning = false) {
   document.getElementById('dt-start').value = '';
   document.getElementById('dt-end').value = '';
   document.getElementById('dt-reason').value = '';
   document.getElementById('downtime-form-title').textContent = 'ADD DOWNTIME RECORD';
   document.getElementById('btn-downtime-cancel').hidden = true;
-  document.getElementById('downtime-overlap-warning').classList.remove('visible');
+  if (!keepWarning) {
+    document.getElementById('downtime-overlap-warning').classList.remove('visible');
+  }
 }
 
 function startEdit(id) {
   const rec = downtimeRecords.find(r => r.id === id);
   if (!rec) return;
   editingId = id;
-  document.getElementById('dt-vehicle').value = rec.vehicle;
-  document.getElementById('dt-start').value = rec.start;
-  document.getElementById('dt-end').value = rec.end;
+  document.getElementById('dt-vehicle').value = rec.vehicle_id;
+  document.getElementById('dt-start').value = toInput(rec.start);
+  document.getElementById('dt-end').value = toInput(rec.end);
   document.getElementById('dt-reason').value = rec.reason;
   document.getElementById('downtime-form-title').textContent = 'EDIT DOWNTIME RECORD';
   document.getElementById('btn-downtime-cancel').hidden = false;
   document.getElementById('tab-downtime').scrollIntoView({ behavior: 'smooth' });
 }
 
-function deleteRecord(id) {
+async function deleteRecord(id) {
   if (!confirm('Delete this downtime record?')) return;
-  downtimeRecords = downtimeRecords.filter(r => r.id !== id);
-  renderDowntime();
-
-  // TODO: DELETE /api/downtime/:id once S18 lands.
+  try {
+    await api(`/api/downtime/${id}`, { method: 'DELETE' });
+    if (editingId === id) {
+      editingId = null;
+      clearDowntimeForm();
+    }
+    await loadDowntime();
+  } catch (err) {
+    alert(`Could not delete the record: ${err.message}`);
+  }
 }
 
-renderDowntime();
+loadDowntime();

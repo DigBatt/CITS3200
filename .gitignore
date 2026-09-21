@@ -8,3 +8,6 @@ __pycache__/
 .env
 claude.md
 data/live/
+data/*.sqlite3
+data/*.sqlite3-wal
+data/*.sqlite3-shm

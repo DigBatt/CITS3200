@@ -16,7 +16,12 @@ Always shaped:
 ```
 
 Codes: `bad_timestamp`, `bad_range` (from > to), `unknown_vehicle`,
-`data_unavailable`.
+`data_unavailable`, `bad_request` (malformed body), `invalid_record`
+(a field the store refuses), `not_found`.
+
+`not_found` is the one exception to "empty is not an error": it answers a
+write aimed at a record id that does not exist, which is not a query that
+matched nothing.
 
 ---
 
@@ -116,6 +121,98 @@ I dont know the format of the data we get here yet, so this is mostly a placehol
 ## `GET /api/metrics`
 
 This will be for utilisation figures. Not implemented yet.
+
+## `GET /api/downtime`
+
+The downtime log for a selection and, optionally, a period. Serves S18-S20.
+
+Operator reported out of service periods. Downtime is the one bucket of the
+time usage model the telemetry cannot supply (see `docs/GMG Time Utilisation
+Model.md`), so these are entered by hand on the admin page.
+
+Unlike the other read endpoints, `from` and `to` are **not** defaulted to
+today: the admin page lists the whole log. Omit them for everything. When
+given, a record is returned if it *overlaps* the window, so one that began
+before `from` and was still open at `from` is included.
+
+```json
+{
+  "from": null,
+  "to": null,
+  "records": [
+    {
+      "id": "ffaf720d7ac7456fa369593ad7969b91",
+      "vehicle_id": "1",
+      "start": "2026-09-17T01:00:00.000000Z",
+      "end": "2026-09-17T03:00:00.000000Z",
+      "reason": "Brake fault",
+      "created_at": "2026-09-17T04:12:09.114000Z",
+      "updated_at": "2026-09-17T04:12:09.114000Z"
+    }
+  ]
+}
+```
+
+Records are ascending by `start`. Times are stored and returned in UTC; the
+admin page converts to and from local time at the form.
+
+> **Not yet protected.** The three writes below are the first write endpoints
+> in the app and admin auth (S13) does not exist, so anyone who can reach the
+> server can edit the log. S13 must guard them before this is exposed beyond
+> a local run.
+
+---
+
+## `POST /api/downtime`
+
+Stores a new record. All four fields are required.
+
+```json
+{ "vehicle_id": "1", "start": "2026-09-17T01:00:00Z", "end": "2026-09-17T03:00:00Z", "reason": "Brake fault" }
+```
+
+`201` with the stored record and any periods it clashes with:
+
+```json
+{
+  "record": {
+    "id": "ffaf720d7ac7456fa369593ad7969b91",
+    "vehicle_id": "1",
+    "start": "2026-09-17T01:00:00.000000Z",
+    "end": "2026-09-17T03:00:00.000000Z",
+    "reason": "Brake fault",
+    "created_at": "2026-09-17T04:12:09.114000Z",
+    "updated_at": "2026-09-17T04:12:09.114000Z"
+  },
+  "overlaps": []
+}
+```
+
+**Overlaps warn, they do not reject.** A non empty `overlaps` means the record
+was stored *and* intersects the ones listed. A vehicle can genuinely have two
+faults logged over one period, so the admin page shows a warning rather than
+refusing the save. Periods are half open, so two that merely touch do not
+overlap.
+
+`400` for a missing field, an unparseable time, an `end` at or before `start`
+(`bad_range`), an empty reason (`invalid_record`), or an unknown vehicle.
+
+---
+
+## `PATCH /api/downtime/<id>`
+
+Changes a stored record. Send only the fields that change; the rest are left
+as they are. Answers `200` in the same shape as `POST`, or `404` with
+`not_found`.
+
+---
+
+## `DELETE /api/downtime/<id>`
+
+Removes a record. `204` with no body, or `404` with `not_found`. Deleting
+twice is a `404`, so the page can tell a stale row from a removed one.
+
+---
 
 ## Not in this sprint
 

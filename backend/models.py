@@ -111,3 +111,54 @@ class Event:
             "kind": self.kind,
             "detail": self.detail,
         }
+
+
+@dataclass(frozen=True)
+class Downtime:
+    """
+    A period one vehicle was out of service, as reported by an operator.
+
+    Downtime is the one part of the time usage model the telemetry cannot
+    answer (see backend/metrics/tum.py), so operators enter these by hand.
+
+    Bounds are half open: the record covers `start` up to but not including
+    `end`, so two records that merely touch do not overlap.
+    """
+
+    id: str
+    vehicle_id: str
+    start: datetime
+    end: datetime
+    reason: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @property
+    def duration_seconds(self) -> float:
+        return (self.end - self.start).total_seconds()
+
+    def overlaps(self, start: datetime, end: datetime) -> bool:
+        """
+        Test this record against a window, half open at both ends.
+
+        Parameters
+        ----------
+        start, end : datetime
+            UTC bounds.
+
+        Returns
+        -------
+        bool
+        """
+        return self.start < end and self.end > start
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "vehicle_id": self.vehicle_id,
+            "start": format_timestamp(self.start),
+            "end": format_timestamp(self.end),
+            "reason": self.reason,
+            "created_at": format_timestamp(self.created_at) if self.created_at else None,
+            "updated_at": format_timestamp(self.updated_at) if self.updated_at else None,
+        }

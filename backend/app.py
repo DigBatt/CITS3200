@@ -5,25 +5,32 @@ Run as `python -m backend.app`
 from __future__ import annotations
 from pathlib import Path
 from flask import Flask, jsonify, send_from_directory
+from backend.api.downtime import bp as downtime_bp
 from backend.api.metrics import bp as metrics_bp
 from backend.api.positions import bp as positions_bp
 from backend.api.vehicles import bp as vehicles_bp
 from backend.config import ConfigError, load_config
-from backend.repository import CsvRepository
+from backend.repository import CsvRepository, DowntimeStore
 from backend.repository.base import RepositoryError
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 
 
-def create_app() -> Flask:
+def create_app(config=None) -> Flask:
     """
     Build the configured application.
+
+    Parameters
+    ----------
+    config : backend.config.Config, optional
+        Already loaded config, for a test that needs its own paths. None
+        reads config/ as usual.
 
     Returns
     -------
     Flask
-        With the repository and the config on `app.config` under
-        `REPOSITORY` and `NUWAY_CONFIG`.
+        With the repository, the downtime store and the config on
+        `app.config` under `REPOSITORY`, `DOWNTIME_STORE` and `NUWAY_CONFIG`.
 
     Raises
     ------
@@ -32,13 +39,15 @@ def create_app() -> Flask:
     """
     app = Flask(__name__, static_folder=str(FRONTEND), static_url_path="")
 
-    config = load_config()
+    config = load_config() if config is None else config
     app.config["NUWAY_CONFIG"] = config
     app.config["REPOSITORY"] = CsvRepository.from_config(config)
+    app.config["DOWNTIME_STORE"] = DowntimeStore.from_config(config)
 
     app.register_blueprint(positions_bp)
     app.register_blueprint(vehicles_bp)
     app.register_blueprint(metrics_bp)
+    app.register_blueprint(downtime_bp)
 
     @app.get("/")
     def index():

@@ -4,6 +4,8 @@ data:
   directory: data/sample
   # Where the live logger appends. Set `directory` to this to view live data.
   live_directory: data/live
+  # Operator reported downtime. Created on first use, not committed.
+  downtime_database: data/downtime.sqlite3
 
 liveness:
   inactivity_threshold_seconds: 300 # when data is to be rendered as grey.
