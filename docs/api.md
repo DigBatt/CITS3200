@@ -16,7 +16,7 @@ Always shaped:
 ```
 
 Codes: `bad_timestamp`, `bad_range` (from > to), `unknown_vehicle`,
-`data_unavailable`.
+`unknown_stop`, `unknown_route`, `data_unavailable`.
 
 ---
 
@@ -116,6 +116,78 @@ I dont know the format of the data we get here yet, so this is mostly a placehol
 ## `GET /api/metrics`
 
 This will be for utilisation figures. Not implemented yet.
+
+---
+
+## Stops and routes
+
+From `config/stops.yaml` ([stops-and-routes.md](stops-and-routes.md)).
+
+A stop or route id in the path that is not configured is `404`, codes
+`unknown_stop` and `unknown_route`. The no-`404` rule above is about queries
+that match no data, not about naming something that does not exist.
+
+### `GET /api/stops`
+
+Every stop, in file order, each with the ids of the routes it is on.
+
+```json
+{
+  "stops": [
+    {
+      "id": "reid-library",
+      "name": "Reid Library",
+      "latitude": -31.97901221771226,
+      "longitude": 115.8183554056777,
+      "routes": ["campus-loop"]
+    }
+  ]
+}
+```
+
+`routes` is in file order and is `[]` for a stop on no route.
+
+### `GET /api/stops/<id>`
+
+One stop, the same shape as an entry above.
+
+### `GET /api/routes`
+
+Every route, in file order, with its stop ids in service order.
+
+```json
+{
+  "routes": [
+    {
+      "id": "campus-loop",
+      "name": "Campus loop",
+      "colour": "#d4741f",
+      "loop": true,
+      "stop_ids": ["reid-library", "civ-mech", "business-school"]
+    }
+  ]
+}
+```
+
+`colour` is `null` when the config does not set one.
+
+### `GET /api/routes/<id>`
+
+One route, with its stops in full and in service order.
+
+```json
+{
+  "id": "campus-loop",
+  "name": "Campus loop",
+  "colour": "#d4741f",
+  "loop": true,
+  "stops": [
+    { "id": "reid-library", "name": "Reid Library", "latitude": -31.97901221771226, "longitude": 115.8183554056777, "routes": ["campus-loop"] }
+  ]
+}
+```
+
+---
 
 ## Not in this sprint
 

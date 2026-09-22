@@ -1,0 +1,25 @@
+# docs/stops-and-routes.md.
+
+stops:
+  - id: reid-library
+    name: Reid Library
+    latitude: -31.97901221771226
+    longitude: 115.8183554056777
+
+  - id: civ-mech
+    name: Outside Civil and Mechanical Engineering
+    latitude: -31.980743857374474
+    longitude: 115.81720535774184
+
+  - id: business-school
+    name: Outside the Business School
+    latitude: -31.985583444723204
+    longitude: 115.82089500479223
+
+routes:
+  # PLACEHOLDER
+  - id: campus-loop
+    name: Campus loop
+    colour: "#d4741f"
+    loop: true
+    stops: [reid-library, civ-mech, business-school]

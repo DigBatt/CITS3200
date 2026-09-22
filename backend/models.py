@@ -56,6 +56,43 @@ class Vehicle:
 
 
 @dataclass(frozen=True)
+class Stop:
+    """
+    A pickup point as declared in config/stops.yaml.
+    """
+
+    id: str
+    name: str
+    latitude: float
+    longitude: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"id": self.id, "name": self.name, "latitude": self.latitude, "longitude": self.longitude}
+
+
+@dataclass(frozen=True)
+class Route:
+    """
+    An ordered list of stop ids as declared in config/stops.yaml.
+    """
+
+    id: str
+    name: str
+    stop_ids: tuple[str, ...]
+    colour: Optional[str] = None
+    loop: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "colour": self.colour,
+            "loop": self.loop,
+            "stop_ids": list(self.stop_ids),
+        }
+
+
+@dataclass(frozen=True)
 class Position:
     """
     A telemetry sample for one vehicle at one instant.

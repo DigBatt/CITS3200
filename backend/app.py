@@ -7,17 +7,23 @@ from pathlib import Path
 from flask import Flask, jsonify, send_from_directory
 from backend.api.metrics import bp as metrics_bp
 from backend.api.positions import bp as positions_bp
+from backend.api.stops import bp as stops_bp
 from backend.api.vehicles import bp as vehicles_bp
-from backend.config import ConfigError, load_config
+from backend.config import DEFAULT_CONFIG_DIR, ConfigError, load_config
 from backend.repository import CsvRepository
 from backend.repository.base import RepositoryError
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 
 
-def create_app() -> Flask:
+def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Flask:
     """
     Build the configured application.
+
+    Parameters
+    ----------
+    config_dir
+        The directory holding app.yaml, vehicles.yaml and stops.yaml.
 
     Returns
     -------
@@ -32,13 +38,14 @@ def create_app() -> Flask:
     """
     app = Flask(__name__, static_folder=str(FRONTEND), static_url_path="")
 
-    config = load_config()
+    config = load_config(config_dir)
     app.config["NUWAY_CONFIG"] = config
     app.config["REPOSITORY"] = CsvRepository.from_config(config)
 
     app.register_blueprint(positions_bp)
     app.register_blueprint(vehicles_bp)
     app.register_blueprint(metrics_bp)
+    app.register_blueprint(stops_bp)
 
     @app.get("/")
     def index():
