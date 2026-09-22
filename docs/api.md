@@ -137,8 +137,8 @@ Every stop, in file order, each with the ids of the routes it is on.
     {
       "id": "reid-library",
       "name": "Reid Library",
-      "latitude": -31.97xxxx,
-      "longitude": 115.81xxxx,
+      "latitude": -31.97901221771226,
+      "longitude": 115.8183554056777,
       "routes": ["campus-loop"]
     }
   ]
@@ -182,7 +182,7 @@ One route, with its stops in full and in service order.
   "colour": "#d4741f",
   "loop": true,
   "stops": [
-    { "id": "reid-library", "name": "Reid Library", "latitude": -31.97xxxx, "longitude": 115.81xxxx, "routes": ["campus-loop"] }
+    { "id": "reid-library", "name": "Reid Library", "latitude": -31.97901221771226, "longitude": 115.8183554056777, "routes": ["campus-loop"] }
   ]
 }
 ```

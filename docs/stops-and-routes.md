@@ -16,18 +16,18 @@ YAML, like `config/app.yaml` and `config/vehicles.yaml`. Two top level keys,
 stops:
   - id: reid-library
     name: Reid Library
-    latitude: -31.97xxxx
-    longitude: 115.81xxxx
+    latitude: -31.97901221771226
+    longitude: 115.8183554056777
 
   - id: civ-mech
     name: Outside Civil and Mechanical Engineering
-    latitude: -31.98xxxx
-    longitude: 115.81xxxx
+    latitude: -31.980743857374474
+    longitude: 115.81720535774184
 
   - id: business-school
     name: Outside the Business School
-    latitude: -31.97xxxx
-    longitude: 115.81xxxx
+    latitude: -31.985583444723204
+    longitude: 115.82089500479223
 
 routes:
   - id: campus-loop
@@ -102,6 +102,7 @@ config/stops.yaml: routes[0] (id 'campus-loop'): stop 'reid-libary' is not a con
 Rejected:
 
 - A missing or empty required field.
+- An id that is not lowercase words joined by hyphens.
 - A duplicate stop id, or a duplicate route id.
 - A coordinate that is not a number, or out of range. `true`/`false` are not
   numbers.

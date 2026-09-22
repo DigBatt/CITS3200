@@ -9,6 +9,7 @@ from typing import Any, Optional
 import yaml
 
 from backend.models import Vehicle
+from backend.stops import StopNetwork, StopsError, parse_stops
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_DIR = PROJECT_ROOT / "config"
@@ -34,6 +35,7 @@ class Config:
     refresh_interval_seconds: Optional[int]
     utilisation: Optional[dict[str, Any]]
     logger: Optional[dict[str, Any]]
+    stops: StopNetwork
 
     def vehicle(self, vehicle_id: str) -> Optional[Vehicle]:
         return next((v for v in self.vehicles if v.id == vehicle_id), None)
@@ -53,6 +55,8 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
     config_dir = Path(config_dir)
     app = _read_yaml(config_dir / "app.yaml")
     fleet = _read_yaml(config_dir / "vehicles.yaml")
+    stops_path = config_dir / "stops.yaml"
+    stops_raw = _read_yaml(stops_path)
 
     try:
         data = app.get("data") or {}
@@ -74,6 +78,9 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
             for entry in fleet.get("vehicles") or []
         ]
 
+        logger = app.get("logger")
+        bounds = (logger or {}).get("bounds")
+
         return Config(
             vehicles=vehicles,
             data_directory=PROJECT_ROOT / directory if directory else None,
@@ -86,7 +93,20 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
             map_zoom=map_settings.get("zoom"),
             refresh_interval_seconds=map_settings.get("refresh_interval_seconds"),
             utilisation=app.get("utilisation"),
-            logger=app.get("logger"),
+            logger=logger,
+            stops=_parse_stops(stops_raw, stops_path, bounds),
         )
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
         raise ConfigError(f"Could not read the config in {config_dir}: {exc}") from exc
+
+
+def _parse_stops(raw: Any, path: Path, bounds: Any) -> StopNetwork:
+    try:
+        source = str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        source = str(path)
+    try:
+        return parse_stops(raw, source, bounds)
+    except StopsError as exc:
+        count = len(exc.problems)
+        raise ConfigError(f"{source} has {count} problem{'' if count == 1 else 's'}:\n{exc}") from exc
