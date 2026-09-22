@@ -236,6 +236,7 @@ loadDowntime();
 let schedule = null;   // { monday: [{start, end, vehicles}], ... }
 let scheduleDays = [];
 let scheduleFleet = [];
+let removeOpen = null;
 
 async function loadSchedule() {
   try {
@@ -268,21 +269,88 @@ function vehicleChips(day, index, vehicles) {
     </div>`;
 }
 
+// A date input gives YYYY-MM-DD; building the Date from parts keeps it on the
+// day the operator picked rather than shifting it through UTC.
+function fmtDate(iso) {
+  const [y, m, d] = String(iso).split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+const todayIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+// Says when a period starts counting and when it stops, so a change booked
+// ahead is visible rather than silently waiting.
+function periodStatus(period) {
+  const today = todayIso();
+  const parts = [];
+
+  if (period.starts_on) {
+    parts.push(period.starts_on > today
+      ? `Starts ${fmtDate(period.starts_on)}, not active yet`
+      : `Active since ${fmtDate(period.starts_on)}`);
+  }
+  if (period.ends_on) {
+    parts.push(period.ends_on > today
+      ? `No longer active from ${fmtDate(period.ends_on)}`
+      : `Ended ${fmtDate(period.ends_on)}`);
+  }
+  if (!parts.length) return '';
+
+  const ended = period.ends_on && period.ends_on <= today;
+  const pending = period.starts_on && period.starts_on > today;
+  return `<p class="sched-status${ended || pending ? ' is-inactive' : ''}">${escHtml(parts.join(' · '))}</p>`;
+}
+
+// Removal is dated: the period stays on the roster, and on screen, until the
+// day it stops applying. "Now" deletes the row outright.
+function removePanel(key, period) {
+  return `
+    <div class="sched-remove">
+      <span class="sched-remove-label">Remove</span>
+      <button type="button" class="btn-xs danger" data-remove-now="${key}">Now</button>
+      <span class="sched-remove-label">or from</span>
+      <input type="date" class="form-input" data-remove-date="${key}"
+             value="${period.ends_on ?? ''}" min="${todayIso()}" aria-label="Remove from date">
+      ${period.ends_on ? `<button type="button" class="btn-xs" data-remove-cancel="${key}">Keep it</button>` : ''}
+      <button type="button" class="btn-xs" data-remove-close="${key}">Done</button>
+    </div>`;
+}
+
 function renderSchedule() {
+  const today = todayIso();
+
   document.getElementById('schedule-days').innerHTML = scheduleDays.map(day => {
     const periods = schedule[day] ?? [];
-    const rows = periods.map((period, index) => `
-      <div class="sched-period">
+    const rows = periods.map((period, index) => {
+      const key = `${day}:${index}`;
+      const inactive = (period.ends_on && period.ends_on <= today) || (period.starts_on && period.starts_on > today);
+
+      return `
+      <div class="sched-period${inactive ? ' is-inactive' : ''}">
         <div class="sched-times">
           <input type="time" class="form-input" value="${period.start}"
                  data-day="${day}" data-index="${index}" data-edge="start" aria-label="Start time">
           <span>to</span>
           <input type="time" class="form-input" value="${period.end}"
                  data-day="${day}" data-index="${index}" data-edge="end" aria-label="End time">
-          <button type="button" class="btn-xs danger" data-remove="${day}" data-index="${index}">Remove</button>
+          <button type="button" class="btn-xs danger" data-remove-open="${key}"
+                  aria-expanded="${removeOpen === key}">Remove</button>
         </div>
         ${vehicleChips(day, index, period.vehicles)}
-      </div>`).join('');
+        <label class="sched-from">
+          <input type="checkbox" data-starts-toggle="${key}" ${period.starts_on ? 'checked' : ''}>
+          <span>Start on</span>
+          <input type="date" class="form-input" data-starts-date="${key}"
+                 value="${period.starts_on ?? ''}" ${period.starts_on ? '' : 'disabled'}
+                 aria-label="Start on date">
+        </label>
+        ${periodStatus(period)}
+        ${removeOpen === key ? removePanel(key, period) : ''}
+      </div>`;
+    }).join('');
 
     return `
       <div class="schedule-day">
@@ -308,34 +376,79 @@ function setScheduleStatus(message) {
 }
 
 // Edits are held here until Save; nothing is written per keystroke.
+// Look a period up from a "day:index" key.
+function periodAt(key) {
+  const [day, index] = key.split(':');
+  return schedule[day]?.[Number(index)];
+}
+
 document.getElementById('schedule-days').addEventListener('input', event => {
   const input = event.target;
-  if (!input.dataset.edge) return;
-  schedule[input.dataset.day][Number(input.dataset.index)][input.dataset.edge] = input.value;
+
+  if (input.dataset.edge) {
+    schedule[input.dataset.day][Number(input.dataset.index)][input.dataset.edge] = input.value;
+  } else if (input.dataset.startsDate) {
+    periodAt(input.dataset.startsDate).starts_on = input.value || null;
+  } else if (input.dataset.removeDate) {
+    periodAt(input.dataset.removeDate).ends_on = input.value || null;
+  } else {
+    return;
+  }
   setScheduleStatus('Unsaved changes.');
 });
 
+// A date input commits on change, which is when the status line is worth
+// redrawing; doing it per keystroke would fight the picker.
+document.getElementById('schedule-days').addEventListener('change', event => {
+  if (event.target.dataset.startsDate || event.target.dataset.removeDate) renderSchedule();
+});
+
 document.getElementById('schedule-days').addEventListener('click', event => {
-  const add = event.target.closest('[data-add]');
-  const remove = event.target.closest('[data-remove]');
-  const vehicle = event.target.closest('[data-vehicle]');
+  const target = event.target;
+  const add = target.closest('[data-add]');
+  const vehicle = target.closest('[data-vehicle]');
+  const openRemove = target.closest('[data-remove-open]');
+  const removeNow = target.closest('[data-remove-now]');
+  const keepIt = target.closest('[data-remove-cancel]');
+  const closeRemove = target.closest('[data-remove-close]');
+  const startsToggle = target.closest('[data-starts-toggle]');
 
   if (add) {
-    (schedule[add.dataset.add] ??= []).push({ start: '08:00', end: '17:00', vehicles: null });
-  } else if (remove) {
-    schedule[remove.dataset.remove].splice(Number(remove.dataset.index), 1);
+    (schedule[add.dataset.add] ??= []).push({
+      start: '08:00', end: '17:00', vehicles: null, starts_on: null, ends_on: null,
+    });
+    removeOpen = null;
+  } else if (openRemove) {
+    // A second click closes it, so the button toggles its own panel.
+    removeOpen = removeOpen === openRemove.dataset.removeOpen ? null : openRemove.dataset.removeOpen;
+  } else if (removeNow) {
+    const [day, index] = removeNow.dataset.removeNow.split(':');
+    schedule[day].splice(Number(index), 1);
+    removeOpen = null;
+  } else if (keepIt) {
+    periodAt(keepIt.dataset.removeCancel).ends_on = null;
+  } else if (closeRemove) {
+    removeOpen = null;
+  } else if (startsToggle) {
+    // Off by default. Turning it on starts from today, which is the common
+    // case; turning it off puts the period back in force always.
+    const period = periodAt(startsToggle.dataset.startsToggle);
+    period.starts_on = period.starts_on ? null : todayIso();
   } else if (vehicle) {
     const period = schedule[vehicle.dataset.day][Number(vehicle.dataset.index)];
     const id = vehicle.dataset.vehicle;
 
     if (id === 'all') {
       period.vehicles = null;
+    } else if (!period.vehicles?.length) {
+      // Picking a vehicle while "All" is on means that one, not the fleet
+      // minus it. Adding and removing applies from there.
+      period.vehicles = [id];
     } else {
-      // Coming from "All", the first pick starts from the whole fleet so that
-      // de-selecting one leaves the rest, which is what the click means.
-      const current = period.vehicles?.length ? period.vehicles : scheduleFleet.map(v => v.id);
-      const next = current.includes(id) ? current.filter(v => v !== id) : [...current, id];
-      // Every vehicle, or none, is the same as fleet wide.
+      const next = period.vehicles.includes(id)
+        ? period.vehicles.filter(v => v !== id)
+        : [...period.vehicles, id];
+      // Every vehicle, or none left, is the same as fleet wide.
       period.vehicles = (next.length === scheduleFleet.length || !next.length) ? null : next;
     }
   } else {
@@ -360,10 +473,10 @@ document.getElementById('btn-schedule-save').addEventListener('click', async () 
       body: JSON.stringify(schedule),
     });
     schedule = saved.schedule;
+    removeOpen = null;
     renderSchedule();
     setScheduleStatus(saved.configured ? 'Saved.' : 'Saved. Nothing is rostered, so all time counts as unscheduled.');
-    miniCalendar.refresh();
-    fullCalendar?.refresh();
+    calendar.refresh();
   } catch (err) {
     // The server validates too, so this is where a bad row is reported.
     showScheduleError(err.message);
@@ -382,56 +495,13 @@ loadSchedule();
 
 // ---- Calendar: the docked mini month, and the full view it opens ----
 //
-// The mini month is always on screen. The full calendar is built the first
-// time it is opened, so a session that never opens it never fetches for it.
+// Wiring lives in calendar.js so the dashboard behaves identically.
 //
 // AUTH (S13): both are view only, over reads that stay public.
 
-const overlay = document.getElementById('cal-overlay');
-let fullCalendar = null;
-
-function openCalendar(day) {
-  overlay.hidden = false;
-  document.body.classList.add('is-overlaid');
-
-  if (fullCalendar) {
-    fullCalendar.goTo(day ?? new Date());
-  } else {
-    // Opens on the week; the 3 day option is in the calendar's own controls.
-    fullCalendar = ServiceCalendar.create(document.getElementById('cal-overlay-body'), {
-      days: 7,
-      anchor: day ?? new Date(),
-    });
-  }
-  document.getElementById('cal-overlay-close').focus();
-}
-
-function closeCalendar() {
-  overlay.hidden = true;
-  document.body.classList.remove('is-overlaid');
-}
-
-const miniCalendar = ServiceCalendar.createMini(document.getElementById('mini-calendar'), {
-  onOpen: openCalendar,
-});
-
-// The dock as a whole opens the calendar, so a click anywhere on it that is
-// not a day or a month arrow still does the obvious thing.
-document.getElementById('mini-calendar').addEventListener('click', event => {
-  if (!event.target.closest('[data-mini-day], [data-mini-month]')) openCalendar();
-});
-document.getElementById('mini-calendar').addEventListener('keydown', event => {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault();
-    openCalendar();
-  }
-});
-
-document.getElementById('cal-overlay-close').addEventListener('click', closeCalendar);
-// Clicking the backdrop, but not the panel on it.
-overlay.addEventListener('click', event => {
-  if (event.target === overlay) closeCalendar();
-});
-document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && !overlay.hidden) closeCalendar();
+const calendar = ServiceCalendar.mount({
+  mini: document.getElementById('mini-calendar'),
+  overlay: document.getElementById('cal-overlay'),
+  body: document.getElementById('cal-overlay-body'),
+  close: document.getElementById('cal-overlay-close'),
 });

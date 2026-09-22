@@ -40,12 +40,19 @@ utilisation:
   # whole fleet. Periods for different vehicles may overlap, periods for the
   # same vehicle may not.
   #
+  # A period may also be booked ahead with `starts_on` (first day it counts)
+  # and `ends_on` (first day it no longer does), so a roster change can be
+  # entered before it takes effect.
+  #
   #   monday:
   #     - hours: ["06:00", "10:00"]
   #       vehicles: ["1", "2"]
+  #       starts_on: 2026-10-01
   #
   # Edited by hand or from the admin page, which rewrites only this block.
   service_hours:
+    monday:
+      - hours: ["08:00", "17:00"]
     tuesday:
       - hours: ["08:00", "17:00"]
     wednesday:

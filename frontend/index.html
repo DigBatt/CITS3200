@@ -29,7 +29,6 @@
         <button type="button" class="app-tab" data-view="operator">Operator</button>
         <button type="button" class="app-tab" data-view="rider">Rider</button>
         <button type="button" class="app-tab" data-view="utilisation">Utilisation</button>
-        <button type="button" class="app-tab" data-view="schedule">Schedule</button>
       </nav>
       <div class="app-header-spacer"></div>
       <!-- STUB: wire to a real liveness/heartbeat signal -->
@@ -42,6 +41,14 @@
       <a href="/admin" class="admin-link">Admin</a>
       <div class="app-avatar" data-stub="current-user">JD</div>
     </header>
+
+    <!-- Mini month, docked top right under the header. Deliberately
+         unlabelled; clicking a day opens the full calendar on that day.
+         AUTH (S13): view only, and the reads behind it stay public. -->
+    <aside class="mini-cal-dock" id="mini-cal-dock">
+      <div id="dashboard-mini" role="button" tabindex="0" aria-haspopup="dialog"
+           aria-label="Service calendar, click a day to open"></div>
+    </aside>
 
     <!-- ============ Date/time range control ============ -->
     <div id="timeline-container"></div>
@@ -175,20 +182,21 @@
         <div class="util-table" id="util-table"></div>
       </section>
 
-      <!-- ============ Schedule view (no map): the service calendar ============
-           View only. Shows the roster, downtime and what is neither, for any
-           visitor. Editing the roster is the admin page.
-           AUTH (S13): stays open to everyone once sign in exists. -->
-      <section class="dashboard-view view-schedule" id="view-schedule" hidden>
-        <div class="util-toolbar">
-          <span class="util-scope-label">Service calendar &middot; a week of scheduled hours, downtime and the time that is neither</span>
-        </div>
-        <div class="util-tum-card">
-          <div id="dashboard-calendar"></div>
-        </div>
-      </section>
     </main>
   </div>
+
+<!-- ============ Full calendar, opened from the mini month ============
+     Titled just "Calendar". Opens on the week, with a 3 day option.
+     AUTH (S13): view only, over reads that stay public. -->
+<div class="cal-overlay" id="cal-overlay" role="dialog" aria-modal="true" aria-labelledby="cal-overlay-title" hidden>
+  <div class="cal-overlay-panel">
+    <div class="cal-overlay-head">
+      <h2 class="cal-overlay-title" id="cal-overlay-title">Calendar</h2>
+      <button type="button" class="btn-outline" id="cal-overlay-close" aria-label="Close calendar">Close</button>
+    </div>
+    <div class="cal-overlay-body" id="cal-overlay-body"></div>
+  </div>
+</div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="js/api.js"></script>

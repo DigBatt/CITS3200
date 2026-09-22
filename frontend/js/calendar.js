@@ -319,6 +319,9 @@
 
   function createMini(container, options = {}) {
     const onOpen = options.onOpen ?? (() => {});
+    // Collapsed shows the month bar alone, which is the whole dock on a small
+    // screen where a full month would bury what is behind it.
+    let collapsed = Boolean(options.collapsed);
     let month = startOfDay(new Date());
     month.setDate(1);
 
@@ -391,13 +394,24 @@
         .join('');
 
       // No title: the dock is unlabelled by design, the overlay names itself.
-      container.innerHTML = `
+      // The month name toggles the grid rather than opening the calendar, so
+      // the dock can be folded down to a bar and back.
+      const head = `
+        <div class="mini-head">
+          <button type="button" class="mini-step" data-mini-month="-1" aria-label="Previous month">&#8249;</button>
+          <button type="button" class="mini-month" data-mini-toggle aria-expanded="${!collapsed}"
+                  title="${collapsed ? 'Show the month' : 'Hide the month'}">
+            <span>${escape(month.toLocaleDateString([], { month: 'long', year: 'numeric' }))}</span>
+            <span class="mini-chevron" aria-hidden="true">${collapsed ? '&#9656;' : '&#9662;'}</span>
+          </button>
+          <button type="button" class="mini-step" data-mini-month="1" aria-label="Next month">&#8250;</button>
+        </div>`;
+
+      container.innerHTML = collapsed
+        ? `<div class="mini is-collapsed">${head}</div>`
+        : `
         <div class="mini">
-          <div class="mini-head">
-            <button type="button" class="mini-step" data-mini-month="-1" aria-label="Previous month">&#8249;</button>
-            <span class="mini-month">${escape(month.toLocaleDateString([], { month: 'long', year: 'numeric' }))}</span>
-            <button type="button" class="mini-step" data-mini-month="1" aria-label="Next month">&#8250;</button>
-          </div>
+          ${head}
           <div class="mini-dows">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d) => `<span>${d}</span>`).join('')}</div>
           <div class="mini-grid">${grid}</div>
           <div class="mini-legend">
@@ -408,10 +422,17 @@
     }
 
     container.addEventListener('click', (event) => {
+      const toggle = event.target.closest('[data-mini-toggle]');
       const step = event.target.closest('[data-mini-month]');
       const day = event.target.closest('[data-mini-day]');
 
-      // Paging the month must not open the overlay, so it is checked first.
+      // Folding and paging both stay inside the dock, so they are checked
+      // before the click can fall through to opening the full calendar.
+      if (toggle) {
+        collapsed = !collapsed;
+        render();
+        return;
+      }
       if (step) {
         month = new Date(month.getFullYear(), month.getMonth() + Number(step.dataset.miniMonth), 1);
         render();
@@ -425,5 +446,67 @@
     return { refresh };
   }
 
-  window.ServiceCalendar = { create, createMini };
+
+  // ---- Mini month plus the full calendar it opens ----
+  //
+  // Both pages use this: the admin dock and the dashboard's Schedule view.
+  // Keeping the wiring here means the two behave the same, and the full
+  // calendar is built only when someone first opens it.
+
+  function mount(elements, options = {}) {
+    const { mini: miniElement, overlay, body, close } = elements;
+    let full = null;
+
+    function open(day) {
+      overlay.hidden = false;
+      document.body.classList.add('is-overlaid');
+
+      if (full) {
+        full.goTo(day ?? new Date());
+      } else {
+        // Opens on the week; the 3 day option is in the calendar's controls.
+        full = create(body, { days: 7, anchor: day ?? new Date() });
+      }
+      close.focus();
+    }
+
+    function shut() {
+      overlay.hidden = true;
+      document.body.classList.remove('is-overlaid');
+    }
+
+    const mini = createMini(miniElement, { onOpen: open, collapsed: options.collapsed });
+
+    // A click anywhere on the dock that is not a day or a month arrow still
+    // does the obvious thing.
+    miniElement.addEventListener('click', (event) => {
+      if (!event.target.closest('[data-mini-day], [data-mini-month], [data-mini-toggle]')) open();
+    });
+    miniElement.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        open();
+      }
+    });
+
+    close.addEventListener('click', shut);
+    // The backdrop, but not the panel sitting on it.
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) shut();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !overlay.hidden) shut();
+    });
+
+    return {
+      open,
+      close: shut,
+      refresh() {
+        mini.refresh();
+        full?.refresh();
+      },
+    };
+  }
+
+  window.ServiceCalendar = { create, createMini, mount };
 })();

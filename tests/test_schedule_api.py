@@ -45,7 +45,9 @@ def test_put_replaces_the_roster(client):
     assert response.status_code == 200
 
     body = response.get_json()
-    assert body["schedule"]["tuesday"] == [{"start": "06:00", "end": "09:00", "vehicles": None}]
+    assert body["schedule"]["tuesday"] == [
+        {"start": "06:00", "end": "09:00", "vehicles": None, "starts_on": None, "ends_on": None}
+    ]
     assert body["schedule"]["monday"] == []
     assert client.get("/api/schedule").get_json()["schedule"]["tuesday"][0]["start"] == "06:00"
 
@@ -53,7 +55,9 @@ def test_put_replaces_the_roster(client):
 def test_put_accepts_a_wrapped_body(client):
     response = client.put("/api/schedule", json={"schedule": {"friday": [["08:00", "15:00"]]}})
     assert response.status_code == 200
-    assert response.get_json()["schedule"]["friday"] == [{"start": "08:00", "end": "15:00", "vehicles": None}]
+    assert response.get_json()["schedule"]["friday"] == [
+        {"start": "08:00", "end": "15:00", "vehicles": None, "starts_on": None, "ends_on": None}
+    ]
 
 
 def test_put_writes_through_to_app_yaml(client):
@@ -181,3 +185,47 @@ def test_an_unrostered_vehicle_is_noted_by_name(client):
     client.put("/api/schedule", json={"monday": [{"start": "08:00", "end": "17:00", "vehicles": ["1"]}]})
     figures = client.get("/api/metrics?vehicles=3&from=2026-09-21&to=2026-09-21").get_json()["vehicles"][0]
     assert "for this vehicle" in figures["notes"]["scheduled_seconds"]
+
+
+# ---- Booked changes ----
+
+
+def test_a_period_can_carry_dates(client):
+    response = client.put("/api/schedule", json={"monday": [
+        {"start": "08:00", "end": "17:00", "ends_on": "2026-10-01"},
+        {"start": "06:00", "end": "20:00", "starts_on": "2026-10-01"},
+    ]})
+    assert response.status_code == 200
+
+    monday = response.get_json()["schedule"]["monday"]
+    assert [p["ends_on"] for p in monday] == [None, "2026-10-01"]
+    assert [p["starts_on"] for p in monday] == ["2026-10-01", None]
+
+
+def test_metrics_follow_a_booked_change(client):
+    # Old hours run out on 28 Sept; the longer day takes over from then.
+    client.put("/api/schedule", json={"monday": [
+        {"start": "08:00", "end": "17:00", "ends_on": "2026-09-28"},
+        {"start": "06:00", "end": "20:00", "starts_on": "2026-09-28"},
+    ]})
+
+    def scheduled(day):
+        body = client.get(f"/api/metrics?vehicles=1&from={day}&to={day}").get_json()
+        return body["vehicles"][0]["buckets"]["scheduled_seconds"]
+
+    assert scheduled("2026-09-21") == 9 * 3600    # Monday before the change
+    assert scheduled("2026-09-28") == 14 * 3600   # Monday on and after it
+
+
+def test_a_period_that_has_not_started_contributes_nothing(client):
+    client.put("/api/schedule", json={"monday": [{"start": "08:00", "end": "17:00", "starts_on": "2099-01-01"}]})
+    body = client.get("/api/metrics?vehicles=1&from=2026-09-21&to=2026-09-21").get_json()
+    assert body["vehicles"][0]["buckets"]["scheduled_seconds"] == 0
+
+
+def test_a_reversed_date_window_is_rejected(client):
+    response = client.put("/api/schedule", json={"monday": [
+        {"start": "08:00", "end": "17:00", "starts_on": "2026-10-05", "ends_on": "2026-10-01"},
+    ]})
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "invalid_schedule"

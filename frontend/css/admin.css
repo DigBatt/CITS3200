@@ -528,6 +528,44 @@
   align-self: center;
 }
 
+/* A period booked to start later, or already ended, is dimmed: still on the
+   roster and still editable, but not in force today. */
+.sched-period.is-inactive { opacity: 0.62; }
+
+.sched-from {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+
+.sched-from input[type="checkbox"] { margin: 0; cursor: pointer; }
+.sched-from input[type="date"] { font-size: 0.72rem; padding: 0.15rem 0.3rem; width: auto; }
+.sched-from input[type="date"]:disabled { opacity: 0.4; }
+
+.sched-status {
+  margin: 0;
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+
+.sched-status.is-inactive { color: #b45309; opacity: 1; }
+
+/* Revealed by the Remove button, so removal can be dated instead of instant */
+.sched-remove {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed rgba(128, 128, 128, 0.3);
+  font-size: 0.72rem;
+}
+
+.sched-remove-label { opacity: 0.7; }
+.sched-remove input[type="date"] { font-size: 0.72rem; padding: 0.15rem 0.3rem; width: auto; }
+
 /* The mini month, docked top right under the header buttons.
    It floats so the panels keep their own width; .admin-panel is capped at
    860px, so on a wide screen the two never meet. Below that the dock goes

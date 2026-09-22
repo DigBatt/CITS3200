@@ -313,6 +313,10 @@ def service_periods(
 
     while day <= last:
         for period in schedule.for_day(DAYS[day.weekday()], vehicle_id):
+            # S21: a period booked to start later, or already ended, does
+            # not count on this day.
+            if not period.applies_on(day):
+                continue
             opens = max(datetime.combine(day, period.start, tzinfo=tz), start)
             closes = min(datetime.combine(day, period.end, tzinfo=tz), end)
             if closes > opens:

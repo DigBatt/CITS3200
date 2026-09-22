@@ -1296,3 +1296,33 @@ empty until the API has events and stops. Layout only -- does not touch any
 .admin-link:hover {
   color: #1c1917;
 }
+
+/* Mini month, docked top right under the header (S21).
+   Fixed rather than floated: the map fills the width here, so the dock sits
+   over it. `top` is set by js/panels.js from the header's measured height,
+   since the header wraps at narrow widths. Above Leaflet's controls (800),
+   below the calendar overlay. */
+.mini-cal-dock {
+  position: fixed;
+  right: 16px;
+  z-index: 900;
+  width: 15rem;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(28, 25, 23, 0.14);
+  cursor: pointer;
+}
+
+.mini-cal-dock:hover { border-color: rgba(28, 25, 23, 0.28); }
+
+/* On a phone the dock starts folded, so a month does not bury the map. That
+   is the same fold the month name toggles, set as the initial state in
+   js/panels.js rather than forced in CSS, so it can still be opened. */
+@media (max-width: 760px) {
+  .mini-cal-dock {
+    width: 12rem;
+    padding: 8px;
+  }
+}

@@ -22,6 +22,12 @@ timetable and a single bus running a different shift:
         - hours: ["09:00", "13:00"]
           vehicles: ["3"]
 
+A period may also carry `starts_on` and `ends_on` dates, so a change to the
+roster can be booked ahead rather than applied the moment someone saves it.
+`starts_on` is the first day it counts, `ends_on` the first day it no longer
+does, so the period runs up to but not including that date. Both are optional
+and a period without them is simply always in force.
+
 A day that is absent or empty is simply not in service. That is not an error:
 a fleet that does not run on Sundays is a normal schedule, and time outside
 service counts as unscheduled. The same holds per vehicle, so a bus nobody
@@ -38,7 +44,7 @@ import os
 import re
 import tempfile
 from dataclasses import dataclass, field
-from datetime import datetime, time
+from datetime import date, datetime, time
 from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
 from zoneinfo import ZoneInfo
@@ -85,6 +91,40 @@ def _format_time(value: time) -> str:
     return value.strftime("%H:%M")
 
 
+def _parse_date(value: Any, field: str) -> Optional[date]:
+    """
+    Read an optional `YYYY-MM-DD` calendar date.
+
+    Raises
+    ------
+    ScheduleError
+        If it is not a date.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise ScheduleError(f"{field}: {value!r} is not a date, expected YYYY-MM-DD") from exc
+
+
+def _ranges_overlap(a: "ServicePeriod", b: "ServicePeriod") -> bool:
+    """
+    Whether two periods are ever in force on the same day.
+
+    An absent bound is open ended, so a period with neither overlaps anything.
+    This is what lets one period be booked to end while its replacement is
+    booked to start: they never both apply, so they do not clash.
+    """
+    return (a.starts_on is None or b.ends_on is None or a.starts_on < b.ends_on) and (
+        b.starts_on is None or a.ends_on is None or b.starts_on < a.ends_on
+    )
+
+
 def _parse_vehicles(value: Any) -> Optional[frozenset[str]]:
     """
     Read a period's vehicle scope.
@@ -117,11 +157,28 @@ class ServicePeriod:
         Local wall clock, `end` strictly after `start`.
     vehicles : frozenset of str, optional
         None means every vehicle, now and any added later.
+    starts_on : date, optional
+        First day this period counts. None means it always has.
+    ends_on : date, optional
+        First day it no longer counts, so the period runs up to but not
+        including it. None means it has no end.
     """
 
     start: time
     end: time
     vehicles: Optional[frozenset[str]] = None
+    starts_on: Optional[date] = None
+    ends_on: Optional[date] = None
+
+    def applies_on(self, day: date) -> bool:
+        """
+        Whether this period is in force on a calendar day.
+        """
+        if self.starts_on is not None and day < self.starts_on:
+            return False
+        if self.ends_on is not None and day >= self.ends_on:
+            return False
+        return True
 
     @property
     def is_fleet_wide(self) -> bool:
@@ -157,11 +214,19 @@ class ServicePeriod:
             "start": _format_time(self.start),
             "end": _format_time(self.end),
             "vehicles": None if self.vehicles is None else sorted(self.vehicles),
+            "starts_on": self.starts_on.isoformat() if self.starts_on else None,
+            "ends_on": self.ends_on.isoformat() if self.ends_on else None,
         }
 
     @property
     def _sort_key(self) -> tuple:
-        return (self.start, self.end, tuple(sorted(self.vehicles or ())))
+        return (
+            self.start,
+            self.end,
+            self.starts_on or date.min,
+            self.ends_on or date.max,
+            tuple(sorted(self.vehicles or ())),
+        )
 
 
 @dataclass(frozen=True)
@@ -238,7 +303,9 @@ class Schedule:
             moment = moment.replace(tzinfo=ZoneInfo("UTC"))
         local = moment.astimezone(ZoneInfo(timezone))
         return any(
-            period.covers_time(local.time()) for period in self.for_day(DAYS[local.weekday()], vehicle_id)
+            period.covers_time(local.time())
+            for period in self.for_day(DAYS[local.weekday()], vehicle_id)
+            if period.applies_on(local.date())
         )
 
     @classmethod
@@ -305,7 +372,13 @@ class Schedule:
                 if not isinstance(hours, (list, tuple)) or len(hours) != 2:
                     raise ScheduleError(f"{day}: expected 'hours' as an [open, close] pair, got {entry!r}")
                 rows.append(
-                    ServicePeriod(_parse_time(hours[0]), _parse_time(hours[1]), _parse_vehicles(entry.get("vehicles")))
+                    ServicePeriod(
+                        _parse_time(hours[0]),
+                        _parse_time(hours[1]),
+                        _parse_vehicles(entry.get("vehicles")),
+                        _parse_date(entry.get("starts_on"), f"{day} starts_on"),
+                        _parse_date(entry.get("ends_on"), f"{day} ends_on"),
+                    )
                 )
             elif isinstance(entry, (list, tuple)) and len(entry) == 2:
                 rows.append(ServicePeriod(_parse_time(entry[0]), _parse_time(entry[1])))
@@ -355,6 +428,10 @@ class Schedule:
                 if period.vehicles is not None:
                     listed = ", ".join(f'"{vehicle}"' for vehicle in sorted(period.vehicles))
                     lines.append(f"{indent}{_INDENT}  vehicles: [{listed}]")
+                if period.starts_on is not None:
+                    lines.append(f"{indent}{_INDENT}  starts_on: {period.starts_on.isoformat()}")
+                if period.ends_on is not None:
+                    lines.append(f"{indent}{_INDENT}  ends_on: {period.ends_on.isoformat()}")
         return "\n".join(lines)
 
 
@@ -374,6 +451,11 @@ def _validated(day: str, rows: Iterable[ServicePeriod]) -> list[ServicePeriod]:
     """
     ordered = sorted(rows, key=lambda period: period._sort_key)
     for period in ordered:
+        if period.starts_on and period.ends_on and period.ends_on <= period.starts_on:
+            raise ScheduleError(
+                f"{day}: a period starting {period.starts_on.isoformat()} cannot end "
+                f"{period.ends_on.isoformat()}; the end date is the first day it no longer applies."
+            )
         if period.end <= period.start:
             raise ScheduleError(
                 f"{day}: {_format_time(period.start)}-{_format_time(period.end)} must end after it starts. "
@@ -384,10 +466,11 @@ def _validated(day: str, rows: Iterable[ServicePeriod]) -> list[ServicePeriod]:
         for other in ordered[index + 1 :]:
             if other.start >= period.end:
                 continue
-            if period.shares_vehicles_with(other):
+            if period.shares_vehicles_with(other) and _ranges_overlap(period, other):
                 scope = "the whole fleet" if period.is_fleet_wide or other.is_fleet_wide else "the same vehicle"
                 raise ScheduleError(
-                    f"{day}: periods overlap at {_format_time(other.start)} for {scope}"
+                    f"{day}: periods overlap at {_format_time(other.start)} for {scope}. "
+                    "Give one of them a start or end date so they are never in force together."
                 )
     return ordered
 

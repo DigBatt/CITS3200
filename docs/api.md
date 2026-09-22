@@ -234,8 +234,8 @@ so anyone may read the roster behind it. Only the `PUT` below is privileged.
   "vehicles": [{ "id": "1", "name": "nUWAy 1", "colour": "#d4741f" }],
   "schedule": {
     "monday": [
-      { "start": "08:00", "end": "12:00", "vehicles": null },
-      { "start": "13:00", "end": "17:00", "vehicles": ["1", "2"] }
+      { "start": "08:00", "end": "12:00", "vehicles": null, "starts_on": null, "ends_on": null },
+      { "start": "13:00", "end": "17:00", "vehicles": ["1", "2"], "starts_on": "2026-10-01", "ends_on": null }
     ],
     "saturday": [{ "start": "09:00", "end": "13:00", "vehicles": ["3"] }],
     "sunday": []
@@ -260,6 +260,27 @@ its scheduled time twice.
 `/api/metrics` follows the same rule: `scheduled_seconds` is computed from the
 periods that apply to that vehicle, so two buses over one window can have
 different scheduled time.
+
+**Changes can be booked ahead.** `starts_on` is the first day a period counts
+and `ends_on` the first day it no longer does, so a period runs up to but not
+including its end date. Both are optional; a period with neither is always in
+force. Dates are `YYYY-MM-DD` in the roster's timezone.
+
+This is how a roster change is scheduled rather than applied the moment it is
+saved: end the old period on the day the new one starts, and both live on the
+roster without ever being in force together.
+
+```json
+"monday": [
+  { "start": "08:00", "end": "17:00", "ends_on": "2026-10-01" },
+  { "start": "06:00", "end": "20:00", "starts_on": "2026-10-01" }
+]
+```
+
+Two periods only clash when their vehicles, their hours **and** their date
+ranges overlap, which is what makes the handover above legal. `/api/metrics`
+counts only the periods in force on each day, so figures before and after a
+booked change differ without anyone editing anything on the day.
 
 `configured` is false when no day has any period. That is a valid state, not an
 error: nothing rostered means no scheduled time, and `/api/metrics` reports the
@@ -293,8 +314,9 @@ file, its ordering and its comments, is left byte for byte as it was. The
 result is parsed and compared against what was asked for before it replaces
 anything, and the swap is atomic, so a failed write leaves the file intact.
 
-`400` with `invalid_schedule` for an unknown day, a malformed time, a period
-that does not end after it starts, or two periods for the same vehicle that
+`400` with `invalid_schedule` for an unknown day, a malformed time or date, a
+period that does not end after it starts, an `ends_on` at or before its
+`starts_on`, or two periods for the same vehicle whose hours and dates both
 overlap. `400` with `unknown_vehicle` if a period names a vehicle the fleet
 does not have.
 

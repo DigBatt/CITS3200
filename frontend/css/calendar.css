@@ -271,10 +271,38 @@
   gap: 0.25rem;
 }
 
+/* The month name is the fold control, so it reads as a button but sits flat
+   in the bar until hovered. */
 .mini-month {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+  font: inherit;
   font-size: 0.75rem;
   font-weight: 600;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
 }
+
+.mini-month:hover { background: rgba(128, 128, 128, 0.12); }
+
+.mini-chevron {
+  font-size: 0.6rem;
+  opacity: 0.6;
+}
+
+/* Folded: the bar alone. The dock keeps its width so it does not jump about
+   as it opens and closes. */
+.mini.is-collapsed { gap: 0; }
 
 .mini-step {
   font: inherit;
@@ -360,7 +388,9 @@
 .cal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  /* Above the dashboard's docked mini month (900), which is itself above
+     Leaflet's controls. */
+  z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;

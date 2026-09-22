@@ -4,7 +4,7 @@ service_hours block of app.yaml without disturbing the rest of the file.
 """
 
 from __future__ import annotations
-from datetime import datetime, time, timezone
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 
 import pytest
@@ -339,3 +339,81 @@ def test_a_fleet_wide_period_writes_no_vehicles_key(app_yaml):
     save_schedule(app_yaml, Schedule.from_dict({"monday": [{"start": "08:00", "end": "17:00"}]}))
     block = app_yaml.read_text().split("service_hours:")[1]
     assert "vehicles:" not in block.split("logger:")[0]
+
+
+# ---- Booked changes: starts_on and ends_on ----
+
+
+def test_a_period_with_no_dates_always_applies():
+    period = Schedule.from_dict({"monday": [{"start": "08:00", "end": "17:00"}]}).for_day("monday")[0]
+    assert period.starts_on is None and period.ends_on is None
+    assert period.applies_on(date(2020, 1, 1))
+    assert period.applies_on(date(2099, 1, 1))
+
+
+def test_starts_on_is_the_first_day_it_counts():
+    period = Schedule.from_dict(
+        {"monday": [{"start": "08:00", "end": "17:00", "starts_on": "2026-10-05"}]}
+    ).for_day("monday")[0]
+    assert period.applies_on(date(2026, 10, 4)) is False
+    assert period.applies_on(date(2026, 10, 5)) is True
+
+
+def test_ends_on_is_the_first_day_it_no_longer_counts():
+    period = Schedule.from_dict(
+        {"monday": [{"start": "08:00", "end": "17:00", "ends_on": "2026-10-05"}]}
+    ).for_day("monday")[0]
+    assert period.applies_on(date(2026, 10, 4)) is True
+    assert period.applies_on(date(2026, 10, 5)) is False
+
+
+def test_covers_respects_the_date_window():
+    schedule = Schedule.from_dict({"monday": [{"start": "08:00", "end": "17:00", "starts_on": "2026-09-28"}]})
+    assert schedule.covers(at(0, 9), PERTH) is False          # Monday 21 Sept, before it starts
+    assert schedule.covers(at(7, 9), PERTH) is True           # Monday 28 Sept
+
+
+def test_a_handover_between_two_periods_is_allowed():
+    # The old hours end the day the new ones begin, so they never both apply.
+    schedule = Schedule.from_dict({"monday": [
+        {"start": "08:00", "end": "17:00", "ends_on": "2026-10-01"},
+        {"start": "06:00", "end": "20:00", "starts_on": "2026-10-01"},
+    ]})
+    assert len(schedule.for_day("monday")) == 2
+    assert [p.applies_on(date(2026, 9, 28)) for p in schedule.for_day("monday")] == [False, True]
+    assert [p.applies_on(date(2026, 10, 5)) for p in schedule.for_day("monday")] == [True, False]
+
+
+def test_overlapping_periods_still_clash_when_their_dates_overlap():
+    with pytest.raises(ScheduleError):
+        Schedule.from_dict({"monday": [
+            {"start": "08:00", "end": "12:00", "ends_on": "2026-11-01"},
+            {"start": "11:00", "end": "17:00", "starts_on": "2026-10-01"},
+        ]})
+
+
+def test_an_end_date_must_be_after_its_start_date():
+    with pytest.raises(ScheduleError):
+        Schedule.from_dict({"monday": [
+            {"start": "08:00", "end": "17:00", "starts_on": "2026-10-05", "ends_on": "2026-10-01"},
+        ]})
+
+
+def test_a_malformed_date_is_rejected():
+    with pytest.raises(ScheduleError):
+        Schedule.from_dict({"monday": [{"start": "08:00", "end": "17:00", "starts_on": "next tuesday"}]})
+
+
+def test_dates_survive_the_yaml_round_trip(app_yaml):
+    schedule = Schedule.from_dict({"monday": [
+        {"start": "08:00", "end": "17:00", "ends_on": "2026-10-01"},
+        {"start": "06:00", "end": "20:00", "starts_on": "2026-10-01", "vehicles": ["1"]},
+    ]})
+    save_schedule(app_yaml, schedule)
+    assert load_schedule(app_yaml) == schedule
+
+
+def test_a_period_without_dates_writes_no_date_keys(app_yaml):
+    save_schedule(app_yaml, Schedule.from_dict({"monday": [{"start": "08:00", "end": "17:00"}]}))
+    block = app_yaml.read_text().split("service_hours:")[1].split("logger:")[0]
+    assert "starts_on:" not in block and "ends_on:" not in block
