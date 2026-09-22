@@ -33,8 +33,27 @@ utilisation:
     centre: [-31.98133, 115.81597]
     radius_m: 40
 
+  # The service schedule (S21). One list of periods per day, so a day can
+  # hold a split shift or none at all. Local wall clock in display.timezone.
+  #
+  # A period may name the vehicles it is for; omitting `vehicles` means the
+  # whole fleet. Periods for different vehicles may overlap, periods for the
+  # same vehicle may not.
+  #
+  #   monday:
+  #     - hours: ["06:00", "10:00"]
+  #       vehicles: ["1", "2"]
+  #
+  # Edited by hand or from the admin page, which rewrites only this block.
   service_hours:
-    weekday: ["08:00", "17:00"]
+    tuesday:
+      - hours: ["08:00", "17:00"]
+    wednesday:
+      - hours: ["08:00", "17:00"]
+    thursday:
+      - hours: ["08:00", "17:00"]
+    friday:
+      - hours: ["08:00", "17:00"]
 
 logger:
   poll_interval_seconds: 30

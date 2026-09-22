@@ -14,6 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/calendar.css">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
@@ -29,6 +30,7 @@
     <nav class="app-tabs" id="admin-tabs" aria-label="Admin sections">
       <button type="button" class="app-tab is-active" data-tab="operator">Operator view</button>
       <button type="button" class="app-tab" data-tab="downtime">Downtime</button>
+      <button type="button" class="app-tab" data-tab="schedule">Schedule</button>
       <button type="button" class="app-tab" data-tab="snapshots">Snapshots</button>
       <button type="button" class="app-tab" data-tab="stops">Stops &amp; routes</button>
     </nav>
@@ -42,6 +44,14 @@
 
   <!-- ============ Main ============ -->
   <main class="admin-main">
+
+    <!-- Mini month, docked top right under the header buttons. Deliberately
+         unlabelled; clicking a day opens the full calendar on that day.
+         AUTH (S13): view only, and the reads behind it stay public. -->
+    <aside class="mini-cal-dock">
+      <div id="mini-calendar" role="button" tabindex="0" aria-haspopup="dialog"
+           aria-label="Service calendar, click a day to open"></div>
+    </aside>
 
     <!-- ---- Operator view (S15): route selector populates once S06/S09 land ---- -->
     <div class="admin-panel" id="tab-operator">
@@ -127,6 +137,35 @@
       </div>
     </div>
 
+    <!-- ---- Service schedule (S21): stored in config/app.yaml, see /api/schedule ---- -->
+    <!-- AUTH (S13): this tab is open to anyone while sign in does not exist. Once it
+         does, editing here is for operators and administrators; the dashboard keeps
+         read only access through GET /api/schedule. -->
+    <div class="admin-panel" id="tab-schedule" hidden>
+      <h1 class="admin-section-title">Service schedule</h1>
+      <p class="admin-section-sub">When the fleet is rostered to run. The dashboard uses this to tell scheduled service time apart from everything else.</p>
+
+      <div class="admin-card">
+        <p class="admin-card-title">WEEKLY SERVICE HOURS</p>
+
+        <div class="form-warning" id="schedule-error"></div>
+
+        <p class="schedule-hint" id="schedule-hint">
+          Times are local (<span id="schedule-tz">…</span>). A day with no periods is not in service.
+          A period must end after it starts, so an overnight run needs a row on each day.
+        </p>
+
+        <!-- Rows injected by js/admin.js -->
+        <div class="schedule-days" id="schedule-days"></div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-primary" id="btn-schedule-save">Save schedule</button>
+          <button type="button" class="btn-outline" id="btn-schedule-reset">Discard changes</button>
+          <span class="schedule-status" id="schedule-status"></span>
+        </div>
+      </div>
+    </div>
+
     <!-- ---- Snapshots (S16, S17): not yet implemented ---- -->
     <div class="admin-panel" id="tab-snapshots" hidden>
       <h1 class="admin-section-title">Daily snapshots</h1>
@@ -176,6 +215,22 @@
   </main>
 </div>
 
+<!-- ============ Full calendar, opened from the mini month ============
+     Titled just "Calendar". Opens on the week, with a 3 day option.
+     AUTH (S13): view only for everyone; editing the roster is the tab above. -->
+<div class="cal-overlay" id="cal-overlay" role="dialog" aria-modal="true" aria-labelledby="cal-overlay-title" hidden>
+  <div class="cal-overlay-panel">
+    <div class="cal-overlay-head">
+      <h2 class="cal-overlay-title" id="cal-overlay-title">Calendar</h2>
+      <button type="button" class="btn-outline" id="cal-overlay-close" aria-label="Close calendar">Close</button>
+    </div>
+    <div class="cal-overlay-body" id="cal-overlay-body"></div>
+  </div>
+</div>
+
+<!-- api.js first: calendar.js calls its getSchedule/getVehicles/getDowntime wrappers. -->
+<script src="js/api.js"></script>
+<script src="js/calendar.js"></script>
 <script src="js/admin.js"></script>
 </body>
 </html>

@@ -7,16 +7,17 @@ from pathlib import Path
 from flask import Flask, jsonify, send_from_directory
 from backend.api.downtime import bp as downtime_bp
 from backend.api.metrics import bp as metrics_bp
+from backend.api.schedule import bp as schedule_bp
 from backend.api.positions import bp as positions_bp
 from backend.api.vehicles import bp as vehicles_bp
-from backend.config import ConfigError, load_config
+from backend.config import DEFAULT_CONFIG_DIR, ConfigError, load_config
 from backend.repository import CsvRepository, DowntimeStore
 from backend.repository.base import RepositoryError
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 
 
-def create_app(config=None) -> Flask:
+def create_app(config=None, config_dir=DEFAULT_CONFIG_DIR) -> Flask:
     """
     Build the configured application.
 
@@ -24,7 +25,10 @@ def create_app(config=None) -> Flask:
     ----------
     config : backend.config.Config, optional
         Already loaded config, for a test that needs its own paths. None
-        reads config/ as usual.
+        reads `config_dir` as usual.
+    config_dir : Path or str, optional
+        The config directory. Also where /api/schedule writes the service
+        schedule back to, so a test that edits it should copy config/ first.
 
     Returns
     -------
@@ -39,8 +43,11 @@ def create_app(config=None) -> Flask:
     """
     app = Flask(__name__, static_folder=str(FRONTEND), static_url_path="")
 
-    config = load_config() if config is None else config
+    config_dir = Path(config_dir)
+    config = load_config(config_dir) if config is None else config
     app.config["NUWAY_CONFIG"] = config
+    app.config["NUWAY_CONFIG_DIR"] = config_dir
+    app.config["NUWAY_CONFIG_PATH"] = config_dir / "app.yaml"
     app.config["REPOSITORY"] = CsvRepository.from_config(config)
     app.config["DOWNTIME_STORE"] = DowntimeStore.from_config(config)
 
@@ -48,6 +55,7 @@ def create_app(config=None) -> Flask:
     app.register_blueprint(vehicles_bp)
     app.register_blueprint(metrics_bp)
     app.register_blueprint(downtime_bp)
+    app.register_blueprint(schedule_bp)
 
     @app.get("/")
     def index():

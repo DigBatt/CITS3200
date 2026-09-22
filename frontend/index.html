@@ -12,6 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/calendar.css">
   <link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body>
@@ -28,6 +29,7 @@
         <button type="button" class="app-tab" data-view="operator">Operator</button>
         <button type="button" class="app-tab" data-view="rider">Rider</button>
         <button type="button" class="app-tab" data-view="utilisation">Utilisation</button>
+        <button type="button" class="app-tab" data-view="schedule">Schedule</button>
       </nav>
       <div class="app-header-spacer"></div>
       <!-- STUB: wire to a real liveness/heartbeat signal -->
@@ -172,6 +174,19 @@
 
         <div class="util-table" id="util-table"></div>
       </section>
+
+      <!-- ============ Schedule view (no map): the service calendar ============
+           View only. Shows the roster, downtime and what is neither, for any
+           visitor. Editing the roster is the admin page.
+           AUTH (S13): stays open to everyone once sign in exists. -->
+      <section class="dashboard-view view-schedule" id="view-schedule" hidden>
+        <div class="util-toolbar">
+          <span class="util-scope-label">Service calendar &middot; a week of scheduled hours, downtime and the time that is neither</span>
+        </div>
+        <div class="util-tum-card">
+          <div id="dashboard-calendar"></div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -182,6 +197,7 @@
   <script src="js/format.js"></script>
   <script src="js/vehicles.js"></script>
   <script src="js/utilisation.js"></script>
+  <script src="js/calendar.js"></script>
   <script src="js/main.js"></script>
   <script src="js/panels.js"></script>
 </body>

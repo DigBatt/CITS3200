@@ -1,0 +1,416 @@
+/* Service calendar (S21). Shared by the admin Schedule tab and the dashboard
+   Schedule view, so it depends on no page specific styles. */
+
+.cal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  --cal-line: rgba(128, 128, 128, 0.28);
+  --cal-scheduled: rgba(56, 189, 248, 0.22);
+  --cal-scheduled-edge: rgba(56, 189, 248, 0.75);
+  --cal-now: #ef4444;
+}
+
+/* Vehicle toggles: multi select, unlike the dashboard's single vehicle filter */
+.cal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.cal-chip {
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--cal-line);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.cal-chip::before {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  background: var(--cal-vehicle);
+  vertical-align: baseline;
+}
+
+.cal-chip.is-on {
+  opacity: 1;
+  border-color: var(--cal-vehicle);
+}
+
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+
+.cal-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.cal-swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  border: 1px solid var(--cal-line);
+}
+
+.cal-swatch.is-scheduled { background: var(--cal-scheduled); border-color: var(--cal-scheduled-edge); }
+.cal-swatch.is-unscheduled { background: transparent; }
+.cal-swatch.is-downtime {
+  background: repeating-linear-gradient(45deg, currentColor 0 3px, transparent 3px 6px);
+  opacity: 0.8;
+}
+.cal-swatch.is-now { background: var(--cal-now); border-color: var(--cal-now); }
+
+/* Navigation: step by a day in the 3 day view, by a week in the 7 day one */
+.cal-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cal-nav {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+
+.cal-step,
+.cal-today,
+.cal-view {
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--cal-line);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cal-step { font-size: 0.95rem; padding-block: 0.18rem; }
+.cal-today[disabled] { opacity: 0.4; cursor: default; }
+
+.cal-range {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.cal-views { display: inline-flex; gap: 0.2rem; margin-left: auto; }
+.cal-view.is-on { border-color: currentColor; font-weight: 600; }
+
+.cal.is-loading { opacity: 0.6; }
+
+/* The board: an hour gutter, then one column per day */
+.cal-grid {
+  display: grid;
+  grid-template-columns: 3.2rem repeat(var(--cal-days, 3), minmax(0, 1fr));
+  gap: 0.3rem;
+  /* 22rem unless the container gives it more, since the bands are positioned
+     as percentages and so need a resolved height either way. */
+  flex: 1 1 22rem;
+  min-height: 20rem;
+}
+
+.cal-hours {
+  position: relative;
+  font-size: 0.65rem;
+  opacity: 0.6;
+}
+
+.cal-hours span {
+  position: absolute;
+  right: 0.3rem;
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+.cal-day {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cal-day-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0 0.2rem 0.25rem;
+  font-size: 0.7rem;
+  border-bottom: 1px solid var(--cal-line);
+}
+
+.cal-day-name { text-transform: uppercase; letter-spacing: 0.06em; }
+.cal-day-date { opacity: 0.6; }
+.cal-day.is-today .cal-day-name { font-weight: 700; }
+.cal-day.is-today .cal-day-head { border-bottom-color: var(--cal-now); }
+
+/* Nothing drawn on a column is scheduled, so the bare column IS non-scheduled */
+.cal-day-body {
+  position: relative;
+  flex: 1;
+  border: 1px solid var(--cal-line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.cal-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--cal-line);
+  opacity: 0.5;
+}
+
+/* One lane per shown vehicle: its roster and its downtime, side by side */
+.cal-lane {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  color: var(--cal-vehicle);
+  border-right: 1px solid var(--cal-line);
+}
+
+.cal-lane:last-child { border-right: none; }
+
+.cal-scheduled {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--cal-scheduled);
+  border-top: 1px solid var(--cal-scheduled-edge);
+  border-bottom: 1px solid var(--cal-scheduled-edge);
+  font-size: 0.58rem;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  color: inherit;
+}
+
+.cal-no-vehicles {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-size: 0.65rem;
+  opacity: 0.5;
+  text-align: center;
+}
+
+.cal-downtime {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  min-height: 2px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(45deg, currentColor 0 4px, transparent 4px 8px);
+  border: 1px solid currentColor;
+}
+
+.cal-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 2px solid var(--cal-now);
+  pointer-events: none;
+}
+
+.cal-now span {
+  position: absolute;
+  right: 2px;
+  top: 1px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--cal-now);
+}
+
+.cal-caption,
+.cal-empty,
+.cal-error {
+  margin: 0;
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+.cal-error { color: #ef4444; opacity: 1; }
+
+@media (max-width: 720px) {
+  .cal-grid { grid-template-columns: 2.4rem repeat(var(--cal-days, 3), minmax(0, 1fr)); flex: 0 0 18rem; min-height: 18rem; }
+  .cal-scheduled { font-size: 0; }
+  .cal-day-date { display: none; }
+}
+
+
+/* ---- Mini month (S21) ----
+   A month at a glance in the admin dock. Unlabelled on purpose: the dock is
+   obviously a calendar, and the full view names itself. */
+
+.mini { display: flex; flex-direction: column; gap: 0.35rem; }
+
+.mini-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+}
+
+.mini-month {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.mini-step {
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mini-dows,
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+}
+
+.mini-dows {
+  font-size: 0.6rem;
+  opacity: 0.5;
+  text-align: center;
+}
+
+.mini-day {
+  font: inherit;
+  font-size: 0.68rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 0.18rem 0 0.12rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mini-day:hover { background: rgba(128, 128, 128, 0.12); }
+.mini-day.is-outside { opacity: 0.32; }
+
+.mini-day.is-today .mini-num {
+  background: var(--cal-now, #ef4444);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 0.28rem;
+  font-weight: 700;
+}
+
+/* The underline: what happened that day, service and/or downtime. */
+.mini-marks {
+  display: flex;
+  gap: 1px;
+  height: 3px;
+  width: 70%;
+}
+
+.mini-mark {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.mini-mark.is-service { background: rgba(56, 189, 248, 0.9); }
+.mini-mark.is-downtime { background: #ef4444; }
+
+.mini-legend {
+  display: flex;
+  gap: 0.6rem;
+  font-size: 0.6rem;
+  opacity: 0.7;
+}
+
+.mini-legend span { display: inline-flex; align-items: center; gap: 0.25rem; }
+.mini-legend .mini-mark { width: 0.6rem; flex: none; }
+
+/* ---- Full calendar overlay ---- */
+
+.cal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2vmin;
+  background: rgba(15, 12, 10, 0.55);
+}
+
+.cal-overlay[hidden] { display: none; }
+
+.cal-overlay-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(1400px, 96vw);
+  height: min(900px, 92vh);
+  padding: 1rem 1.15rem 1.15rem;
+  border-radius: 12px;
+  background: #fff;
+  color: #1c1917;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+}
+
+.cal-overlay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cal-overlay-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* The board fills the panel, so a week of lanes has room to be read. */
+.cal-overlay-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.cal-overlay-body .cal {
+  flex: 1;
+  min-height: 0;
+}
+
+body.is-overlaid { overflow: hidden; }
+
+@media (max-width: 720px) {
+  .cal-overlay { padding: 0; }
+  .cal-overlay-panel { width: 100vw; height: 100vh; border-radius: 0; }
+}

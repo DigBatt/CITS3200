@@ -218,3 +218,220 @@ async function deleteRecord(id) {
 }
 
 loadDowntime();
+
+// ---- Service schedule (S21) ----
+//
+// The roster lives in config/app.yaml, so saving here rewrites that block and
+// the utilisation figures move with it. The whole week is sent at once: it is
+// one config file, so one validated write beats a half applied edit.
+//
+// A period names the vehicles it is for, or none to mean the whole fleet. Two
+// periods may overlap when they are for different vehicles, which is the point
+// of a per vehicle roster; the server rejects an overlap within one vehicle.
+//
+// AUTH (S13): reading is public and stays public, the dashboard shows
+// scheduled time to anyone. Saving is for operators and administrators, so
+// when sign in exists, guard the save below and the PUT it calls.
+
+let schedule = null;   // { monday: [{start, end, vehicles}], ... }
+let scheduleDays = [];
+let scheduleFleet = [];
+
+async function loadSchedule() {
+  try {
+    const data = await api('/api/schedule');
+    scheduleDays = data.days;
+    scheduleFleet = data.vehicles ?? [];
+    schedule = data.schedule;
+    document.getElementById('schedule-tz').textContent = data.timezone ?? 'local time';
+    renderSchedule();
+    setScheduleStatus(data.configured ? '' : 'No service schedule is in the system yet.');
+  } catch (err) {
+    showScheduleError(`Could not load the schedule: ${err.message}`);
+  }
+}
+
+// An empty or absent vehicle list means the whole fleet, so "All" is on when
+// nothing is named rather than when everything is.
+function vehicleChips(day, index, vehicles) {
+  const all = !vehicles || !vehicles.length;
+  const chip = (id, label, on, colour) =>
+    `<button type="button" class="sched-chip${on ? ' is-on' : ''}"
+       data-day="${day}" data-index="${index}" data-vehicle="${escHtml(id)}"
+       style="--sched-vehicle:${escHtml(colour ?? 'currentColor')}"
+       aria-pressed="${on}">${escHtml(label)}</button>`;
+
+  return `
+    <div class="sched-scope">
+      ${chip('all', 'All', all, null)}
+      ${scheduleFleet.map(v => chip(v.id, v.name ?? v.id, !all && vehicles.includes(v.id), v.colour)).join('')}
+    </div>`;
+}
+
+function renderSchedule() {
+  document.getElementById('schedule-days').innerHTML = scheduleDays.map(day => {
+    const periods = schedule[day] ?? [];
+    const rows = periods.map((period, index) => `
+      <div class="sched-period">
+        <div class="sched-times">
+          <input type="time" class="form-input" value="${period.start}"
+                 data-day="${day}" data-index="${index}" data-edge="start" aria-label="Start time">
+          <span>to</span>
+          <input type="time" class="form-input" value="${period.end}"
+                 data-day="${day}" data-index="${index}" data-edge="end" aria-label="End time">
+          <button type="button" class="btn-xs danger" data-remove="${day}" data-index="${index}">Remove</button>
+        </div>
+        ${vehicleChips(day, index, period.vehicles)}
+      </div>`).join('');
+
+    return `
+      <div class="schedule-day">
+        <div class="schedule-day-head">
+          <span class="schedule-day-name">${day}</span>
+          <button type="button" class="btn-xs" data-add="${day}">Add period</button>
+        </div>
+        <div class="schedule-periods">
+          ${rows || '<p class="schedule-closed">Not in service</p>'}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function showScheduleError(message) {
+  const box = document.getElementById('schedule-error');
+  box.textContent = message ? `⚠ ${message}` : '';
+  box.classList.toggle('visible', Boolean(message));
+}
+
+function setScheduleStatus(message) {
+  document.getElementById('schedule-status').textContent = message;
+}
+
+// Edits are held here until Save; nothing is written per keystroke.
+document.getElementById('schedule-days').addEventListener('input', event => {
+  const input = event.target;
+  if (!input.dataset.edge) return;
+  schedule[input.dataset.day][Number(input.dataset.index)][input.dataset.edge] = input.value;
+  setScheduleStatus('Unsaved changes.');
+});
+
+document.getElementById('schedule-days').addEventListener('click', event => {
+  const add = event.target.closest('[data-add]');
+  const remove = event.target.closest('[data-remove]');
+  const vehicle = event.target.closest('[data-vehicle]');
+
+  if (add) {
+    (schedule[add.dataset.add] ??= []).push({ start: '08:00', end: '17:00', vehicles: null });
+  } else if (remove) {
+    schedule[remove.dataset.remove].splice(Number(remove.dataset.index), 1);
+  } else if (vehicle) {
+    const period = schedule[vehicle.dataset.day][Number(vehicle.dataset.index)];
+    const id = vehicle.dataset.vehicle;
+
+    if (id === 'all') {
+      period.vehicles = null;
+    } else {
+      // Coming from "All", the first pick starts from the whole fleet so that
+      // de-selecting one leaves the rest, which is what the click means.
+      const current = period.vehicles?.length ? period.vehicles : scheduleFleet.map(v => v.id);
+      const next = current.includes(id) ? current.filter(v => v !== id) : [...current, id];
+      // Every vehicle, or none, is the same as fleet wide.
+      period.vehicles = (next.length === scheduleFleet.length || !next.length) ? null : next;
+    }
+  } else {
+    return;
+  }
+
+  renderSchedule();
+  setScheduleStatus('Unsaved changes.');
+});
+
+document.getElementById('btn-schedule-save').addEventListener('click', async () => {
+  // AUTH (S13): an operator or administrator only action.
+  const button = document.getElementById('btn-schedule-save');
+  button.disabled = true;
+  showScheduleError('');
+  setScheduleStatus('Saving…');
+
+  try {
+    const saved = await api('/api/schedule', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(schedule),
+    });
+    schedule = saved.schedule;
+    renderSchedule();
+    setScheduleStatus(saved.configured ? 'Saved.' : 'Saved. Nothing is rostered, so all time counts as unscheduled.');
+    miniCalendar.refresh();
+    fullCalendar?.refresh();
+  } catch (err) {
+    // The server validates too, so this is where a bad row is reported.
+    showScheduleError(err.message);
+    setScheduleStatus('Not saved.');
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.getElementById('btn-schedule-reset').addEventListener('click', () => {
+  showScheduleError('');
+  loadSchedule();
+});
+
+loadSchedule();
+
+// ---- Calendar: the docked mini month, and the full view it opens ----
+//
+// The mini month is always on screen. The full calendar is built the first
+// time it is opened, so a session that never opens it never fetches for it.
+//
+// AUTH (S13): both are view only, over reads that stay public.
+
+const overlay = document.getElementById('cal-overlay');
+let fullCalendar = null;
+
+function openCalendar(day) {
+  overlay.hidden = false;
+  document.body.classList.add('is-overlaid');
+
+  if (fullCalendar) {
+    fullCalendar.goTo(day ?? new Date());
+  } else {
+    // Opens on the week; the 3 day option is in the calendar's own controls.
+    fullCalendar = ServiceCalendar.create(document.getElementById('cal-overlay-body'), {
+      days: 7,
+      anchor: day ?? new Date(),
+    });
+  }
+  document.getElementById('cal-overlay-close').focus();
+}
+
+function closeCalendar() {
+  overlay.hidden = true;
+  document.body.classList.remove('is-overlaid');
+}
+
+const miniCalendar = ServiceCalendar.createMini(document.getElementById('mini-calendar'), {
+  onOpen: openCalendar,
+});
+
+// The dock as a whole opens the calendar, so a click anywhere on it that is
+// not a day or a month arrow still does the obvious thing.
+document.getElementById('mini-calendar').addEventListener('click', event => {
+  if (!event.target.closest('[data-mini-day], [data-mini-month]')) openCalendar();
+});
+document.getElementById('mini-calendar').addEventListener('keydown', event => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    openCalendar();
+  }
+});
+
+document.getElementById('cal-overlay-close').addEventListener('click', closeCalendar);
+// Clicking the backdrop, but not the panel on it.
+overlay.addEventListener('click', event => {
+  if (event.target === overlay) closeCalendar();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !overlay.hidden) closeCalendar();
+});

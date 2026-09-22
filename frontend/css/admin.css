@@ -407,3 +407,153 @@
   text-align: center;
 }
 
+
+/* Service schedule (S21).
+   The old layout put day name, times and buttons on one grid row, which ran
+   past the card once a vehicle picker was added. Each day is now a block with
+   its periods stacked inside it, so nothing has to fit on one line. */
+.schedule-hint {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.schedule-days {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.schedule-day {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+  min-width: 0;
+}
+
+.schedule-day:last-child { border-bottom: none; }
+
+.schedule-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.schedule-day-name {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.schedule-periods {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.sched-period {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.2));
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.sched-times {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+/* Time inputs size to content and may shrink, so a row never overflows. */
+.sched-times .form-input {
+  width: auto;
+  min-width: 0;
+  flex: 0 1 auto;
+  padding-inline: 0.4rem;
+}
+
+.sched-times > span { opacity: 0.6; font-size: 0.8rem; }
+/* Directly after the end time, not flung to the far right of the row. */
+.sched-times .btn-xs { margin-left: 0.25rem; }
+
+/* The vehicle picker spans the period, so the chips read as one control
+   rather than as a few buttons trailing off the times above them. */
+.sched-scope {
+  display: flex;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.sched-chip {
+  font: inherit;
+  font-size: 0.7rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.3));
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.55;
+  /* Equal shares of the row, shrinking together rather than wrapping. */
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.sched-chip.is-on {
+  opacity: 1;
+  border-color: var(--sched-vehicle);
+  box-shadow: inset 0 -2px 0 var(--sched-vehicle);
+}
+
+.schedule-closed {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.55;
+}
+
+.schedule-status {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  align-self: center;
+}
+
+/* The mini month, docked top right under the header buttons.
+   It floats so the panels keep their own width; .admin-panel is capped at
+   860px, so on a wide screen the two never meet. Below that the dock goes
+   back into the flow above the panel. */
+.mini-cal-dock {
+  float: right;
+  position: sticky;
+  top: 12px;
+  z-index: 5;
+  width: 15rem;
+  margin: 12px 16px 12px 24px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.mini-cal-dock:hover { border-color: rgba(28, 25, 23, 0.25); }
+
+@media (max-width: 1180px) {
+  .mini-cal-dock {
+    float: none;
+    position: static;
+    margin: 16px 24px 0;
+    width: auto;
+    max-width: 18rem;
+  }
+}

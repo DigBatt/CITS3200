@@ -17,7 +17,7 @@ Always shaped:
 
 Codes: `bad_timestamp`, `bad_range` (from > to), `unknown_vehicle`,
 `data_unavailable`, `bad_request` (malformed body), `invalid_record`
-(a field the store refuses), `not_found`.
+(a field the store refuses), `invalid_schedule`, `not_found`.
 
 `not_found` is the one exception to "empty is not an error": it answers a
 write aimed at a record id that does not exist, which is not a query that
@@ -211,6 +211,128 @@ as they are. Answers `200` in the same shape as `POST`, or `404` with
 
 Removes a record. `204` with no body, or `404` with `not_found`. Deleting
 twice is a `404`, so the page can tell a stale row from a removed one.
+
+---
+
+## `GET /api/schedule`
+
+The shuttle service schedule. Serves S21.
+
+When the fleet is rostered to run, which is what lets the time usage model
+tell scheduled service time apart from everything else. Source of truth is
+`utilisation.service_hours` in `config/app.yaml`, so a schedule change is a
+config change: the figures recalculate with no code change.
+
+**Public, and staying public.** The dashboard shows scheduled time to anyone,
+so anyone may read the roster behind it. Only the `PUT` below is privileged.
+
+```json
+{
+  "days": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+  "timezone": "Australia/Perth",
+  "configured": true,
+  "vehicles": [{ "id": "1", "name": "nUWAy 1", "colour": "#d4741f" }],
+  "schedule": {
+    "monday": [
+      { "start": "08:00", "end": "12:00", "vehicles": null },
+      { "start": "13:00", "end": "17:00", "vehicles": ["1", "2"] }
+    ],
+    "saturday": [{ "start": "09:00", "end": "13:00", "vehicles": ["3"] }],
+    "sunday": []
+  }
+}
+```
+
+Every day is present, so a client need not know which were omitted. A day with
+an empty list is not in service. Times are local wall clock in `timezone`,
+because a roster is written in local time.
+
+**Rosters are per vehicle.** A period's `vehicles` names who it is for;
+`null` means the whole fleet, now and any vehicle added later. `vehicles` at
+the top level is the fleet a period may name, so an editor needs no second
+request.
+
+Two periods may overlap when they are for different vehicles, which is the
+point: one bus can run a late shift while another runs mornings. Two periods
+that could apply to the *same* vehicle may not overlap, since that would count
+its scheduled time twice.
+
+`/api/metrics` follows the same rule: `scheduled_seconds` is computed from the
+periods that apply to that vehicle, so two buses over one window can have
+different scheduled time.
+
+`configured` is false when no day has any period. That is a valid state, not an
+error: nothing rostered means no scheduled time, and `/api/metrics` reports the
+whole window as unscheduled with a note saying why. See **Empty schedules**.
+
+---
+
+## `PUT /api/schedule`
+
+Replaces the whole schedule. The roster is sent in one piece rather than a row
+at a time, because it is written back into a config file: one read, one
+validated write, no half applied edit.
+
+```json
+{
+  "monday": [{ "start": "08:00", "end": "17:00" }],
+  "saturday": [{ "start": "09:00", "end": "13:00", "vehicles": ["3"] }]
+}
+```
+
+A day that is absent or empty has no service, and a period with no `vehicles`
+(or an empty list) is for the whole fleet. `200` with the stored schedule, in
+the same shape as `GET`.
+
+The older `[["08:00", "17:00"]]` pair form is still accepted on read, and on
+the `weekday`/`weekend` keys of the original config, so an app.yaml from
+before this change keeps working. Everything from those forms is fleet wide.
+
+Only the `service_hours` block of `app.yaml` is rewritten; the rest of the
+file, its ordering and its comments, is left byte for byte as it was. The
+result is parsed and compared against what was asked for before it replaces
+anything, and the swap is atomic, so a failed write leaves the file intact.
+
+`400` with `invalid_schedule` for an unknown day, a malformed time, a period
+that does not end after it starts, or two periods for the same vehicle that
+overlap. `400` with `unknown_vehicle` if a period names a vehicle the fleet
+does not have.
+
+A period crossing midnight cannot be expressed and is rejected; it needs a row
+on each day.
+
+> **Not yet protected.** Editing the roster is an operator and administrator
+> action, but admin auth (S13) does not exist, so this `PUT` is open like the
+> `/api/downtime` writes. The guard belongs on `replace_schedule` in
+> `backend/api/schedule.py`, which is the only write in that module. `GET`
+> stays open.
+
+---
+
+### Empty schedules
+
+With no schedule in the system, `/api/metrics` answers with real figures and
+explains them, rather than erroring or blocking the bucket:
+
+```json
+{
+  "buckets": { "scheduled_seconds": 0, "unscheduled_seconds": 86400 },
+  "notes": { "scheduled_seconds": "No service schedule is in the system, so all time counts as unscheduled." }
+}
+```
+
+A vehicle nobody rostered gets the same treatment while the rest of the fleet
+has a timetable, with a note naming it as the vehicle's own gap: *"No service
+schedule is in the system for this vehicle, so all its time counts as
+unscheduled."*
+
+`notes` is new alongside `unavailable`: `unavailable` explains a figure that is
+`null`, `notes` explains one that is real but needs saying. The dashboard shows
+the note as the caption on the scheduled row.
+
+A timezone is still required. Without `display.timezone` a local roster cannot
+be placed on a clock, so `scheduled_seconds` is `null` with an `unavailable`
+reason, which is a broken config rather than an empty schedule.
 
 ---
 

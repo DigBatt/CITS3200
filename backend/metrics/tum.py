@@ -22,6 +22,7 @@ from typing import Any, Optional, Sequence
 from zoneinfo import ZoneInfo
 
 from backend.models import Position, format_timestamp
+from backend.schedule import DAYS, Schedule
 
 EARTH_RADIUS_M = 6_371_000.0
 
@@ -57,7 +58,7 @@ class Settings:
     min_standby_seconds: Optional[float] = None
     depot_centre: Optional[Sequence[float]] = None
     depot_radius_m: Optional[float] = None
-    service_hours: Optional[dict[str, tuple[time, time]]] = None
+    schedule: Optional[Schedule] = None
     timezone: Optional[str] = None
 
     @property
@@ -80,24 +81,15 @@ class Settings:
         """
         block = config.utilisation or {}
         depot = block.get("depot") or {}
-        hours = block.get("service_hours") or {}
         return cls(
             stationary_speed_mps=block.get("stationary_speed_mps"),
             max_gap_seconds=block.get("max_gap_seconds"),
             min_standby_seconds=block.get("min_standby_seconds"),
             depot_centre=depot.get("centre"),
             depot_radius_m=depot.get("radius_m"),
-            service_hours={day: _parse_hours(value) for day, value in hours.items()} or None,
+            schedule=Schedule.from_config_block(block.get("service_hours")),
             timezone=config.timezone,
         )
-
-
-def _parse_hours(value: Sequence[str]) -> tuple[time, time]:
-    """
-    Turn `["08:00", "17:00"]` into a pair of times.
-    """
-    start, end = value
-    return time.fromisoformat(start), time.fromisoformat(end)
 
 
 @dataclass(frozen=True)
@@ -130,6 +122,9 @@ class Utilisation:
     buckets: dict[str, Optional[float]] = field(default_factory=dict)
     kpis: dict[str, Optional[float]] = field(default_factory=dict)
     unavailable: dict[str, str] = field(default_factory=dict)
+    #: Figures that are real but need explaining, unlike `unavailable` which
+    #: explains a figure that is None. Keyed the same way.
+    notes: dict[str, str] = field(default_factory=dict)
 
     def check(self) -> None:
         """
@@ -155,6 +150,7 @@ class Utilisation:
             "buckets": self.buckets,
             "kpis": self.kpis,
             "unavailable": self.unavailable,
+            "notes": self.notes,
         }
 
 
@@ -272,48 +268,63 @@ def _apply_min_standby(merged: Sequence[Span], settings: Settings) -> list[Span]
     return _merge(demoted)
 
 
-def service_periods(start: datetime, end: datetime, settings: Settings) -> Optional[list[tuple[datetime, datetime]]]:
+def service_periods(
+    start: datetime, end: datetime, settings: Settings, vehicle_id: Optional[str] = None
+) -> Optional[list[tuple[datetime, datetime]]]:
     """
-    Service hours overlapping the window, each clipped to it.
+    Service periods overlapping the window, each clipped to it.
 
-    Hours are read in the display timezone, since a roster is written in local
-    time. Only `weekday` is understood, so a weekend day contributes nothing;
-    public holidays and per vehicle rosters are not modelled.
+    The roster is read in the display timezone, since it is written in local
+    time. Every day of the week is looked up separately and a day may hold
+    several periods, so a split shift or a Saturday timetable is expressed
+    directly. Public holidays and per vehicle rosters are not modelled.
 
     Parameters
     ----------
     start, end : datetime
         The reporting window, UTC.
     settings : Settings
+    vehicle_id : str, optional
+        Whose roster to read. A period naming no vehicle is fleet wide and
+        applies to all of them. None pools every period, which answers "was
+        anything scheduled" rather than "was this bus scheduled".
 
     Returns
     -------
     list of (datetime, datetime) or None
-        Ascending, non-empty (opens, closes) pairs. None when no service hours
-        or no timezone are configured, which leaves scheduled time genuinely
-        unknown rather than zero.
+        Ascending (opens, closes) pairs, clipped to the window.
+
+        Empty when nothing is rostered, which is a real answer: no schedule
+        means no scheduled time, so the whole window is unscheduled. Callers
+        should say so rather than treat it as missing, see `summarise`.
+
+        None only when the timezone is unset, since a local roster cannot be
+        placed on a clock without one. That is a broken config, not an empty
+        schedule.
     """
-    if not settings.service_hours or settings.timezone is None:
+    if settings.timezone is None:
         return None
 
+    schedule = settings.schedule or Schedule()
     tz = ZoneInfo(settings.timezone)
     periods: list[tuple[datetime, datetime]] = []
     day: date = start.astimezone(tz).date()
     last: date = end.astimezone(tz).date()
 
     while day <= last:
-        hours = settings.service_hours.get("weekday") if day.weekday() < 5 else None
-        if hours:
-            opens = max(datetime.combine(day, hours[0], tzinfo=tz), start)
-            closes = min(datetime.combine(day, hours[1], tzinfo=tz), end)
+        for period in schedule.for_day(DAYS[day.weekday()], vehicle_id):
+            opens = max(datetime.combine(day, period.start, tzinfo=tz), start)
+            closes = min(datetime.combine(day, period.end, tzinfo=tz), end)
             if closes > opens:
                 periods.append((opens, closes))
         day += timedelta(days=1)
 
-    return periods
+    return sorted(periods)
 
 
-def scheduled_seconds(start: datetime, end: datetime, settings: Settings) -> Optional[float]:
+def scheduled_seconds(
+    start: datetime, end: datetime, settings: Settings, vehicle_id: Optional[str] = None
+) -> Optional[float]:
     """
     Service hours overlapping the window, in seconds.
 
@@ -322,7 +333,7 @@ def scheduled_seconds(start: datetime, end: datetime, settings: Settings) -> Opt
     float or None
         None when scheduled time is unknown, see `service_periods`.
     """
-    periods = service_periods(start, end, settings)
+    periods = service_periods(start, end, settings, vehicle_id)
     return None if periods is None else sum(((closes - opens).total_seconds() for opens, closes in periods), 0.0)
 
 
@@ -369,8 +380,8 @@ def summarise(
     delay = totals[State.DELAY]
     standby = totals[State.STANDBY]
     operating = working + delay
-    scheduled = scheduled_seconds(start, end, settings)
-    periods = service_periods(start, end, settings)
+    scheduled = scheduled_seconds(start, end, settings, vehicle_id)
+    periods = service_periods(start, end, settings, vehicle_id)
     # GMG nests working time inside scheduled time, so effective utilisation
     # counts only the working time that fell within service hours.
     scheduled_working = (
@@ -404,10 +415,27 @@ def summarise(
     result.unavailable = dict(BLOCKED_KPIS)
     if scheduled is None:
         result.unavailable["effective_utilisation"] = (
-            "needs scheduled time; config/app.yaml does not set utilisation.service_hours"
+            "needs a timezone; config/app.yaml does not set display.timezone"
         )
         result.unavailable["scheduled_seconds"] = result.unavailable["effective_utilisation"]
         result.unavailable["scheduled_working_seconds"] = result.unavailable["effective_utilisation"]
+    elif settings.schedule is None or settings.schedule.is_empty_for(vehicle_id):
+        # S21: nothing rostered is a real figure, not a missing one. Scheduled
+        # time is zero and the window is unscheduled; the note says why, so
+        # the dashboard does not read it as the fleet having been idle.
+        #
+        # Per vehicle, since the roster is: a bus nobody scheduled says so,
+        # even while the rest of the fleet has a timetable.
+        note = (
+            "No service schedule is in the system, so all time counts as unscheduled."
+            if settings.schedule is None or settings.schedule.is_empty
+            else "No service schedule is in the system for this vehicle, so all its time counts as unscheduled."
+        )
+        result.notes["scheduled_seconds"] = note
+        result.notes["unscheduled_seconds"] = note
+        result.unavailable["effective_utilisation"] = (
+            "needs scheduled time; no service schedule is in the system"
+        )
     if not operating:
         result.unavailable["operating_efficiency"] = "no operating time in this window"
     if not settings.has_depot:

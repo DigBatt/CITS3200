@@ -28,3 +28,16 @@ function getMetrics(query) {
 function getVehicles() {
   return request('/api/vehicles');
 }
+
+// The service schedule (S21). Public: the dashboard shows scheduled time to
+// anyone, so anyone may read the roster behind it. Editing it is the admin
+// page's PUT, which S13 will guard.
+function getSchedule() {
+  return request('/api/schedule');
+}
+
+// Operator reported downtime, for the service calendar. Reading is public;
+// the admin page's writes are what S13 will guard.
+function getDowntime(query) {
+  return request('/api/downtime', query);
+}

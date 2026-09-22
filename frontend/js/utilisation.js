@@ -18,7 +18,10 @@
 
   const BUCKETS = ['calendar_seconds', 'operating_seconds', 'scheduled_seconds', 'scheduled_working_seconds', 'unscheduled_seconds', ...STATES.map((s) => s.key)];
 
-  const EMPTY = { buckets: {}, kpis: {}, unavailable: {} };
+  const EMPTY = { buckets: {}, kpis: {}, unavailable: {}, notes: {} };
+
+  // The roster behind the scheduled row, fetched once. Null until it loads.
+  let schedule = null;
 
   const ratio = (part, whole) => (part != null && whole ? part / whole : null);
 
@@ -39,13 +42,15 @@
       operating_efficiency: ratio(buckets.working_seconds, buckets.operating_seconds),
     };
 
-    // A reason holds for the pool only if it holds for every vehicle.
+    // A reason, or a note, holds for the pool only if it holds for every vehicle.
     const unavailable = {};
+    const notes = {};
     for (const key of [...BUCKETS, ...KPIS.map((kpi) => kpi.key)]) {
       if (entries.every((entry) => entry.unavailable[key])) unavailable[key] = entries[0].unavailable[key];
+      if (entries.every((entry) => entry.notes?.[key])) notes[key] = entries[0].notes[key];
     }
 
-    return { buckets, kpis, unavailable };
+    return { buckets, kpis, unavailable, notes };
   }
 
   function renderKpis(figures) {
@@ -131,7 +136,7 @@
         ghost(b.standby_seconds),
         ghost(b.not_reporting_seconds),
       ]),
-      '<span class="util-tum-caption">Against the service roster</span>',
+      `<span class="util-tum-caption">${escapeHtml(rosterCaption(figures))}</span>`,
       row([scheduledRow]),
     ].join('');
 
@@ -143,6 +148,23 @@
     legend.innerHTML = entries
       .map(([colour, code, seconds]) => `<span><span class="util-legend-swatch" style="background: var(--util-${colour})"></span>${code} ${formatDuration(seconds)}</span>`)
       .join('');
+  }
+
+  // S21: what the scheduled row is measured against. An empty roster is a
+  // real state, not a missing figure, so it is said plainly rather than left
+  // to read as though the fleet never ran.
+  function rosterCaption(figures) {
+    const note = figures.notes?.scheduled_seconds;
+    if (note) return note;
+    if (!schedule) return 'Against the service roster';
+
+    const days = Object.entries(schedule.schedule ?? {}).filter(([, periods]) => periods.length);
+    if (!days.length) return 'Against the service roster';
+
+    const shown = days
+      .map(([day, periods]) => `${day.slice(0, 3)} ${periods.map((p) => `${p[0]}-${p[1]}`).join(', ')}`)
+      .join(' · ');
+    return `Against the service roster · ${shown}${schedule.timezone ? ` (${schedule.timezone})` : ''}`;
   }
 
   function renderTable(entries, total) {
@@ -186,6 +208,10 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    // The roster is small and changes rarely, so it is read once rather than
+    // on every selection change.
+    getSchedule().then((data) => { schedule = data; }).catch(() => { schedule = null; });
+
     // A vehicle's row in the table scopes the whole dashboard to it.
     document.getElementById('util-table').addEventListener('click', (event) => {
       const row = event.target.closest('[data-vehicle]');
