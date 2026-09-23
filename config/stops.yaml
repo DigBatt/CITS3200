@@ -11,7 +11,7 @@ stops:
     latitude: -31.980743857374474
     longitude: 115.81720535774184
 
-  - id: business-school
+  - id: business-school   # this is the actual business school car park and not the location on the current gps track the buses follow.
     name: Outside the Business School
     latitude: -31.985583444723204
     longitude: 115.82089500479223
@@ -35,6 +35,21 @@ stops:
     name: Path to E-zone from James oval
     latitude: -31.9797545
     longitude: 115.8171536
+
+  - id: bilya-marlee
+    name: underwood parade outside Bilya Marlee
+    latitude: -31.9828347
+    longitude: 115.8201390
+  
+  - id: sports-science
+    name: Saw promenade at Human movement lab/ UWA aquatic center 
+    latitude: -31.9848357
+    longitude: 115.8187636
+
+  - id: marine-research
+    name: Between IOMRC and Civ & Mechanical Engineering 
+    latitude: -31.9813149
+    longitude: 115.8165538
 
 
 routes:
