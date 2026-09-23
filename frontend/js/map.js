@@ -60,6 +60,16 @@ function drawStops(stops) {
   return stops.length;
 }
 
+// Show or hide the whole stop layer. The markers are kept, so turning it back
+// on needs no refetch.
+function setStopsVisible(visible) {
+  if (visible) {
+    layers.stops.addTo(map);
+  } else {
+    map.removeLayer(layers.stops);
+  }
+}
+
 function applyStopLabelZoom() {
   map.getContainer().classList.toggle('hide-stop-labels', map.getZoom() < STOP_LABEL_MIN_ZOOM);
 }
