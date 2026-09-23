@@ -129,6 +129,33 @@ class Position:
 
 
 @dataclass(frozen=True)
+class PickupRequest:
+    """
+    A rider's request to be picked up at a stop (docs/api.md, S08)
+    """
+
+    id: str
+    stop_id: str
+    rider_token: str
+    status: str
+    created_at: datetime
+    cleared_at: Optional[datetime] = None
+
+    OPEN = "open"
+    COLLECTED = "collected"
+    EXPIRED = "expired"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "stop_id": self.stop_id,
+            "status": self.status,
+            "created_at": format_timestamp(self.created_at),
+            "cleared_at": format_timestamp(self.cleared_at) if self.cleared_at else None,
+        }
+
+
+@dataclass(frozen=True)
 class Event:
     """
     An engage or disengage.
