@@ -2,12 +2,19 @@
 //
 // Layer groups map one-to-one onto the overlays.
 //
-// Owns: vehicle markers, position trails, event markers.
+// Owns: vehicle markers, position trails, event markers, stop markers.
 
 let map = null;
-const layers = { trails: null };
+const layers = { trails: null, stops: null };
 
 let pendingFit = null;
+
+// Every stop label drawn at once is unreadable when zoomed out past the
+// campus, so below this the names are hidden and the markers stay.
+const STOP_LABEL_MIN_ZOOM = 15;
+
+// Stops are drawn in their own pane, under the trails and vehicle markers.
+let stopRenderer = null;
 
 function initMap() {
   map = L.map('map').setView([-31.98133, 115.81597], 16); // sets the initial to UWA campus
@@ -15,7 +22,46 @@ function initMap() {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
+
+  map.createPane('stops').style.zIndex = 350; // below overlayPane (400)
+  stopRenderer = L.svg({ pane: 'stops' });
+
+  layers.stops = L.layerGroup().addTo(map);
   layers.trails = L.layerGroup().addTo(map);
+
+  map.on('zoomend', applyStopLabelZoom);
+  applyStopLabelZoom();
+}
+
+// Draw the configured stops. They come from config and change only on a
+// restart, so this is called once rather than on every live poll.
+function drawStops(stops) {
+  layers.stops.clearLayers();
+
+  for (const stop of stops) {
+    L.circleMarker([stop.latitude, stop.longitude], {
+      renderer: stopRenderer,
+      pane: 'stops',
+      radius: 5,
+      weight: 2,
+      color: 'rgba(28, 25, 23, 0.55)',
+      fillColor: '#ffffff',
+      fillOpacity: 1,
+    })
+      .bindTooltip(stop.name, {
+        permanent: true,
+        direction: 'top',
+        offset: [0, -7],
+        className: 'stop-label',
+      })
+      .addTo(layers.stops);
+  }
+
+  return stops.length;
+}
+
+function applyStopLabelZoom() {
+  map.getContainer().classList.toggle('hide-stop-labels', map.getZoom() < STOP_LABEL_MIN_ZOOM);
 }
 
 function drawTracks(vehicles, { fit = true } = {}) {
