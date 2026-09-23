@@ -1066,6 +1066,43 @@ empty until the API has events and stops. Layout only -- does not touch any
   display: none; /* Leaflet's tooltip arrow; the label sits on the marker. */
 }
 
+/* ---- Stop popup: name and the routes the stop is on (S07.3) ---- */
+
+.stop-popup .leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(28, 25, 23, 0.18);
+}
+
+.stop-popup .leaflet-popup-content {
+  margin: 10px 12px;
+  min-width: 140px;
+}
+
+.stop-popup-name {
+  font: 600 13px/1.35 Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.9);
+}
+
+.stop-popup-label {
+  margin-top: 8px;
+  font: 500 9.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+.stop-popup-routes {
+  margin: 3px 0 0;
+  padding: 0;
+  list-style: none;
+  font: 400 11.5px/1.6 Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.75);
+}
+
+.stop-popup-routes .is-empty {
+  color: rgba(28, 25, 23, 0.45);
+  font-style: italic;
+}
+
 /* A stop that is not on the selected route. */
 .stop-label.is-dimmed {
   opacity: 0.45;
