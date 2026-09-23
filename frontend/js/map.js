@@ -16,6 +16,40 @@ const STOP_LABEL_MIN_ZOOM = 15;
 // Stops are drawn in their own pane, under the trails and vehicle markers.
 let stopRenderer = null;
 
+// Kept so selecting a route restyles the markers in place. Redrawing the
+// layer instead would rebuild every tooltip on each click.
+const stopMarkers = new Map(); // stop id -> circleMarker
+
+// No route selected: every stop reads the same.
+const STOP_NEUTRAL = {
+  radius: 5,
+  weight: 2,
+  color: 'rgba(28, 25, 23, 0.55)',
+  fillColor: '#ffffff',
+  fillOpacity: 1,
+};
+
+// On the selected route: the route's own colour, filled and larger.
+const STOP_ON_ROUTE = { radius: 7, weight: 2, color: '#ffffff', fillOpacity: 1 };
+const STOP_ON_ROUTE_FALLBACK_COLOUR = 'rgba(28, 25, 23, 0.8)';
+
+// Off it: present, but plainly secondary.
+const STOP_OFF_ROUTE = {
+  radius: 4,
+  weight: 1.5,
+  color: 'rgba(28, 25, 23, 0.3)',
+  fillColor: '#ffffff',
+  fillOpacity: 0.65,
+};
+
+// The Leaflet style for one stop under the current selection. Kept free of
+// Leaflet and of the DOM so it can be tested on its own.
+function styleForStop(stop, selectedRouteId, routeColour) {
+  if (!selectedRouteId) return { ...STOP_NEUTRAL };
+  if (!stop.routes.includes(selectedRouteId)) return { ...STOP_OFF_ROUTE };
+  return { ...STOP_ON_ROUTE, fillColor: routeColour ?? STOP_ON_ROUTE_FALLBACK_COLOUR };
+}
+
 function initMap() {
   map = L.map('map').setView([-31.98133, 115.81597], 16); // sets the initial to UWA campus
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -37,16 +71,13 @@ function initMap() {
 // restart, so this is called once rather than on every live poll.
 function drawStops(stops) {
   layers.stops.clearLayers();
+  stopMarkers.clear();
 
   for (const stop of stops) {
-    L.circleMarker([stop.latitude, stop.longitude], {
+    const marker = L.circleMarker([stop.latitude, stop.longitude], {
       renderer: stopRenderer,
       pane: 'stops',
-      radius: 5,
-      weight: 2,
-      color: 'rgba(28, 25, 23, 0.55)',
-      fillColor: '#ffffff',
-      fillOpacity: 1,
+      ...STOP_NEUTRAL,
     })
       .bindTooltip(stop.name, {
         permanent: true,
@@ -55,9 +86,27 @@ function drawStops(stops) {
         className: 'stop-label',
       })
       .addTo(layers.stops);
+
+    stopMarkers.set(stop.id, marker);
   }
 
   return stops.length;
+}
+
+// Restyle the drawn stops for the selected route, or for none. The stops a
+// route serves stay full strength; the rest fade, labels included.
+function highlightRoute(stops, selectedRouteId, routeColour) {
+  for (const stop of stops) {
+    const marker = stopMarkers.get(stop.id);
+    if (!marker) continue;
+
+    marker.setStyle(styleForStop(stop, selectedRouteId, routeColour));
+
+    // Null while the layer is hidden by the Stops toggle, since a tooltip has
+    // no element until it is on the map.
+    const label = marker.getTooltip()?.getElement();
+    label?.classList.toggle('is-dimmed', Boolean(selectedRouteId) && !stop.routes.includes(selectedRouteId));
+  }
 }
 
 // Show or hide the whole stop layer. The markers are kept, so turning it back

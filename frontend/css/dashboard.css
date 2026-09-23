@@ -1016,6 +1016,11 @@ empty until the API has events and stops. Layout only -- does not touch any
   display: none; /* Leaflet's tooltip arrow; the label sits on the marker. */
 }
 
+/* A stop that is not on the selected route. */
+.stop-label.is-dimmed {
+  opacity: 0.45;
+}
+
 /* Zoomed out past the campus the names collide, so only the markers show. */
 .hide-stop-labels .stop-label {
   display: none;
