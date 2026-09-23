@@ -66,7 +66,8 @@
 
             <div class="vehicle-list" id="vehicle-list"></div>
 
-            <!-- STUB: layer toggles are visual only -- not yet wired to map.js layers -->
+            <!-- STUB: the toggles are visual only, apart from Stops, which
+                 js/stops.js wires to the map's stop layer. -->
             <div class="layer-toggles" data-stub="map-layer-toggles">
               <span class="layer-toggles-label">MAP LAYERS</span>
               <label class="layer-toggle-row">
@@ -88,7 +89,7 @@
               <label class="layer-toggle-row">
                 <span>Stops</span>
                 <span class="toggle-switch">
-                  <input type="checkbox" checked>
+                  <input type="checkbox" id="layer-toggle-stops" checked>
                   <span class="toggle-track"></span>
                   <span class="toggle-knob"></span>
                 </span>
