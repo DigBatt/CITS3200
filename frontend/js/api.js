@@ -28,3 +28,11 @@ function getMetrics(query) {
 function getVehicles() {
   return request('/api/vehicles');
 }
+
+function getStops() {
+  return request('/api/stops');
+}
+
+function getRoutes() {
+  return request('/api/routes');
+}
