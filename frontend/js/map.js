@@ -141,7 +141,10 @@ function drawTracks(vehicles, { fit = true } = {}) {
     drawn += 1;
 
     const style = vehicle.colour ? { color: vehicle.colour } : {};
-    L.polyline(points, { weight: 3, ...style }).addTo(layers.trails);
+    // Not interactive: the trail carries no popup of its own, and it is drawn
+    // over the stops, so a clickable trail would swallow clicks on a stop
+    // underneath it.
+    L.polyline(points, { weight: 3, interactive: false, ...style }).addTo(layers.trails);
     L.circleMarker(points[points.length - 1], { radius: 6, weight: 2, fillOpacity: 1, ...style })
       .bindPopup(`${vehicle.name ?? vehicle.vehicle_id} — ${vehicle.count} positions`)
       .addTo(layers.trails);
