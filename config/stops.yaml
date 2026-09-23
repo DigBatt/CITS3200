@@ -26,7 +26,7 @@ stops:
     latitude: -31.9830579
     longitude: 115.8187461
   
-    - id: guild-village
+  - id: guild-village
     name: Intersection of Saw Promenade and Graduates walk
     latitude: -31.9806087
     longitude: 115.8187129
