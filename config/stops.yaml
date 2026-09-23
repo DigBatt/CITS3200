@@ -51,11 +51,54 @@ stops:
     latitude: -31.9813149
     longitude: 115.8165538
 
+  - id: hackett-cafe
+    name: Outside Hacket Cafe 
+    latitude: -31.9763834
+    longitude: 115.8183017
+
+  - id: winthrop-hall
+    name: On South-East end of Winthrop Hall 
+    latitude: -31.9770705
+    longitude: 115.8183066
+
+  - id: art-complex
+    name: Entrance to Arts Complex 
+    latitude: -31.9781462
+    longitude: 115.8183461
+
+  - id: law-library
+    name: In wide path outside Law library 
+    latitude: -31.9793561
+    longitude: 115.8194325
+
 
 routes:
-  # PLACEHOLDER
-  - id: campus-loop
+  - id: full-campus-loop
     name: Campus loop
-    colour: "#d4741f"
+    colour: "#D4741F"
     loop: true
-    stops: [reid-library, civ-mech, business-school]
+    stops: [hackett-cafe, winthrop-hall, art-complex, reid-library, ezone-central, civ-mech, guild-village, barry-marshall, sports-science, business-school, bilya-marlee]
+
+  - id: eng-business-loop
+    name: Engineering to Business School loop
+    colour: "#1F7FD4"
+    loop: true
+    stops: [civ-mech, guild-village, barry-marshall, sports-science, business-school, bilya-marlee]
+    
+  - id: nth-south
+    name: Full length of campus North - South and back
+    colour: "#2E7D32"
+    loop: false
+    stops: [hackett-cafe, winthrop-hall, art-complex, reid-library, guild-village, barry-marshall, sports-science]
+  
+  - id: james-oval-loop
+    name: Loop around James oval
+    colour: "#C2185B"
+    loop: true
+    stops: [civ-mech, ezone-central, reid-library, guild-village]
+
+  - id: library-service
+    name: Direct service to 3 highest use libraries
+    colour: "#6A1B9A"
+    loop: true
+    stops: [reid-library, law-library, guild-village, barry-marshall]
