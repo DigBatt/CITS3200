@@ -121,13 +121,33 @@
             </div>
           </div>
 
-          <!-- ---- Rider panel: empty until stops and stop requests exist ---- -->
+          <!-- ---- Rider panel: stop picker and pickup request (S08) ---- -->
           <div class="panel panel-rider" id="panel-rider" hidden>
             <div class="rider-intro">
               <span class="rider-title">nuway shuttle</span>
               <span class="rider-sub">Let the shuttle know you're waiting</span>
             </div>
-            <p class="empty-state">Stops, arrivals and stop requests are not available yet.</p>
+
+            <!-- Options come from /api/stops, so a stop added to the config
+                 appears here with no code change. -->
+            <div class="stop-picker">
+              <label class="stop-picker-label" for="rider-stop-select">
+                <span class="stop-picker-dot"></span>
+                YOUR STOP
+              </label>
+              <select class="stop-select" id="rider-stop-select" disabled>
+                <option value="">Loading stops&hellip;</option>
+              </select>
+            </div>
+
+            <button type="button" class="request-button" id="rider-request-button" disabled>
+              <span class="request-button-title">Request pickup</span>
+              <span class="request-button-sub" id="rider-request-sub">Choose a stop first</span>
+            </button>
+
+            <p class="rider-status" id="rider-status" role="status" hidden></p>
+
+            <p class="rider-note">Arrival times are not available yet.</p>
           </div>
         </aside>
 
@@ -184,5 +204,6 @@
   <script src="js/utilisation.js"></script>
   <script src="js/main.js"></script>
   <script src="js/panels.js"></script>
+  <script src="js/rider.js"></script>
 </body>
 </html>
