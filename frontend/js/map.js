@@ -69,7 +69,7 @@ function initMap() {
 
 // Draw the configured stops. They come from config and change only on a
 // restart, so this is called once rather than on every live poll.
-function drawStops(stops) {
+function drawStops(stops, { popupHtml = null } = {}) {
   layers.stops.clearLayers();
   stopMarkers.clear();
 
@@ -86,6 +86,8 @@ function drawStops(stops) {
         className: 'stop-label',
       })
       .addTo(layers.stops);
+
+    if (popupHtml) marker.bindPopup(popupHtml(stop), { className: 'stop-popup', closeButton: false });
 
     stopMarkers.set(stop.id, marker);
   }

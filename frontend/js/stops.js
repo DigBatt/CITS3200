@@ -11,6 +11,24 @@
     return routes.find((route) => route.id === routeId) ?? null;
   }
 
+  // Names, in the order the config lists the routes. An id with no route left
+  // in the config is dropped rather than shown raw.
+  function routeNamesFor(stop) {
+    return routes.filter((route) => stop.routes.includes(route.id)).map((route) => route.name);
+  }
+
+  // Names come from a file an administrator edits, so everything is escaped.
+  function popupHtml(stop) {
+    const names = routeNamesFor(stop);
+    const routeLine = names.length
+      ? names.map((name) => `<li>${escapeHtml(name)}</li>`).join('')
+      : '<li class="is-empty">Not on any route</li>';
+    return `
+      <div class="stop-popup-name">${escapeHtml(stop.name)}</div>
+      <div class="stop-popup-label">ROUTES</div>
+      <ul class="stop-popup-routes">${routeLine}</ul>`;
+  }
+
   function select(routeId) {
     if (routeId === selected) return;
     selected = routeId;
@@ -88,7 +106,7 @@
 
     selected = recall();
     render();
-    drawStops(stops);
+    drawStops(stops, { popupHtml });
     highlightRoute(stops, selected, routeOf(selected)?.colour);
   }
 
