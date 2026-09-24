@@ -11,3 +11,6 @@ data/live/
 data/*.sqlite3
 data/*.sqlite3-wal
 data/*.sqlite3-shm
+node_modules/
+.expo/
+expo-env.d.ts
