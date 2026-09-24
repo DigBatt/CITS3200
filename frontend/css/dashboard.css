@@ -858,6 +858,51 @@ empty until the API has events and stops. Layout only -- does not touch any
   color: rgba(28, 25, 23, 0.45);
 }
 
+.stop-select {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid rgba(28, 25, 23, 0.16);
+  border-radius: 8px;
+  background: #fff;
+  color: #1c1917;
+  font: 400 13px Sora, sans-serif;
+}
+
+.stop-select:focus {
+  outline: 2px solid oklch(0.62 0.17 300);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.stop-select:disabled {
+  color: rgba(28, 25, 23, 0.45);
+  background: rgba(28, 25, 23, 0.04);
+}
+
+/* Confirmation or failure after a pickup request */
+.rider-status {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 9px;
+  font: 400 12px/1.5 Sora, sans-serif;
+}
+
+.rider-status[hidden] {
+  display: none;
+}
+
+.rider-status.is-ok {
+  background: oklch(0.62 0.17 300 / 10%);
+  border: 1px solid oklch(0.62 0.17 300 / 35%);
+  color: oklch(0.42 0.15 300);
+}
+
+.rider-status.is-error {
+  background: oklch(0.75 0.1 25 / 10%);
+  border: 1px solid oklch(0.75 0.1 25 / 40%);
+  color: oklch(0.42 0.13 25);
+}
+
 .request-button {
   display: flex;
   flex-direction: column;
@@ -870,6 +915,11 @@ empty until the API has events and stops. Layout only -- does not touch any
   border: none;
   text-align: left;
   width: 100%;
+}
+
+.request-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .request-button-title {
