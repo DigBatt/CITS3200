@@ -1,0 +1,20 @@
+# How the app reaches the backend. Read by app.config.js when Metro starts
+# and handed to the app as Constants.expoConfig.extra.endpoints.
+#
+#   npm start              LAN. The backend is on the machine running Metro,
+#                          on lan.port. Works on the same Wi-Fi only.
+#   npm run start:tunnel   Tunnel. The app calls tunnel.api and Metro
+#                          advertises tunnel.metro, so Expo Go loads it from
+#                          any network. Needs `ngrok start --all` running,
+#                          see ../ngrok/README.md.
+#
+# The URLs mirror ../ngrok/ngrok.yml, and lan.port mirrors listen.port in
+# ../backend/endpoints.yaml. EXPO_PUBLIC_API_URL in .env overrides all of it.
+
+lan:
+  port: 5001
+
+tunnel:
+  api: https://nuway-api.ngrok.app
+  metro: https://nuway-metro.ngrok.app
+  dashboard: https://nuway-dashboard.ngrok.app

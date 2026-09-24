@@ -29,12 +29,7 @@ machine. `react-native-maps` is bundled in Expo Go, so no native build is needed
    FLASK_APP=backend.app:create_app flask run --host 0.0.0.0 --port 5001
    ```
 
-2. Tell the app which port the backend is on (only needed when it is not 5000):
-
-   ```bash
-   cd mobile
-   cp .env.example .env                    # then set EXPO_PUBLIC_API_PORT=5001
-   ```
+2. Check `lan.port` in `endpoints.yaml` matches that port (it is 5001 already).
 
 3. Start Metro and scan the QR code with Expo Go:
 
@@ -48,12 +43,33 @@ phone that can load the bundle can also reach the API. Set
 `EXPO_PUBLIC_API_URL` in `.env` to point somewhere else, such as a deployed
 backend.
 
+## Endpoints
+
+`endpoints.yaml` is the one place the app learns where the backend is.
+`app.config.js` reads it when Metro starts and hands it to the app through
+`Constants.expoConfig.extra.endpoints`; `src/lib/endpoints.ts` turns that
+into the API base URL.
+
+| Key | Used by | Mirrors |
+|---|---|---|
+| `lan.port` | `npm start` | `listen.port` in `../backend/endpoints.yaml` |
+| `tunnel.api` | `npm run start:tunnel` | `nuway-api` in `../ngrok/ngrok.yml` |
+| `tunnel.metro` | `npm run start:tunnel`, advertised to Expo Go | `nuway-metro` |
+| `tunnel.dashboard` | nothing yet | `nuway-dashboard` |
+
+`npm run start:tunnel` sets `NUWAY_TUNNEL=1`, which makes the app call
+`tunnel.api`, and `EXPO_PACKAGER_PROXY_URL` so Expo Go loads the bundle
+through `tunnel.metro`. It expects `ngrok start --all` to be running, see
+[../ngrok/README.md](../ngrok/README.md). Edit the YAML and restart Metro to
+change any of it.
+
 ## Pickup requests
 
-The app posts to `POST /api/pickup-requests` with `{"stop_id": "..."}`,
-the contract on the `rider-requests` branch. On a backend without that
-endpoint the request button reports that pickups are not enabled on the
-server, and everything else keeps working.
+The app posts to `POST /api/pickup-requests` with `{"stop_id": "..."}`
+([../docs/api.md](../docs/api.md)). Requests are held in memory by the
+backend, so restarting it clears them. On a backend without the endpoint the
+request button reports that pickups are not enabled on the server, and
+everything else keeps working.
 
 The backend identifies a rider by a cookie set on their first request. Native
 fetch keeps that cookie between calls, so the no-duplicate rule works without

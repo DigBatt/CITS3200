@@ -189,6 +189,62 @@ One route, with its stops in full and in service order.
 
 ---
 
-## Not in this sprint
+## Pickup requests
 
-`POST /api/stop-requests`.
+S08. A rider asks to be collected at a stop, no account needed.
+
+**Identifying a rider (S08.2).** No login exists, the server
+generates a random `rider_token` and sets it as an http only cookie
+(`SameSite=Lax`, ~1 year) the first time a browser posts a request; every
+later request from that browser carries it automatically. It never appears in
+a JSON body, and the operator view never sees another rider's token.
+
+### `POST /api/pickup-requests`
+
+```json
+{ "stop_id": "reid-library" }
+```
+
+`400` `unknown_stop` if the stop is not configured — this is a bad request
+body, not a path lookup, so it does not follow the `404` convention `/api/stops/<id>`
+uses.
+
+If the rider (by cookie) already has an open request at that stop, that same
+request is returned unchanged with `200` instead of opening a second one. A
+genuinely new request is `201`.
+
+```json
+{
+  "request": {
+    "id": "3f1c2b7a9e4d4f0b8c6a1d2e3f4a5b6c",
+    "stop_id": "reid-library",
+    "status": "open",
+    "created_at": "2025-09-04T08:58:37.495682Z",
+    "cleared_at": null
+  }
+}
+```
+
+### `GET /api/pickup-requests`
+
+Every pickup request, ascending by `created_at`. For the operator view to
+poll so a bus doesn't skip a stop with a rider waiting.
+
+| Parameter | Required | Notes |
+|---|---|---|
+| `status` | no | One of `open`, `collected`, `expired`. Default: all. |
+
+```json
+{ "requests": [ { "...": "as in POST above" } ] }
+```
+
+`status` only ever leaves `open` today — nothing yet marks a request
+`collected` or `expired` — but the field exists now so S10's audit trail does
+not require reshaping this data later.
+
+---
+
+## Not implemented yet
+
+Marking a pickup request `collected` or `expired`, and the rider-facing stop
+picker page (S08.4).
