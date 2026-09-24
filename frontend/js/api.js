@@ -53,7 +53,3 @@ async function createPickupRequest(stopId) {
   }
   return { request: body.request, created: response.status === 201 };
 }
-
-function getRoutes() {
-  return request('/api/routes');
-}
