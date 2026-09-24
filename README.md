@@ -52,6 +52,7 @@ data/        committed sample data.
 backend/     Flask app, storage behind an interface, API blueprints, live logger.
 tests/       pytest suite.
 frontend/    Leaflet dashboard.
+mobile/      Expo rider app for phones, see mobile/README.md.
 drafts/      Sprint 1 prototypes, reference only so not part of the build.
 GPS_Report/  client supplied telemetry and ROS 2 sample nodes.
 ```
