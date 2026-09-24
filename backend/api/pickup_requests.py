@@ -1,7 +1,7 @@
-"""POST and GET /api/pickup-requests.
+"""POST and GET /api/pickup-requests, GET /api/routes/<id>/waiting.
 
-A rider asking to be collected at a stop. Response shapes
-and the rider-token cookie decision: docs/api.md.
+A rider asking to be collected at a stop, and the operator's per-route view of
+who is waiting. Response shapes and the rider-token cookie decision: docs/api.md.
 """
 
 from __future__ import annotations
@@ -10,7 +10,8 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, current_app, jsonify, request
 
-from backend.pickup_requests import PickupRequestStore
+from backend.models import PickupRequest, format_timestamp
+from backend.pickup_requests import PickupRequestStore, waiting_at_stops
 from backend.stops import StopNetwork
 
 bp = Blueprint("pickup_requests", __name__)
@@ -82,3 +83,48 @@ def list_pickup_requests():
     """
     requests = _store().list(status=request.args.get("status"))
     return jsonify({"requests": [r.to_dict() for r in requests]})
+
+
+@bp.get("/api/routes/<route_id>/waiting")
+def route_waiting(route_id: str):
+    """
+    Riders waiting along a route, for the operator view (S09.2).
+
+    Returns
+    -------
+    flask.Response
+        `404` `unknown_route` if the route is not configured. Otherwise the
+        route's stops in service order, each with the number of open requests
+        and the age of the oldest. Requests at stops off the route are left out.
+    """
+    network = _network()
+    found = network.route(route_id)
+    if found is None:
+        message = f"No route with id '{route_id}'. Known ids: {', '.join(network.routes) or 'none'}."
+        return jsonify({"error": {"code": "unknown_route", "message": message}}), 404
+
+    now = datetime.now(timezone.utc)
+    counts = waiting_at_stops(_store().list(status=PickupRequest.OPEN), found.stop_ids)
+
+    stops = []
+    for stop, count in zip(network.stops_on_route(found.id), counts):
+        oldest = count.oldest_created_at
+        stops.append(
+            {
+                **stop.to_dict(),
+                "waiting": count.waiting,
+                "oldest_requested_at": format_timestamp(oldest) if oldest else None,
+                "oldest_wait_seconds": round((now - oldest).total_seconds(), 1) if oldest else None,
+            }
+        )
+
+    body = found.to_dict()
+    del body["stop_ids"]
+    return jsonify(
+        {
+            "generated_at": format_timestamp(now),
+            "route": body,
+            "total_waiting": sum(c.waiting for c in counts),
+            "stops": stops,
+        }
+    )

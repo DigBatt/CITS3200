@@ -7,11 +7,42 @@ later without a rework.
 
 from __future__ import annotations
 import threading
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Iterable, Optional, Sequence
 from uuid import uuid4
 
 from backend.models import PickupRequest
+
+
+@dataclass(frozen=True)
+class StopWaiting:
+    """
+    Open requests at one stop (S09.2). `oldest_created_at` is None when nobody
+    is waiting.
+    """
+
+    stop_id: str
+    waiting: int
+    oldest_created_at: Optional[datetime]
+
+
+def waiting_at_stops(requests: Iterable[PickupRequest], stop_ids: Sequence[str]) -> list[StopWaiting]:
+    """
+    Count open requests per stop, in the order of `stop_ids`.
+
+    Requests at stops not in `stop_ids` are ignored, so passing a route's
+    stops leaves out riders waiting somewhere the shuttle does not go.
+    """
+    counts = {stop_id: 0 for stop_id in stop_ids}
+    oldest: dict[str, datetime] = {}
+    for r in requests:
+        if r.status != PickupRequest.OPEN or r.stop_id not in counts:
+            continue
+        counts[r.stop_id] += 1
+        if r.stop_id not in oldest or r.created_at < oldest[r.stop_id]:
+            oldest[r.stop_id] = r.created_at
+    return [StopWaiting(stop_id, counts[stop_id], oldest.get(stop_id)) for stop_id in stop_ids]
 
 
 class PickupRequestStore:
