@@ -6,10 +6,12 @@ from __future__ import annotations
 from pathlib import Path
 from flask import Flask, jsonify, send_from_directory
 from backend.api.metrics import bp as metrics_bp
+from backend.api.pickup_requests import bp as pickup_requests_bp
 from backend.api.positions import bp as positions_bp
 from backend.api.stops import bp as stops_bp
 from backend.api.vehicles import bp as vehicles_bp
 from backend.config import DEFAULT_CONFIG_DIR, ConfigError, load_config
+from backend.pickup_requests import PickupRequestStore
 from backend.repository import CsvRepository
 from backend.repository.base import RepositoryError
 
@@ -41,11 +43,13 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Flask:
     config = load_config(config_dir)
     app.config["NUWAY_CONFIG"] = config
     app.config["REPOSITORY"] = CsvRepository.from_config(config)
+    app.config["PICKUP_REQUEST_STORE"] = PickupRequestStore()
 
     app.register_blueprint(positions_bp)
     app.register_blueprint(vehicles_bp)
     app.register_blueprint(metrics_bp)
     app.register_blueprint(stops_bp)
+    app.register_blueprint(pickup_requests_bp)
 
     @app.get("/")
     def index():
