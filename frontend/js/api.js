@@ -29,6 +29,10 @@ function getVehicles() {
   return request('/api/vehicles');
 }
 
+function getRoutes() {
+  return request('/api/routes');
+}
+
 function getStops() {
   return request('/api/stops');
 }
@@ -49,6 +53,7 @@ async function createPickupRequest(stopId) {
   }
   return { request: body.request, created: response.status === 201 };
 }
+
 function getRoutes() {
   return request('/api/routes');
 }
