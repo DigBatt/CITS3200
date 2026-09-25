@@ -35,6 +35,7 @@ class Config:
     refresh_interval_seconds: Optional[int]
     utilisation: Optional[dict[str, Any]]
     logger: Optional[dict[str, Any]]
+    pickup_requests: Optional[dict[str, Any]]
     stops: StopNetwork
 
     def vehicle(self, vehicle_id: str) -> Optional[Vehicle]:
@@ -94,6 +95,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
             refresh_interval_seconds=map_settings.get("refresh_interval_seconds"),
             utilisation=app.get("utilisation"),
             logger=logger,
+            pickup_requests=app.get("pickup_requests"),
             stops=_parse_stops(stops_raw, stops_path, bounds),
         )
     except (AttributeError, KeyError, TypeError, ValueError) as exc:

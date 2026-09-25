@@ -165,6 +165,7 @@ function renderStops(data, hereStopId) {
         <strong class="operator-stop-waiting">${stop.waiting}</strong> waiting
         ${stop.waiting ? `<span class="operator-stop-age">oldest ${formatWait(stop.oldest_wait_seconds)}</span>` : ''}
       </span>
+      ${stop.waiting ? `<button type="button" class="operator-collect" data-stop-id="${operatorEscape(stop.id)}">Picked up</button>` : ''}
     </li>
   `).join('');
 }
@@ -173,6 +174,24 @@ function renderError(message) {
   operatorEls.card.hidden = false;
   operatorEls.error.hidden = false;
   operatorEls.error.textContent = `Could not refresh: ${message}. Retrying.`;
+}
+
+// Closes every open request at the stop, then refreshes so it clears at once
+// rather than on the next tick.
+async function collectAtStop(button) {
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/stops/${encodeURIComponent(button.dataset.stopId)}/collect`, { method: 'POST' });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
+    }
+  } catch (err) {
+    button.disabled = false;
+    renderError(err.message);
+    return;
+  }
+  refreshOperatorView();
 }
 
 // ---- Refresh loop (S09.5) ----
@@ -237,6 +256,12 @@ async function initOperatorView() {
       saveSelection();
       restartOperatorRefresh();
     });
+  });
+
+  // The list is rebuilt on every refresh, so listen once on the list itself.
+  operatorEls.stops.addEventListener('click', (event) => {
+    const button = event.target.closest('.operator-collect');
+    if (button) collectAtStop(button);
   });
 
   // Catch up straight away when a backgrounded tablet is woken.
