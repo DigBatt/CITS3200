@@ -34,6 +34,9 @@ utilisation:
   service_hours:
     weekday: ["08:00", "17:00"]
 
+pickup_requests:
+  expire_after_seconds: 1800
+
 logger:
   poll_interval_seconds: 30
   timeout_seconds: 60

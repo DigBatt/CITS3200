@@ -238,9 +238,14 @@ poll so a bus doesn't skip a stop with a rider waiting.
 { "requests": [ { "...": "as in POST above" } ] }
 ```
 
-`status` only ever leaves `open` today — nothing yet marks a request
-`collected` or `expired` — but the field exists now so S10's audit trail does
-not require reshaping this data later.
+A request leaves `open` once: `collected` when the operator clears its
+stop, or `expired` when it has been open longer than
+`pickup_requests.expire_after_seconds` in `config/app.yaml`. Either way the
+record is kept with `cleared_at` set, so `?status=collected` and
+`?status=expired` are the admin's record of the day. Expiry is applied when
+requests are read or opened, not by a background job.
+
+The store is in memory, so a restart clears every request, open or closed.
 
 ### `GET /api/routes/<id>/waiting`
 
@@ -280,9 +285,24 @@ server holds no assignment. The vehicle's position comes from
 `GET /api/vehicles`: live when the logger is feeding it, otherwise the latest
 recorded position, labelled with its age.
 
+### `POST /api/stops/<id>/collect`
+
+The operator has picked up the riders at a stop. Every `open` request at
+the stop becomes `collected`, whichever route the rider was waiting for, since
+requests belong to a stop and not a route. No body. `404` `unknown_stop` if the
+stop is not configured.
+
+Returns the requests closed, empty if nobody was waiting:
+
+```json
+{ "collected": [ { "...": "as in POST /api/pickup-requests, with status collected and cleared_at set" } ] }
+```
+
+A rider who asks again at the same stop afterwards opens a new request.
+
 ---
 
 ## Not implemented yet
 
-Marking a pickup request `collected` or `expired`, and the rider-facing stop
-picker page (S08.4).
+The rider-facing stop picker page (S08.4). Pickup requests that survive a
+restart.

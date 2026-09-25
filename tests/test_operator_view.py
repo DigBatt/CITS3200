@@ -238,3 +238,19 @@ def test_new_request_appears_within_30_seconds_without_reload(page, server):
     assert page.evaluate("window.__notReloaded") is True
     assert page.locator('.operator-stop[data-stop-id="off-route"]').count() == 0
     assert page.locator("#operator-empty").is_hidden()
+
+
+def test_picked_up_clears_the_stop(page, server):
+    """
+    S10: the operator's button closes the stop's requests and the stop clears
+    straight away, without waiting for the next poll.
+    """
+    post_request(server, "shared")
+    button = page.locator('.operator-stop[data-stop-id="shared"] .operator-collect')
+    button.wait_for(timeout=30_000)
+
+    button.click()
+
+    page.locator('.operator-stop[data-stop-id="shared"] .operator-stop-waiting').filter(has_text="0").wait_for(timeout=5_000)
+    assert button.count() == 0
+    assert page.locator("#operator-empty").is_visible()

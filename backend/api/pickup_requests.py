@@ -1,12 +1,14 @@
-"""POST and GET /api/pickup-requests, GET /api/routes/<id>/waiting.
+"""POST and GET /api/pickup-requests, GET /api/routes/<id>/waiting,
+POST /api/stops/<id>/collect.
 
-A rider asking to be collected at a stop, and the operator's per-route view of
-who is waiting. Response shapes and the rider-token cookie decision: docs/api.md.
+A rider asking to be collected at a stop, the operator's per-route view of
+who is waiting, and the operator clearing a stop once the riders are aboard.
+Response shapes and the rider-token cookie decision: docs/api.md.
 """
 
 from __future__ import annotations
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, current_app, jsonify, request
 
@@ -28,6 +30,18 @@ def _network() -> StopNetwork:
 
 def _store() -> PickupRequestStore:
     return current_app.config["PICKUP_REQUEST_STORE"]
+
+
+def _expire_stale(now: datetime) -> None:
+    """
+    S10: expire open requests older than `pickup_requests.expire_after_seconds`.
+    Run at the start of every request that reads or opens one, so expiry needs
+    no background job; the operator view polls often enough to keep it current.
+    """
+    block = current_app.config["NUWAY_CONFIG"].pickup_requests or {}
+    seconds = block.get("expire_after_seconds")
+    if seconds:
+        _store().expire(now, timedelta(seconds=seconds))
 
 
 @bp.post("/api/pickup-requests")
@@ -58,7 +72,10 @@ def create_pickup_request():
     if is_new_rider:
         rider_token = secrets.token_urlsafe(24)
 
-    pickup_request, created = _store().create(stop_id, rider_token, datetime.now(timezone.utc))
+    # Expire first, so a rider whose old request has gone stale gets a new one.
+    now = datetime.now(timezone.utc)
+    _expire_stale(now)
+    pickup_request, created = _store().create(stop_id, rider_token, now)
 
     response = jsonify({"request": pickup_request.to_dict()})
     response.status_code = 201 if created else 200
@@ -81,6 +98,7 @@ def list_pickup_requests():
     Query params:
         status  optional; one of `open`, `collected`, `expired`.
     """
+    _expire_stale(datetime.now(timezone.utc))
     requests = _store().list(status=request.args.get("status"))
     return jsonify({"requests": [r.to_dict() for r in requests]})
 
@@ -104,6 +122,7 @@ def route_waiting(route_id: str):
         return jsonify({"error": {"code": "unknown_route", "message": message}}), 404
 
     now = datetime.now(timezone.utc)
+    _expire_stale(now)
     counts = waiting_at_stops(_store().list(status=PickupRequest.OPEN), found.stop_ids)
 
     stops = []
@@ -128,3 +147,26 @@ def route_waiting(route_id: str):
             "stops": stops,
         }
     )
+
+
+@bp.post("/api/stops/<stop_id>/collect")
+def collect_at_stop(stop_id: str):
+    """
+    The operator has picked up the riders waiting at a stop (S10).
+
+    Every open request at the stop is closed, whichever route the rider was
+    waiting for. The records are kept, marked `collected` with `cleared_at`.
+
+    Returns
+    -------
+    flask.Response
+        `404` `unknown_stop` if the stop is not configured. Otherwise `200`
+        with the requests closed, empty if nobody was waiting.
+    """
+    network = _network()
+    if network.stop(stop_id) is None:
+        message = f"No stop with id '{stop_id}'. Known ids: {', '.join(network.stops) or 'none'}."
+        return jsonify({"error": {"code": "unknown_stop", "message": message}}), 404
+
+    closed = _store().collect(stop_id, datetime.now(timezone.utc))
+    return jsonify({"collected": [r.to_dict() for r in closed]})

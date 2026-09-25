@@ -7,8 +7,8 @@ later without a rework.
 
 from __future__ import annotations
 import threading
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta
 from typing import Iterable, Optional, Sequence
 from uuid import uuid4
 
@@ -81,6 +81,40 @@ class PickupRequestStore:
         if status is not None:
             requests = [r for r in requests if r.status == status]
         return sorted(requests, key=lambda r: r.created_at)
+
+    def collect(self, stop_id: str, now: datetime) -> list[PickupRequest]:
+        """
+        Close every open request at a stop as collected (S10). The records are
+        kept, with `cleared_at`, for the admin's review of the day.
+
+        Returns the requests closed, empty if nobody was waiting.
+        """
+        with self._lock:
+            closed = [
+                replace(r, status=PickupRequest.COLLECTED, cleared_at=now)
+                for r in self._requests.values()
+                if r.stop_id == stop_id and r.status == PickupRequest.OPEN
+            ]
+            for r in closed:
+                self._requests[r.id] = r
+        return sorted(closed, key=lambda r: r.created_at)
+
+    def expire(self, now: datetime, max_age: timedelta) -> list[PickupRequest]:
+        """
+        Mark open requests older than `max_age` as expired (S10). Kept like
+        collected ones, with `cleared_at` set to `now`.
+
+        Returns the requests expired.
+        """
+        with self._lock:
+            stale = [
+                replace(r, status=PickupRequest.EXPIRED, cleared_at=now)
+                for r in self._requests.values()
+                if r.status == PickupRequest.OPEN and now - r.created_at > max_age
+            ]
+            for r in stale:
+                self._requests[r.id] = r
+        return sorted(stale, key=lambda r: r.created_at)
 
     def _open_request(self, stop_id: str, rider_token: str) -> Optional[PickupRequest]:
         return next(
