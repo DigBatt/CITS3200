@@ -8,3 +8,5 @@ __pycache__/
 .env
 claude.md
 data/live/
+mobile/node_modules
+mobile/.env
