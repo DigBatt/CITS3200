@@ -238,13 +238,71 @@ poll so a bus doesn't skip a stop with a rider waiting.
 { "requests": [ { "...": "as in POST above" } ] }
 ```
 
-`status` only ever leaves `open` today — nothing yet marks a request
-`collected` or `expired` — but the field exists now so S10's audit trail does
-not require reshaping this data later.
+A request leaves `open` once: `collected` when the operator clears its
+stop, or `expired` when it has been open longer than
+`pickup_requests.expire_after_seconds` in `config/app.yaml`. Either way the
+record is kept with `cleared_at` set, so `?status=collected` and
+`?status=expired` are the admin's record of the day. Expiry is applied when
+requests are read or opened, not by a background job.
+
+The store is in memory, so a restart clears every request, open or closed.
+
+### `GET /api/routes/<id>/waiting`
+
+S09.2. The riders waiting along one route, for the operator view to poll
+(`/admin`, Operator view tab, every 10 s). `404` `unknown_route` if the route
+is not configured.
+
+The route's stops in service order, each with the number of `open` requests
+and the age of the oldest. Stops with nobody waiting have `waiting: 0` and
+nulls. Requests at stops not on the route are left out, and do not count
+toward `total_waiting`.
+
+```json
+{
+  "generated_at": "2025-09-04T09:00:00.000000Z",
+  "route": { "id": "campus-loop", "name": "Campus loop", "colour": "#d4741f", "loop": true },
+  "total_waiting": 2,
+  "stops": [
+    {
+      "id": "reid-library", "name": "Reid Library", "latitude": -31.979, "longitude": 115.818,
+      "waiting": 2,
+      "oldest_requested_at": "2025-09-04T08:53:12.000000Z",
+      "oldest_wait_seconds": 408.0
+    },
+    {
+      "id": "civ-mech", "name": "Outside Civil and Mechanical Engineering", "latitude": -31.981, "longitude": 115.817,
+      "waiting": 0, "oldest_requested_at": null, "oldest_wait_seconds": null
+    }
+  ]
+}
+```
+
+**Which route a vehicle is on (S09.1).** The operator picks their vehicle and
+route when the page loads. The choice lives in the page URL
+(`/admin?vehicle=1&route=campus-loop`) and the browser's local storage; the
+server holds no assignment. The vehicle's position comes from
+`GET /api/vehicles`: live when the logger is feeding it, otherwise the latest
+recorded position, labelled with its age.
+
+### `POST /api/stops/<id>/collect`
+
+The operator has picked up the riders at a stop. Every `open` request at
+the stop becomes `collected`, whichever route the rider was waiting for, since
+requests belong to a stop and not a route. No body. `404` `unknown_stop` if the
+stop is not configured.
+
+Returns the requests closed, empty if nobody was waiting:
+
+```json
+{ "collected": [ { "...": "as in POST /api/pickup-requests, with status collected and cleared_at set" } ] }
+```
+
+A rider who asks again at the same stop afterwards opens a new request.
 
 ---
 
 ## Not implemented yet
 
-Marking a pickup request `collected` or `expired`, and the rider-facing stop
-picker page (S08.4).
+The rider-facing stop picker page (S08.4). Pickup requests that survive a
+restart.

@@ -43,23 +43,37 @@
   <!-- ============ Main ============ -->
   <main class="admin-main">
 
-    <!-- ---- Operator view (S15): route selector populates once S06/S09 land ---- -->
+    <!-- ---- Operator view (S09): driven by js/operator.js ---- -->
     <div class="admin-panel" id="tab-operator">
       <h1 class="admin-section-title">Operator view</h1>
-      <p class="admin-section-sub">See what an operator sees on any route. Rider requests appear here as they come in.</p>
+      <p class="admin-section-sub">Pick the vehicle and the route it is running. Rider requests appear here as they come in.</p>
 
+      <!-- S09.1: the operator picks the vehicle and its route on load -->
       <div class="admin-card">
         <div class="route-select-row">
-          <span class="route-select-label">ROUTE</span>
-          <select class="form-select" id="route-selector" style="max-width:220px" disabled>
-            <option value="">— not yet available —</option>
+          <label class="route-select-label" for="vehicle-selector">VEHICLE</label>
+          <select class="form-select" id="vehicle-selector" style="max-width:220px" disabled>
+            <option value="">Loading vehicles…</option>
+          </select>
+          <label class="route-select-label" for="route-selector">ROUTE</label>
+          <select class="form-select" id="route-selector" style="max-width:260px" disabled>
+            <option value="">Loading routes…</option>
           </select>
         </div>
 
-        <div class="stub-notice">
-          <span class="stub-notice-dot"></span>
-          Operator view is available once stops and routes are configured (S06, S09). This selector will populate automatically.
+        <!-- S09.4: vehicle position, live or last recorded -->
+        <div class="operator-vehicle" id="operator-vehicle" hidden></div>
+      </div>
+
+      <!-- S09.3, S09.6: ordered stops with waiting counts, or the empty state -->
+      <div class="admin-card" id="operator-stops-card" hidden>
+        <div class="operator-stops-head">
+          <p class="admin-card-title" id="operator-route-title">STOPS</p>
+          <span class="operator-updated" id="operator-updated"></span>
         </div>
+        <div class="operator-empty" id="operator-empty" hidden>No riders waiting on this route.</div>
+        <div class="operator-error" id="operator-error" hidden></div>
+        <ol class="operator-stops" id="operator-stops"></ol>
       </div>
     </div>
 
@@ -177,5 +191,6 @@
 </div>
 
 <script src="js/admin.js"></script>
+<script src="js/operator.js"></script>
 </body>
 </html>

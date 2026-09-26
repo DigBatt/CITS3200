@@ -311,6 +311,138 @@
   white-space: nowrap;
 }
 
+/* Operator view (S09) */
+.route-select-row { flex-wrap: wrap; }
+
+.operator-vehicle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(28, 25, 23, 0.04);
+  font: 400 12.5px Sora, sans-serif;
+}
+
+.operator-vehicle[hidden] { display: none; }
+
+.operator-vehicle-name { font-weight: 600; }
+
+.operator-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font: 600 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  background: rgba(28, 25, 23, 0.08);
+  color: rgba(28, 25, 23, 0.6);
+}
+
+.operator-badge.is-live {
+  background: oklch(0.72 0.14 150 / 18%);
+  color: oklch(0.42 0.12 150);
+}
+
+.operator-vehicle-detail { color: rgba(28, 25, 23, 0.55); }
+
+.operator-stops-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.operator-updated {
+  font: 400 11px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+.operator-empty,
+.operator-error {
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  font: 500 12.5px Sora, sans-serif;
+}
+
+.operator-empty {
+  background: rgba(28, 25, 23, 0.04);
+  color: rgba(28, 25, 23, 0.6);
+}
+
+.operator-error {
+  background: oklch(0.75 0.1 25 / 10%);
+  border: 1px solid oklch(0.75 0.1 25 / 40%);
+  color: oklch(0.42 0.13 25);
+}
+
+.operator-stops {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.operator-stop {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(28, 25, 23, 0.07);
+}
+
+.operator-stop:last-child { border-bottom: none; }
+
+.operator-stop-index {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.4);
+  text-align: right;
+}
+
+.operator-stop-name { font: 600 13px Sora, sans-serif; }
+
+.operator-stop-here {
+  margin-left: 8px;
+  font: 600 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  color: #2f7d8f;
+}
+
+.operator-stop-count {
+  text-align: right;
+  font: 400 12px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.4);
+}
+
+.operator-stop.has-waiting .operator-stop-count { color: #1c1917; }
+
+.operator-stop-count strong { font: 700 16px Sora, sans-serif; }
+
+.operator-stop-age {
+  display: block;
+  font: 400 11px 'IBM Plex Mono', monospace;
+  color: oklch(0.5 0.14 60);
+}
+
+/* sized to hit reliably on a tablet in a moving vehicle (S12). */
+.operator-collect {
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  font: 600 12px Sora, sans-serif;
+  border: 1px solid #2f7d8f;
+  background: #2f7d8f;
+  color: #fff;
+}
+
+.operator-collect:hover { background: #276a79; }
+
+.operator-collect:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Stops list — used by S06 once stops are configured */
 .stops-list {
   display: flex;

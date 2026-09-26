@@ -43,6 +43,16 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
+The browser tests (`test_map_stops.py`, `test_operator_view.py`) use Google
+Chrome if it is installed. The operator view tests also accept the Chromium
+that Playwright downloads, the easy option under WSL or Linux:
+
+```bash
+playwright install --with-deps chromium   # once; asks for sudo on Linux
+```
+
+Without a browser those tests are skipped and the rest of the suite still runs.
+
 ## Layout
 
 ```
