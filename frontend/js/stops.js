@@ -24,6 +24,7 @@
       ? names.map((name) => `<li>${escapeHtml(name)}</li>`).join('')
       : '<li class="is-empty">Not on any route</li>';
     return `
+      <div class="stop-popup-id">${escapeHtml(stop.id)}</div>
       <div class="stop-popup-name">${escapeHtml(stop.name)}</div>
       <div class="stop-popup-label">ROUTES</div>
       <ul class="stop-popup-routes">${routeLine}</ul>`;

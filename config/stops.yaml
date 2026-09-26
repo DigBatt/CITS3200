@@ -2,7 +2,7 @@
 
 stops:
   - id: reid-library
-    name: Reid Library
+    name: Reid Library ground floor entrance
     latitude: -31.97901221771226
     longitude: 115.8183554056777
 
@@ -12,7 +12,7 @@ stops:
     longitude: 115.81720535774184
 
   - id: business-school   # this is the actual business school car park and not the location on the current gps track the buses follow.
-    name: Outside the Business School
+    name: Outside the Business School carpark
     latitude: -31.985583444723204
     longitude: 115.82089500479223
 
@@ -22,7 +22,7 @@ stops:
     longitude: 115.8187129
 
   - id: barry-marshall
-    name: Barry J Marshall Library
+    name: Barry J Marshall Library entrance
     latitude: -31.9830579
     longitude: 115.8187461
 
@@ -32,7 +32,7 @@ stops:
     longitude: 115.8171536
 
   - id: bilya-marlee
-    name: underwood parade outside Bilya Marlee
+    name: Underwood parade outside Bilya Marlee
     latitude: -31.9828347
     longitude: 115.8201390
   
@@ -57,7 +57,7 @@ routes:
     name: Campus loop
     colour: "#D4741F"
     loop: true
-    stops: [reid-library, ezone-central, civ-mech, guild-village, barry-marshall, sports-science, business-school, bilya-marlee]
+    stops: [reid-library, ezone-central, civ-mech, guild-village, barry-marshall, sports-science, business-school, bilya-marlee, marine-research]
 
   - id: eng-business-loop
     name: Engineering to Business School loop
