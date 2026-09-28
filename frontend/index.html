@@ -9,6 +9,7 @@
   <title>nUWAy Fleet Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/tokens.css">
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="css/base.css">
@@ -17,11 +18,12 @@
 <body>
   <div class="app-shell">
 
-    <!-- ============ Header: brand, view tabs, live clock ============ -->
+    <!-- ============ Header: brand, view tabs, live pill, admin link ============ -->
     <header class="app-header">
       <div class="app-header-brand">
-        <span class="app-header-brand-name">nuway</span>
-        <span class="app-header-brand-tag">SHUTTLE OPS</span>
+        <span class="app-header-brand-name">nUWAy</span>
+        <!-- CAMPUS SHUTTLE on the Rider view; set by js/panels.js -->
+        <span class="app-header-brand-tag" id="app-brand-tag">SHUTTLE OPS</span>
       </div>
       <nav class="app-tabs" id="app-tabs" aria-label="Dashboard view">
         <button type="button" class="app-tab is-active" data-view="fleet">Fleet</button>
@@ -30,32 +32,37 @@
         <button type="button" class="app-tab" data-view="utilisation">Utilisation</button>
       </nav>
       <div class="app-header-spacer"></div>
-      <!-- STUB: wire to a real liveness/heartbeat signal -->
-      <div class="app-live-indicator" data-stub="connection-status">
-        <span class="app-live-dot"></span>
-        <span>Live</span>
+      <!-- Reporting count and dot colour set by js/vehicles.js from /api/vehicles -->
+      <div class="app-live-indicator is-stale" id="app-live">
+        <span class="app-live-dot" aria-hidden="true"></span>
+        <span id="app-live-text">Live &middot; no vehicle data</span>
         <span class="app-live-clock" id="app-clock"></span>
       </div>
-      <!-- STUB: wire to signed-in operator -->
       <a href="/admin" class="admin-link">Admin</a>
-      <div class="app-avatar" data-stub="current-user">JD</div>
     </header>
 
-    <!-- ============ Date/time range control ============ -->
-    <div id="timeline-container"></div>
+    <!-- ============ Filter bar: time range, vehicle, route ============ -->
+    <div class="filter-bar-row">
+      <!-- Range menu, Start, End and Live, rendered by js/timeline.js -->
+      <div id="timeline-container"></div>
 
-    <!-- ============ Vehicle filter chips, rendered by js/vehicles.js ============ -->
-    <div class="filter-bar">
-      <span class="filter-bar-label">VEHICLE</span>
-      <div class="chip-row" id="vehicle-filter-chips">
-        <button type="button" class="chip is-active" data-vehicle="all">All vehicles</button>
-      </div>
-    </div>
+      <!-- Vehicle menu, options rendered by js/vehicles.js. The dot shows the
+           chosen vehicle's colour, as on the map. -->
+      <label class="timeline-group filter-bar">
+        <span class="timeline-group-label">VEHICLE</span>
+        <span class="filter-select-wrap">
+          <span class="filter-select-dot" id="vehicle-select-dot" hidden></span>
+          <select class="filter-select" id="vehicle-select">
+            <option value="all">All vehicles</option>
+          </select>
+        </span>
+      </label>
 
-    <!-- ============ Route filter chips, rendered by js/stops.js ============ -->
-    <div class="filter-bar" id="route-filter" hidden>
-      <span class="filter-bar-label">ROUTE</span>
-      <div class="chip-row" id="route-filter-chips"></div>
+      <!-- Route menu, options rendered by js/stops.js -->
+      <label class="timeline-group filter-bar" id="route-filter" hidden>
+        <span class="timeline-group-label">ROUTE</span>
+        <select class="filter-select filter-select-route" id="route-select"></select>
+      </label>
     </div>
 
     <main>
@@ -64,51 +71,66 @@
         <aside class="sidebar">
 
           <!-- ---- Fleet panel: rows from /api/vehicles, KPIs from /api/metrics ---- -->
-          <div class="panel" id="panel-fleet">
-            <div class="panel-header">
-              <span class="panel-title">Vehicles</span>
-              <span class="panel-subtitle" id="fleet-active-count">Loading&hellip;</span>
-            </div>
+          <div class="panel panel-cards" id="panel-fleet">
+            <!-- Vehicles card: header pill and rows rendered by js/vehicles.js -->
+            <section class="section-card" aria-labelledby="vehicles-card-title">
+              <div class="section-card-head">
+                <svg class="section-card-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="4" y="3" width="16" height="14" rx="3"></rect>
+                  <path d="M4 10h16M8 21v-4M16 21v-4"></path>
+                </svg>
+                <span class="section-card-title" id="vehicles-card-title">Vehicles</span>
+                <span class="section-card-pill" id="fleet-active-count">Loading&hellip;</span>
+              </div>
+              <div class="vehicle-list section-card-body" id="vehicle-list"></div>
+            </section>
 
-            <div class="vehicle-list" id="vehicle-list"></div>
-
-            <!-- STUB: the toggles are visual only, apart from Stops, which
-                 js/stops.js wires to the map's stop layer. -->
-            <div class="layer-toggles" data-stub="map-layer-toggles">
-              <span class="layer-toggles-label">MAP LAYERS</span>
-              <label class="layer-toggle-row">
-                <span>Live positions</span>
-                <span class="toggle-switch">
-                  <input type="checkbox" checked>
-                  <span class="toggle-track"></span>
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
-              <label class="layer-toggle-row">
-                <span>Engage / disengage</span>
-                <span class="toggle-switch">
-                  <input type="checkbox" checked>
-                  <span class="toggle-track"></span>
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
-              <label class="layer-toggle-row">
-                <span>Stops</span>
-                <span class="toggle-switch">
-                  <input type="checkbox" id="layer-toggle-stops" checked>
-                  <span class="toggle-track"></span>
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
-              <label class="layer-toggle-row">
-                <span>Today's trail</span>
-                <span class="toggle-switch">
-                  <input type="checkbox">
-                  <span class="toggle-track"></span>
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
-            </div>
+            <!-- Map layers card. STUB: Vehicle positions and Today's trail are
+                 visual only; Stops is wired to the map by js/stops.js. -->
+            <section class="section-card layer-toggles" aria-labelledby="layers-card-title" data-stub="map-layer-toggles">
+              <div class="section-card-head">
+                <svg class="section-card-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3l9 5-9 5-9-5 9-5z"></path>
+                  <path d="M3 13l9 5 9-5"></path>
+                </svg>
+                <span class="section-card-title" id="layers-card-title">Map layers</span>
+              </div>
+              <div class="section-card-body">
+                <label class="layer-toggle-row">
+                  <span>Vehicle positions</span>
+                  <span class="toggle-switch">
+                    <input type="checkbox" checked>
+                    <span class="toggle-track"></span>
+                    <span class="toggle-knob"></span>
+                  </span>
+                </label>
+                <!-- Hidden until vehicle events exist (DESIGN-FINAL.md s3). -->
+                <label class="layer-toggle-row" hidden>
+                  <span>Engage / disengage</span>
+                  <span class="toggle-switch">
+                    <input type="checkbox" checked>
+                    <span class="toggle-track"></span>
+                    <span class="toggle-knob"></span>
+                  </span>
+                </label>
+                <label class="layer-toggle-row">
+                  <span>Stops</span>
+                  <span class="toggle-switch">
+                    <input type="checkbox" id="layer-toggle-stops" checked>
+                    <span class="toggle-track"></span>
+                    <span class="toggle-knob"></span>
+                  </span>
+                </label>
+                <label class="layer-toggle-row">
+                  <span>Today's trail</span>
+                  <span class="toggle-switch">
+                    <input type="checkbox">
+                    <span class="toggle-track"></span>
+                    <span class="toggle-knob"></span>
+                  </span>
+                </label>
+              </div>
+            </section>
 
             <div class="kpi-mini-grid" id="fleet-kpis"></div>
           </div>
@@ -175,7 +197,7 @@
             <button type="button" class="util-tab is-active" data-util-mode="pie">Pie</button>
             <button type="button" class="util-tab" data-util-mode="tum">Time model</button>
           </div>
-          <span class="util-toolbar-note">GMG 2020 categories the telemetry supports &middot; use the vehicle chips above to scope</span>
+          <span class="util-toolbar-note">GMG 2020 categories the telemetry supports &middot; use the vehicle menu above to scope</span>
         </div>
 
         <div class="util-kpi-grid" id="util-kpis"></div>

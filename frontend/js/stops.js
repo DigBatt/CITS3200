@@ -62,18 +62,20 @@
 
   function render() {
     const bar = document.getElementById('route-filter');
-    const row = document.getElementById('route-filter-chips');
-    if (!bar || !row) return;
+    const menu = document.getElementById('route-select');
+    if (!bar || !menu) return;
 
     // With one route the choice is still highlight it or not; with none there
     // is nothing to choose from.
     bar.hidden = routes.length === 0;
 
-    const chip = (id, label, isActive) =>
-      `<button type="button" class="chip${isActive ? ' is-active' : ''}" data-route="${escapeHtml(id)}">${escapeHtml(label)}</button>`;
-    row.innerHTML = [
-      chip('all', 'All routes', selected === null),
-      ...routes.map((route) => chip(route.id, route.name, route.id === selected)),
+    // A menu rather than chips: route names are long, and a chip each pushed
+    // the filter bar onto a second line.
+    const option = (id, label, isSelected) =>
+      `<option value="${escapeHtml(id)}"${isSelected ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+    menu.innerHTML = [
+      option('all', 'All routes', selected === null),
+      ...routes.map((route) => option(route.id, route.name, route.id === selected)),
     ].join('');
   }
 
@@ -84,17 +86,16 @@
     toggle.addEventListener('change', () => setStopsVisible(toggle.checked));
   }
 
-  function wireChips() {
-    document.getElementById('route-filter-chips')?.addEventListener('click', (event) => {
-      const chip = event.target.closest('.chip');
-      if (chip) select(chip.dataset.route === 'all' ? null : chip.dataset.route);
+  function wireMenu() {
+    document.getElementById('route-select')?.addEventListener('change', (event) => {
+      select(event.target.value === 'all' ? null : event.target.value);
     });
   }
 
   async function init(options = {}) {
     onChange = options.onChange ?? null;
     wireToggle();
-    wireChips();
+    wireMenu();
 
     try {
       const [stopsBody, routesBody] = await Promise.all([getStops(), getRoutes()]);

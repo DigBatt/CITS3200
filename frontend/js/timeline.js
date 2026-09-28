@@ -1,15 +1,16 @@
-// Timeline period control.
+// Timeline period control, on one line in the filter bar.
 //
-// A start/end date+time picker, plus a "Live" toggle that pins the end of
-// the range to now and keeps refetching, producing the from/to parameters
-// in docs/api.md.
+// A Range menu of suggested timeframes (Last hour, Today, ...), a start/end
+// date+time picker, and a "Live" toggle that pins the end of the range to
+// now and keeps refetching, producing the from/to parameters in docs/api.md.
 //
-// While Live is on, the End row is hidden rather than just disabled, and a
-// plain-language summary line states the resolved range -- both came out
-// of testing feedback that a greyed-out End field still showing a stale
-// date looked broken even when it was correctly being ignored.
+// While Live is on, the End inputs are hidden rather than just disabled,
+// with "Now" in their place -- testing feedback was that a greyed-out End
+// field still showing a stale date looked broken even when it was
+// correctly being ignored.
 //
-// Defaults to today, live, when the page loads, per S06's third criterion.
+// Defaults to today from midnight, live, when the page loads, per S06's
+// third criterion.
 // Dates and times are chosen and displayed in Perth time; the API wants
 // UTC instants, so everything is converted here before onChange fires.
 // Perth is UTC+8 year round (docs/data-schema.md s4) -- WA has no DST --
@@ -20,14 +21,6 @@ const PERTH_TZ = 'Australia/Perth';
 const PERTH_UTC_OFFSET_HOURS = 8; // WA does not observe DST.
 const DEFAULT_LIVE_POLL_MS = 15000; // matches config/app.yaml refresh_interval_seconds
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-// TEMPORARY dev convenience: defaults Start to the sample
-// data's actual window instead of today, so tracks render immediately on
-// load without needing to touch the picker first. Only the sample CSVs
-// exist right now (no live telemetry yet) -- remove this once real
-// position data is flowing in, reverting Start's default to today.
-const DEV_DEFAULT_START_DATE = '2025-09-04';
-const DEV_DEFAULT_START_TIME = '08:00';
 
 /**
  * The current calendar date in Perth local time, as "YYYY-MM-DD".
@@ -97,9 +90,51 @@ function formatDisplay(dateStr, timeStr) {
   return `${day} ${MONTH_ABBR[month - 1]} ${year}, ${hour12}:${String(minute).padStart(2, '0')} ${period}`;
 }
 
+// Suggested timeframes in the Range menu. Each resolves to a Perth-local
+// range at the moment it is chosen, so "Today" always means the day it was
+// picked. Editing a date or time by hand switches the menu to Custom.
+const PRESETS = [
+  { id: 'last-hour', label: 'Last hour' },
+  { id: 'today', label: 'Today' },
+  { id: 'yesterday', label: 'Yesterday' },
+  { id: 'last-7-days', label: 'Last 7 days' },
+  { id: 'last-30-days', label: 'Last 30 days' },
+  { id: 'custom', label: 'Custom' },
+];
+
+/** "YYYY-MM-DD" moved by a whole number of days. */
+function addDays(dateStr, days) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
 /**
- * Mount a start/end date-time range picker into `container`, with a "Live"
- * toggle for the end of the range.
+ * The range a preset stands for, as the five values the control keeps:
+ * start date/time, end date/time (Perth), and whether the end is "now".
+ */
+function presetRange(id, now = new Date()) {
+  const today = getPerthDateString(now);
+  const time = getPerthTimeString(now);
+  switch (id) {
+    case 'last-hour': {
+      const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+      return { startDate: getPerthDateString(hourAgo), startTime: getPerthTimeString(hourAgo), endDate: today, endTime: time, live: true };
+    }
+    case 'yesterday':
+      return { startDate: addDays(today, -1), startTime: '00:00', endDate: today, endTime: '00:00', live: false };
+    case 'last-7-days':
+      return { startDate: addDays(today, -6), startTime: '00:00', endDate: today, endTime: time, live: true };
+    case 'last-30-days':
+      return { startDate: addDays(today, -29), startTime: '00:00', endDate: today, endTime: time, live: true };
+    default: // 'today'
+      return { startDate: today, startTime: '00:00', endDate: today, endTime: time, live: true };
+  }
+}
+
+/**
+ * Mount the time range controls into `container`, on one line: a Range menu
+ * of suggested timeframes, Start and End date+time inputs, and a Live switch
+ * that pins the end to now.
  *
  * @param {HTMLElement} container
  * @param {Object} [options]
@@ -119,42 +154,54 @@ function formatDisplay(dateStr, timeStr) {
  */
 function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_POLL_MS } = {}) {
   const todayStr = getPerthDateString();
-  const nowStr = getPerthTimeString();
+  // Default: today from midnight to now, live (DESIGN-FINAL.md s2).
+  const initial = presetRange('today');
+
+  const presetOptions = PRESETS.map((preset) =>
+    `<option value="${preset.id}"${preset.id === 'today' ? ' selected' : ''}>${preset.label}</option>`).join('');
 
   container.innerHTML = `
     <div class="timeline-control">
-      <div class="timeline-row">
-        <span class="timeline-row-label">Start</span>
-        <input type="date" id="timeline-start-date" value="${DEV_DEFAULT_START_DATE}" max="${todayStr}" autocomplete="off">
-        <input type="time" id="timeline-start-time" value="${DEV_DEFAULT_START_TIME}" autocomplete="off">
+      <label class="timeline-group">
+        <span class="timeline-group-label">RANGE</span>
+        <select class="timeline-preset" id="timeline-preset">${presetOptions}</select>
+      </label>
+      <div class="timeline-group">
+        <span class="timeline-group-label" id="timeline-start-label">START</span>
+        <div class="timeline-row">
+          <input type="date" id="timeline-start-date" value="${initial.startDate}" max="${todayStr}" autocomplete="off" aria-labelledby="timeline-start-label">
+          <input type="time" id="timeline-start-time" value="${initial.startTime}" autocomplete="off" aria-labelledby="timeline-start-label">
+        </div>
       </div>
-      <div class="timeline-row" id="timeline-end-row">
-        <span class="timeline-row-label">End</span>
-        <input type="date" id="timeline-end-date" value="${todayStr}" max="${todayStr}" autocomplete="off">
-        <input type="time" id="timeline-end-time" value="${nowStr}" autocomplete="off">
+      <div class="timeline-group">
+        <span class="timeline-group-label" id="timeline-end-label">END</span>
+        <div class="timeline-row" id="timeline-end-row">
+          <input type="date" id="timeline-end-date" value="${initial.endDate}" max="${todayStr}" autocomplete="off" aria-labelledby="timeline-end-label">
+          <input type="time" id="timeline-end-time" value="${initial.endTime}" autocomplete="off" aria-labelledby="timeline-end-label">
+        </div>
+        <!-- Stands in for the End inputs while Live is on. -->
+        <span class="timeline-now" id="timeline-now"><span class="timeline-live-dot" aria-hidden="true"></span>Now</span>
       </div>
-      <div class="timeline-live">
-        <label class="timeline-switch" for="timeline-live">
+      <label class="timeline-live" for="timeline-live">
+        <span class="toggle-switch">
           <input type="checkbox" id="timeline-live" checked aria-labelledby="timeline-live-label">
-          <span class="timeline-switch-track"></span>
-          <span class="timeline-switch-knob"></span>
-        </label>
-        <span id="timeline-live-label">Live (end = now)</span>
-        <span class="timeline-live-dot" aria-hidden="true"></span>
-      </div>
-      <p class="timeline-summary">Showing <strong id="timeline-summary-text"></strong></p>
+          <span class="toggle-track"></span>
+          <span class="toggle-knob"></span>
+        </span>
+        <span id="timeline-live-label">Live</span>
+      </label>
       <p class="timeline-status" aria-live="polite"></p>
     </div>
   `;
 
+  const preset = container.querySelector('#timeline-preset');
   const startDate = container.querySelector('#timeline-start-date');
   const startTime = container.querySelector('#timeline-start-time');
   const endDate = container.querySelector('#timeline-end-date');
   const endTime = container.querySelector('#timeline-end-time');
   const endRow = container.querySelector('#timeline-end-row');
+  const nowLabel = container.querySelector('#timeline-now');
   const liveToggle = container.querySelector('#timeline-live');
-  const liveDot = container.querySelector('.timeline-live-dot');
-  const summaryText = container.querySelector('#timeline-summary-text');
   const status = container.querySelector('.timeline-status');
 
   let pollHandle = null;
@@ -170,20 +217,8 @@ function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_
     return { from, to, live: liveToggle.checked };
   }
 
-  function updateSummary() {
-    const startDisplay = formatDisplay(startDate.value, startTime.value);
-    // Real current date/time, not the word "now" -- refreshes on every
-    // poll tick while Live is on, so the summary visibly advances rather
-    // than sitting static.
-    const endDisplay = liveToggle.checked
-      ? formatDisplay(getPerthDateString(), getPerthTimeString())
-      : formatDisplay(endDate.value, endTime.value);
-    summaryText.textContent = `${startDisplay} \u2192 ${endDisplay}`;
-  }
-
   function emit() {
     status.textContent = '';
-    updateSummary();
     onChange?.(currentRange());
   }
 
@@ -198,29 +233,49 @@ function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_
     const isLive = liveToggle.checked;
     // Hidden, not just disabled -- a greyed-out End field still showing a
     // stale date reads as broken even when it's correctly being ignored
-    // (see the timeline-picker-redesign discussion).
+    // (see the timeline-picker-redesign discussion). "Now" stands in for it.
     endRow.hidden = isLive;
     endDate.disabled = isLive;
     endTime.disabled = isLive;
-    liveDot.hidden = !isLive;
+    nowLabel.hidden = !isLive;
     stopPolling();
     if (isLive) {
       pollHandle = setInterval(emit, livePollMs);
     }
   }
 
+  function applyPreset(id) {
+    const range = presetRange(id);
+    startDate.value = range.startDate;
+    startTime.value = range.startTime;
+    endDate.value = range.endDate;
+    endTime.value = range.endTime;
+    liveToggle.checked = range.live;
+    preset.value = id;
+    syncLiveState();
+    emit();
+  }
+
+  // A hand edit no longer matches a suggested timeframe.
+  function edited() {
+    preset.value = 'custom';
+    emit();
+  }
+
   function guardFutureDate(input) {
-    if (input.value > todayStr) {
-      input.value = todayStr;
+    if (input.value > getPerthDateString()) {
+      input.value = getPerthDateString();
       status.textContent = 'Future dates are not available yet.';
     }
   }
 
-  startDate.addEventListener('change', () => { guardFutureDate(startDate); emit(); });
-  startTime.addEventListener('change', emit);
-  endDate.addEventListener('change', () => { guardFutureDate(endDate); emit(); });
-  endTime.addEventListener('change', emit);
-  liveToggle.addEventListener('change', () => { syncLiveState(); emit(); });
+  // Choosing Custom changes nothing by itself; the inputs are there to edit.
+  preset.addEventListener('change', () => { if (preset.value !== 'custom') applyPreset(preset.value); });
+  startDate.addEventListener('change', () => { guardFutureDate(startDate); edited(); });
+  startTime.addEventListener('change', edited);
+  endDate.addEventListener('change', () => { guardFutureDate(endDate); edited(); });
+  endTime.addEventListener('change', edited);
+  liveToggle.addEventListener('change', () => { syncLiveState(); edited(); });
 
   syncLiveState();
   // Fire once immediately so the caller is told about the default (today,
@@ -230,15 +285,7 @@ function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_
 
   return {
     getRange: currentRange,
-    reset: () => {
-      startDate.value = DEV_DEFAULT_START_DATE;
-      startTime.value = DEV_DEFAULT_START_TIME;
-      endDate.value = todayStr;
-      endTime.value = getPerthTimeString();
-      liveToggle.checked = true;
-      syncLiveState();
-      emit();
-    },
+    reset: () => applyPreset('today'),
     // Called by main.js when a fetch for the selected range comes back
     // empty, so "no data" is stated rather than an unexplained blank map
     // (S06 AC2, docs/api.md).

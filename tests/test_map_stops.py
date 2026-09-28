@@ -98,7 +98,7 @@ def labels(page, selector=".stop-label"):
 
 
 def select_route(page, label):
-    page.get_by_role("button", name=label, exact=True).click()
+    page.select_option("#route-select", label=label)
 
 
 # ---- S07.1 markers ----
@@ -143,7 +143,7 @@ def test_toggle_hides_and_restores_the_stops(page):
 
 
 def test_route_selector_lists_every_route(page):
-    assert labels(page, "#route-filter-chips .chip") == ["All routes", "North Route", "South Route"]
+    assert labels(page, "#route-select option") == ["All routes", "North Route", "South Route"]
 
 
 def test_no_route_selected_draws_every_stop_the_same(page):
@@ -179,7 +179,7 @@ def test_selection_survives_a_reload(page, server):
     select_route(page, "South Route")
     page.reload()
     page.wait_for_selector(".stop-label")
-    assert page.locator("#route-filter-chips .chip.is-active").text_content() == "South Route"
+    assert page.locator("#route-select option:checked").text_content() == "South Route"
 
 
 # ---- S07.3 popup ----

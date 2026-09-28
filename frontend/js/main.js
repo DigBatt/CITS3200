@@ -5,9 +5,12 @@
 
 const statusLine = document.getElementById('status');
 
-function setStatus(message) {
+// The banner at the top of the map. `isError` styles it as a problem to fix
+// rather than a passing note like "Loading positions...".
+function setStatus(message, { isError = false } = {}) {
   statusLine.textContent = message ?? '';
   statusLine.hidden = !message;
+  statusLine.classList.toggle('is-error', Boolean(message) && isError);
 }
 
 let timelineControl = null;
@@ -17,9 +20,19 @@ let latestLoad = 0;
 // `to` is always null), so they redraw without moving the map.
 let lastFitted = null;
 
-// Turns a raw API error message into wording that matches the picker's own
-// Start/End labels, rather than the API's internal from/to param names.
-function humanizeError(message) {
+// Turns a failed request into wording for people rather than the raw error.
+// fetch rejects with a TypeError ("Failed to fetch" in Chrome) only when the
+// server could not be reached at all; the API's own errors are plain Errors.
+// Range errors are reworded to match the picker's Start/End labels, rather
+// than the API's internal from/to param names.
+function humanizeError(error) {
+  if (error instanceof TypeError) {
+    // While live, the next poll tries again on its own.
+    return currentRange?.live
+      ? "Couldn't reach the server — retrying"
+      : "Couldn't reach the server. Check it's running, then try again.";
+  }
+  const message = error?.message ?? String(error);
   if (message.includes("must not be after")) {
     return "'Start time' must be before 'End time'.";
   }
@@ -59,13 +72,13 @@ async function load() {
     // A failed request means there's no valid current selection -- the map
     // shouldn't keep showing whatever trail was drawn before this attempt.
     drawTracks([]);
-    setStatus(humanizeError(positions.reason.message));
+    setStatus(humanizeError(positions.reason), { isError: true });
   }
 
   if (metrics.status === 'fulfilled') {
     Utilisation.render(metrics.value);
   } else {
-    Utilisation.showError(humanizeError(metrics.reason.message));
+    Utilisation.showError(humanizeError(metrics.reason));
   }
 }
 

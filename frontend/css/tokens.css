@@ -1,0 +1,62 @@
+/*
+  nUWAy dashboard – final design tokens.
+  UWA blue #003087 measured from uwa.edu.au header (rgb(0, 48, 135)).
+  Import before dashboard.css / admin.css and replace hard-coded colours with these.
+*/
+:root {
+  /* Brand */
+  --uwa-blue: #003087;
+  --uwa-gold: #E0B321;         /* decorative / on-blue only; not for text on white */
+
+  /* Surfaces (neutral off-whites, lightest on top). UWA blue is reserved for the header and interactive elements. */
+  --surface-page: #F2F3F5;     /* page background behind everything */
+  --surface-panel: #FAFAFB;    /* filter bar, sidebar, legend */
+  --surface-card: #FFFFFF;     /* vehicle cards, chips, date pill */
+  --surface-card-muted: #F6F7F9; /* inactive/offline vehicle card */
+  --surface-tint: #EEEFF2;     /* KPI tiles, neutral badges */
+  --border: #E4E6EA;
+
+  /* Text – only these three */
+  --text: #141B2D;
+  --text-2: #4A5366;
+  --text-3: #667085;           /* smallest labels; ≥4.5:1 on panel */
+
+  /* Interactive: UWA blue means "you can click this / it is selected" */
+  --accent: var(--uwa-blue);
+  --accent-ink: #FFFFFF;
+
+  /* Header (on UWA blue) */
+  --header-bg: var(--uwa-blue);
+  --header-ink: #FFFFFF;
+  --header-ink-2: #DCE4F2;     /* inactive tabs, clock */
+  --header-tray: rgba(255, 255, 255, 0.12); /* segmented tab tray, live pill */
+
+  /* Status */
+  --live: #2FA66A;
+  --live-ink: #1F8A55;        /* 'LIVE' / 'Now' text on white */
+  --stale: #E0A526;           /* live pill dot when no vehicle is reporting */
+
+  /* Section card header strip */
+  --section-head: #F4F5F7;
+  --range-selected: #E3EAF6;  /* calendar in-range days, active preset */
+
+  /* Vehicles – the only other saturated colours on screen (keep in sync with config/vehicles.yaml) */
+  --vehicle-1: #D4741F;
+  --vehicle-2: #2F7D8F;
+  --vehicle-3: #7A5EA8;
+  --vehicle-4: #4F8A3C;
+
+  /* Map: use a muted basemap, e.g. CARTO Positron:
+     https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png
+     attribution: © OpenStreetMap contributors © CARTO */
+
+  /* Type */
+  --font-ui: "Sora", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Shape */
+  --radius-pill: 999px;
+  --radius-card: 10px;
+  --radius-tab: 8px;
+  --radius-tray: 12px;
+}

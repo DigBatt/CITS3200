@@ -1,6 +1,6 @@
 // The vehicle filter.
 //
-// Renders the list from /api/vehicles: the filter chips, the fleet panel rows
+// Renders the list from /api/vehicles: the Vehicle menu, the fleet panel rows
 // and the map legend.
 //
 // Also owns the liveness presentation: a vehicle the server reports as
@@ -9,8 +9,8 @@
 //
 // Clearing the filter restores the whole fleet.
 //
-// The selection is one vehicle or the whole fleet. A chip or a fleet row
-// selects that vehicle; "All vehicles", or the selected row again, clears it.
+// The selection is one vehicle or the whole fleet. The Vehicle menu or a fleet
+// row selects that vehicle; "All vehicles", or the selected row again, clears it.
 
 (function () {
   let fleet = [];
@@ -52,55 +52,71 @@
   }
 
   function note(vehicle) {
-    if (vehicle.last_seen === null) return 'No telemetry received';
+    if (vehicle.last_seen === null) return 'No telemetry yet';
     if (vehicle.status === 'active') return `Last packet ${formatAge(vehicle.seconds_since_last_seen)} ago`;
     return `Last seen ${formatInstant(vehicle.last_seen)}`;
   }
 
-  // Only an active vehicle's readings are current enough to show.
+  // Only an active vehicle's readings are current enough to show. They go in
+  // the row's tooltip, since the row itself is one line; readings the vehicle
+  // did not send are left out rather than shown as placeholders.
   function stats(vehicle) {
     const position = vehicle.status === 'active' ? vehicle.last_position : null;
-    if (!position) return ['—', '—', '—'];
+    if (!position) return [];
     return [
-      position.speed_mps === null ? '— km/h' : `${(position.speed_mps * 3.6).toFixed(1)} km/h`,
-      position.battery_percent === null ? '— %' : `${Math.round(position.battery_percent)}%`,
-      position.gps_status === null ? 'GPS —' : position.gps_status < 0 ? 'No fix' : 'GPS fix',
-    ];
+      position.speed_mps === null ? null : `${(position.speed_mps * 3.6).toFixed(1)} km/h`,
+      position.battery_percent === null ? null : `Battery ${Math.round(position.battery_percent)}%`,
+      position.gps_status === null ? null : position.gps_status < 0 ? 'No GPS fix' : 'GPS fix',
+    ].filter(Boolean);
   }
 
+  // One line: colour dot, name, status badge, then when it last reported.
   function rowHtml(vehicle) {
     const active = vehicle.status === 'active';
     const classes = ['vehicle-row', active ? '' : 'is-offline', vehicle.id === selected ? 'is-selected' : '']
       .filter(Boolean)
       .join(' ');
+    const readings = stats(vehicle);
     return `
-      <div class="${classes}" data-vehicle-row="${escapeHtml(vehicle.id)}">
-        <div class="vehicle-row-main">
-          <div class="vehicle-row-top">
-            <span class="vehicle-id">${escapeHtml(nameOf(vehicle.id))}</span>
-            <span class="vehicle-badge ${active ? 'badge-active' : 'badge-inactive'}">${active ? 'ACTIVE' : 'INACTIVE'}</span>
-          </div>
-          <div class="vehicle-note">${escapeHtml(note(vehicle))}</div>
-          <div class="vehicle-stats">
-            ${stats(vehicle).map((value) => `<span>${escapeHtml(value)}</span>`).join('')}
-          </div>
-        </div>
-        <div class="vehicle-chip-num" style="box-shadow: inset 0 -3px 0 ${escapeHtml(vehicle.colour ?? 'transparent')}">${escapeHtml(vehicle.id.padStart(2, '0'))}</div>
+      <div class="${classes}" data-vehicle-row="${escapeHtml(vehicle.id)}"${readings.length ? ` title="${escapeHtml(readings.join(' · '))}"` : ''}>
+        <span class="vehicle-dot" style="background: ${escapeHtml(vehicle.colour ?? 'var(--text-3)')}"></span>
+        <span class="vehicle-id">${escapeHtml(nameOf(vehicle.id))}</span>
+        <span class="vehicle-badge ${active ? 'badge-active' : 'badge-inactive'}">${active ? 'ACTIVE' : 'INACTIVE'}</span>
+        <span class="vehicle-note">${escapeHtml(note(vehicle))}</span>
       </div>`;
   }
 
   function render() {
     const active = fleet.filter((vehicle) => vehicle.status === 'active').length;
     document.getElementById('fleet-active-count').textContent = refreshError
-      ? 'Vehicles unavailable'
-      : `${active} of ${fleet.length} active`;
+      ? 'Unavailable'
+      : `${active} / ${fleet.length} reporting`;
 
-    const chip = (id, label, isActive) =>
-      `<button type="button" class="chip${isActive ? ' is-active' : ''}" data-vehicle="${escapeHtml(id)}">${escapeHtml(label)}</button>`;
-    document.getElementById('vehicle-filter-chips').innerHTML = [
-      chip('all', 'All vehicles', selected === null),
-      ...fleet.map((vehicle) => chip(vehicle.id, nameOf(vehicle.id), vehicle.id === selected)),
+    // Header pill: green while at least one vehicle is reporting, amber
+    // otherwise, so "Live" never looks healthy with nothing coming in.
+    const reporting = !refreshError && active > 0;
+    document.getElementById('app-live').classList.toggle('is-stale', !reporting);
+    document.getElementById('app-live-text').textContent = reporting
+      ? `Live · ${active} of ${fleet.length} reporting`
+      : 'Live · no vehicle data';
+
+    // Render runs on every live poll; rebuilding the options each time would
+    // close the menu under the user, so they are replaced only when they change.
+    const menu = document.getElementById('vehicle-select');
+    const options = [
+      '<option value="all">All vehicles</option>',
+      ...fleet.map((vehicle) => `<option value="${escapeHtml(vehicle.id)}">${escapeHtml(nameOf(vehicle.id))}</option>`),
     ].join('');
+    if (menu.dataset.options !== options) {
+      menu.innerHTML = options;
+      menu.dataset.options = options;
+    }
+    menu.value = selected ?? 'all';
+
+    const dot = document.getElementById('vehicle-select-dot');
+    const colour = fleet.find((vehicle) => vehicle.id === selected)?.colour;
+    dot.hidden = !colour;
+    dot.style.background = colour ?? '';
 
     document.getElementById('vehicle-list').innerHTML = fleet.length
       ? fleet.map(rowHtml).join('')
@@ -119,9 +135,8 @@
   function init(options = {}) {
     onChange = options.onChange ?? null;
 
-    document.getElementById('vehicle-filter-chips').addEventListener('click', (event) => {
-      const chip = event.target.closest('.chip');
-      if (chip) select(chip.dataset.vehicle === 'all' ? null : chip.dataset.vehicle);
+    document.getElementById('vehicle-select').addEventListener('change', (event) => {
+      select(event.target.value === 'all' ? null : event.target.value);
     });
 
     document.getElementById('vehicle-list').addEventListener('click', (event) => {

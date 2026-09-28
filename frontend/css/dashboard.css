@@ -21,117 +21,153 @@ main {
   inset: 0;
 }
 
+/* Banner across the top of the map: a passing note ("Loading positions..."),
+   or with .is-error a problem the user should know about. */
 .map-status {
   position: absolute;
-  top: 1rem;
+  top: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000; /* above Leaflet's panes */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 120px); /* clear of the zoom buttons */
   margin: 0;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: 0 4px 14px rgba(20, 27, 45, 0.12);
+  font: 500 13px var(--font-ui);
+  color: var(--text);
 }
+
+.map-status[hidden] {
+  display: none;
+}
+
+.map-status.is-error {
+  border-color: color-mix(in srgb, var(--stale) 55%, var(--border));
+  background: color-mix(in srgb, var(--stale) 12%, var(--surface-card));
+}
+
+.map-status.is-error::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--stale);
+}
+
+/* ---- Time range: Range menu, Start, End, Live on one line (js/timeline.js) ---- */
 
 .timeline-control {
   display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+/* A tiny mono caption over its controls. */
+.timeline-group {
+  display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.95);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  gap: 4px;
+}
+
+.timeline-group-label {
+  font: 500 9.5px var(--font-mono);
+  letter-spacing: 0.08em;
+  color: var(--text-3);
 }
 
 .timeline-row {
-  flex-wrap: wrap;
+  display: flex;
+  gap: 6px;
 }
 
 .timeline-row[hidden] {
   display: none;
 }
 
-.timeline-row-label {
-  width: 2.5rem;
-  flex-shrink: 0;
-  font-size: 0.875rem;
-  color: rgba(0, 0, 0, 0.6);
+/* The Range menu, the date/time inputs, and the Vehicle and Route menus in
+   the filter bar all share this look. */
+.timeline-preset,
+.filter-select,
+.timeline-row input {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-tab);
+  background: var(--surface-card);
+  font: 400 13.5px var(--font-ui);
+  color: var(--text);
 }
 
-.timeline-row input[type='date'] {
-  width: 160px;
-  flex: 0 0 auto;
+.timeline-preset,
+.filter-select {
+  min-width: 140px;
+  padding-right: 30px;
+  appearance: none;
+  cursor: pointer;
+  /* Chevron in --text-2 (#4A5366). */
+  background: var(--surface-card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234A5366' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;
+}
+
+.timeline-preset:hover,
+.filter-select:hover,
+.timeline-row input:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+.filter-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.timeline-preset:focus-visible,
+.timeline-row input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Stands in for the End inputs while Live is on. */
+.timeline-now {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-tab);
+  background: var(--surface-card);
+  font: 600 13.5px var(--font-ui);
+  color: var(--live-ink);
+}
+
+.timeline-now[hidden] {
+  display: none;
 }
 
 .timeline-live {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-}
-
-.timeline-switch {
-  position: relative;
-  display: inline-block;
-  width: 2.25rem;
-  height: 1.25rem;
-  flex-shrink: 0;
-}
-
-.timeline-switch input {
-  position: absolute;
-  inset: 0;
-  margin: 0;
-  opacity: 0;
+  gap: 8px;
+  height: 36px;
   cursor: pointer;
-}
-
-.timeline-switch-track {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.25);
-  transition: background 0.15s ease;
-}
-
-.timeline-switch-knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  transition: left 0.15s ease;
-}
-
-/* Colour matches nUWAy 2's vehicle marker (config/vehicles.yaml), reused
-   here as the app's one accent colour rather than introducing a new one. */
-.timeline-switch input:checked + .timeline-switch-track {
-  background: #2f7d8f;
-}
-
-.timeline-switch input:checked ~ .timeline-switch-knob {
-  left: 1.125rem;
-}
-
-.timeline-switch input:focus-visible + .timeline-switch-track {
-  outline: 2px solid #2f7d8f;
-  outline-offset: 2px;
+  font: 500 13.5px var(--font-ui);
+  color: var(--text);
 }
 
 .timeline-live-dot {
-  display: inline-block;
   position: relative;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #c0392b; /* broadcast red -- distinct from any vehicle colour */
-}
-
-.timeline-live-dot[hidden] {
-  display: none;
+  flex: none;
+  background: var(--live);
 }
 
 .timeline-live-dot::after {
@@ -139,7 +175,7 @@ main {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: #c0392b;
+  background: var(--live);
   animation: timeline-pulse-ring 1.6s ease-out infinite;
 }
 
@@ -154,17 +190,25 @@ main {
   }
 }
 
-.timeline-summary {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: rgba(0, 0, 0, 0.6);
+@media (prefers-reduced-motion: reduce) {
+  .timeline-live-dot::after {
+    animation: none;
+  }
 }
 
+/* "No data for this period." The map banner already says so on screen, so
+   this is kept for screen readers only (it is an aria-live region) rather
+   than crowding the filter bar. */
 .timeline-status {
-  margin: 0;
-  min-height: 1rem;
-  font-size: 0.8125rem;
-  color: #a35b00;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /*
@@ -181,62 +225,76 @@ empty until the API has events and stops. Layout only -- does not touch any
   flex-direction: column;
   height: 100%;
   font-family: Sora, system-ui, sans-serif;
-  background: #faf9f7;
-  color: #1c1917;
+  background: var(--surface-page);
+  color: var(--text);
 }
 
-/* ---- Header: brand, view tabs, live clock, avatar ---- */
+/* ---- Header: brand, view tabs, live pill, admin link ---- */
 
 .app-header {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 22px;
   flex-wrap: wrap;
-  padding: 10px 16px;
-  background: #fff;
-  border-bottom: 1px solid rgba(28, 25, 23, 0.1);
+  min-height: 60px; /* 60px on one line; grows only when it wraps */
+  padding: 0 20px;
+  background: var(--header-bg);
+  color: var(--header-ink);
 }
 
 .app-header-brand {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 12px;
 }
 
 .app-header-brand-name {
-  font: 700 16px Sora, sans-serif;
+  font: 700 21px var(--font-ui);
   letter-spacing: -0.02em;
+  color: var(--header-ink);
 }
 
+/* SHUTTLE OPS, or CAMPUS SHUTTLE on the Rider view (js/panels.js). */
 .app-header-brand-tag {
-  font: 500 10px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
-  letter-spacing: 0.08em;
+  font: 500 10.5px var(--font-mono);
+  letter-spacing: 0.12em;
+  color: var(--uwa-gold);
 }
 
+/* Segmented tray of view tabs. */
 .app-tabs {
   display: flex;
   gap: 2px;
-  background: rgba(28, 25, 23, 0.05);
-  padding: 3px;
-  border-radius: 8px;
+  padding: 4px;
+  border-radius: var(--radius-tray);
+  background: var(--header-tray);
 }
 
 .app-tab {
-  padding: 6px 14px;
-  border-radius: 6px;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: var(--radius-tab);
   cursor: pointer;
-  font: 500 12.5px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.55);
+  font: 500 14px var(--font-ui);
+  color: var(--header-ink-2);
   background: transparent;
   border: none;
 }
 
+.app-tab:hover {
+  color: var(--header-ink);
+}
+
 .app-tab.is-active {
   font-weight: 600;
-  color: #1c1917;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  color: var(--uwa-blue);
+  background: var(--surface-card);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+}
+
+.app-tab:focus-visible {
+  outline: 2px solid var(--header-ink);
+  outline-offset: 2px;
 }
 
 .app-header-spacer {
@@ -244,81 +302,90 @@ empty until the API has events and stops. Layout only -- does not touch any
   min-width: 8px;
 }
 
+/* Live pill: the dot is --live while a vehicle is reporting, --stale when
+   none is (js/vehicles.js sets .is-stale). */
 .app-live-indicator {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 12px;
-  border: 1px solid rgba(28, 25, 23, 0.14);
-  border-radius: 7px;
-  font: 500 12px Sora, sans-serif;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  background: var(--header-tray);
+  font: 400 13px var(--font-ui);
+  color: var(--header-ink);
+  white-space: nowrap;
 }
 
 .app-live-dot {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: oklch(0.66 0.15 155);
+  background: var(--live);
+  flex: none;
+}
+
+.app-live-indicator.is-stale .app-live-dot {
+  background: var(--stale);
 }
 
 .app-live-clock {
-  font: 400 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
+  font: 500 12px var(--font-mono);
+  color: var(--header-ink-2);
 }
 
-.app-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: oklch(0.62 0.17 300);
-  color: #fff;
+/* ---- Filter bar: Range, Start, End, Live | Vehicle, Route, on one line ---- */
+
+.filter-bar-row {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font: 600 11px Sora, sans-serif;
-  flex: none;
-}
-
-/* ---- Filter bar: vehicle chips ---- */
-
-.filter-bar {
-  display: flex;
-  gap: 8px;
-  padding: 10px 16px;
-  overflow-x: auto;
-  background: #fff;
-  border-bottom: 1px solid rgba(28, 25, 23, 0.08);
-  align-items: center;
-}
-
-.filter-bar-label {
-  flex: none;
-  font: 500 10px Sora, sans-serif;
-  letter-spacing: 0.05em;
-  color: rgba(28, 25, 23, 0.45);
-}
-
-.chip-row {
-  display: flex;
-  gap: 7px;
+  align-items: flex-end; /* controls line up; captions sit above them */
   flex-wrap: wrap;
+  gap: 10px 14px;
+  min-height: 68px;
+  padding: 10px 20px;
+  background: var(--surface-panel);
+  border-bottom: 1px solid var(--border);
 }
 
-.chip {
-  flex: none;
-  padding: 6px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  font: 500 11.5px Sora, sans-serif;
-  background: #fff;
-  color: rgba(28, 25, 23, 0.6);
-  border: 1px solid rgba(28, 25, 23, 0.14);
+/* Vehicle and Route: a thin rule sets them apart from the time controls. */
+.filter-bar-row > .filter-bar:first-of-type {
+  margin-left: 4px;
+  padding-left: 18px;
+  border-left: 1px solid var(--border);
 }
 
-.chip.is-active {
-  background: #1c1917;
-  color: #fff;
-  border-color: #1c1917;
+.filter-bar[hidden] {
+  display: none;
+}
+
+/* The chosen vehicle's colour, inside the Vehicle menu. */
+.filter-select-wrap {
+  position: relative;
+  display: flex;
+}
+
+.filter-select-dot {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.filter-select-dot[hidden] {
+  display: none;
+}
+
+.filter-select-dot:not([hidden]) + .filter-select {
+  padding-left: 26px;
+}
+
+.filter-select-route {
+  max-width: 240px; /* long route names are cut with an ellipsis */
+  text-overflow: ellipsis;
 }
 
 /* ---- Main content: fleet/operator/rider view vs. utilisation view ---- */
@@ -368,8 +435,8 @@ empty until the API has events and stops. Layout only -- does not touch any
   flex: 1 1 300px;
   min-width: 280px;
   max-width: 100%;
-  background: #fff;
-  border-right: 1px solid rgba(28, 25, 23, 0.1);
+  background: var(--surface-panel);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -398,144 +465,178 @@ empty until the API has events and stops. Layout only -- does not touch any
 
 .panel-subtitle {
   font: 400 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
+  color: var(--text-3);
 }
 
-/* ---- Vehicle rows (fleet panel) ---- */
+/* ---- Section cards (fleet panel): Vehicles, Map layers ---- */
 
-.vehicle-list {
-  display: flex;
-  flex-direction: column;
+.panel-cards {
+  flex: 1 0 auto; /* fills the sidebar, so the KPI tiles sit at the bottom */
+  gap: 14px;
+  padding: 18px 20px;
 }
 
-.vehicle-row {
-  display: flex;
-  gap: 12px;
-  padding: 14px 18px;
-  cursor: pointer;
-  border-bottom: 1px solid rgba(28, 25, 23, 0.07);
-  border-left: 3px solid transparent;
-  background: #fff;
+.section-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-tray);
+  background: var(--surface-card);
+  overflow: hidden;
 }
 
-.vehicle-row.is-selected {
-  border-left-color: oklch(0.62 0.17 300);
-  background: oklch(0.62 0.17 300 / 4.5%);
-}
-
-.vehicle-row.is-offline {
-  opacity: 0.62;
-  background: repeating-linear-gradient(135deg, rgba(28, 25, 23, 0.03) 0 6px, transparent 6px 12px);
-}
-
-.vehicle-row-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.vehicle-row-top {
+.section-card-head {
   display: flex;
   align-items: center;
   gap: 8px;
+  height: 44px;
+  padding: 0 14px;
+  background: var(--section-head);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+}
+
+.section-card-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.section-card-title {
+  flex: 1;
+  font: 700 14.5px var(--font-ui);
+  color: var(--text);
+}
+
+.section-card-pill {
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  font: 600 11px var(--font-mono);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.section-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+/* ---- Vehicle rows: one line each ---- */
+
+.vehicle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+
+.vehicle-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+.vehicle-row.is-selected {
+  border-color: var(--accent);
+}
+
+.vehicle-row.is-offline {
+  background: var(--surface-card-muted);
+}
+
+.vehicle-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.vehicle-row.is-offline .vehicle-dot {
+  opacity: 0.45;
 }
 
 .vehicle-id {
-  font: 600 13.5px Sora, sans-serif;
+  font: 600 15px var(--font-ui);
+  color: var(--text);
+  white-space: nowrap;
 }
 
 .vehicle-badge {
   padding: 2px 7px;
-  border-radius: 4px;
-  font: 600 10px Sora, sans-serif;
-  letter-spacing: 0.03em;
+  border-radius: var(--radius-pill);
+  font: 500 10px var(--font-mono);
+  letter-spacing: 0.06em;
 }
 
 .badge-engaged,
 .badge-active {
-  background: oklch(0.66 0.15 155 / 14%);
-  color: oklch(0.45 0.13 155);
+  background: color-mix(in srgb, var(--live) 14%, transparent);
+  color: var(--live-ink);
 }
 
 .badge-manual {
-  background: oklch(0.75 0.15 75 / 20%);
+  background: color-mix(in srgb, var(--stale) 20%, transparent);
   color: oklch(0.45 0.12 60);
 }
 
 .badge-idle,
 .badge-offline,
 .badge-inactive {
-  background: rgba(28, 25, 23, 0.1);
-  color: rgba(28, 25, 23, 0.62);
+  background: var(--surface-tint);
+  color: var(--text-3);
 }
 
+/* "Last seen …" / "No telemetry yet", pushed to the right of the row. */
 .vehicle-note {
-  font: 400 11.5px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.55);
-}
-
-.vehicle-stats {
-  display: flex;
-  gap: 14px;
-  font: 400 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.5);
-}
-
-.vehicle-chip-num {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  background: rgba(28, 25, 23, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font: 600 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.5);
-  flex: none;
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font: 400 12.5px var(--font-ui);
+  color: var(--text-3);
 }
 
 .empty-state {
   margin: 0;
   padding: 14px 18px;
   font: 400 11.5px/1.5 Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.5);
+  color: var(--text-3);
 }
 
 .panel-rider .empty-state {
   padding: 0;
 }
 
-/* ---- Map layer toggles (fleet panel) ---- */
-
-.layer-toggles {
-  padding: 14px 18px;
-  border-top: 1px solid rgba(28, 25, 23, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.layer-toggles-label {
-  font: 600 11px Sora, sans-serif;
-  letter-spacing: 0.04em;
-  color: rgba(28, 25, 23, 0.5);
-}
+/* ---- Map layer toggles (Map layers card) ---- */
 
 .layer-toggle-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-height: 30px;
+  padding: 0 2px;
   cursor: pointer;
-  font: 500 12px Sora, sans-serif;
+  font: 400 14.5px var(--font-ui);
+  color: var(--text);
+}
+
+.layer-toggle-row[hidden] {
+  display: none;
 }
 
 .toggle-switch {
   position: relative;
   display: inline-block;
-  width: 30px;
-  height: 17px;
+  width: 36px;
+  height: 20px;
   flex: none;
 }
 
@@ -551,62 +652,70 @@ empty until the API has events and stops. Layout only -- does not touch any
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: rgba(28, 25, 23, 0.16);
+  background: var(--border);
   transition: background 0.15s ease;
 }
 
 .toggle-switch input:checked + .toggle-track {
-  background: oklch(0.62 0.17 300);
+  background: var(--accent);
+}
+
+.toggle-switch input:focus-visible + .toggle-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .toggle-knob {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface-card);
   transition: left 0.15s ease;
 }
 
 .toggle-switch input:checked ~ .toggle-knob {
-  left: 15px;
+  left: 18px;
 }
 
-/* ---- Fleet KPI mini-cards ---- */
+/* ---- Fleet KPI tiles, under the cards ---- */
 
 .kpi-mini-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 1px;
-  background: rgba(28, 25, 23, 0.09);
-  border-top: 1px solid rgba(28, 25, 23, 0.09);
+  gap: 8px;
+  margin-top: auto;
 }
 
 .kpi-mini {
-  background: #fff;
-  padding: 13px 14px;
+  background: var(--surface-tint);
+  border-radius: var(--radius-card);
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .kpi-mini-label {
-  font: 500 9.5px Sora, sans-serif;
-  letter-spacing: 0.05em;
-  color: rgba(28, 25, 23, 0.5);
+  font: 500 10px var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--text-3);
 }
 
 .kpi-mini-value {
-  font: 600 18px Sora, sans-serif;
+  font: 700 20px var(--font-ui);
+  letter-spacing: -0.02em;
+  color: var(--text);
 }
 
 /* ---- Operator panel ---- */
 
 .operator-header {
   padding: 18px 18px 14px;
-  border-bottom: 1px solid rgba(28, 25, 23, 0.08);
+  border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -627,14 +736,14 @@ empty until the API has events and stops. Layout only -- does not touch any
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1px;
-  background: rgba(28, 25, 23, 0.09);
-  border: 1px solid rgba(28, 25, 23, 0.09);
+  background: var(--border);
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
 }
 
 .operator-metric {
-  background: #fff;
+  background: var(--surface-card);
   padding: 11px 13px;
   display: flex;
   flex-direction: column;
@@ -650,8 +759,8 @@ empty until the API has events and stops. Layout only -- does not touch any
   flex-direction: column;
   gap: 7px;
   padding: 12px 13px;
-  border: 1px solid oklch(0.75 0.15 75 / 45%);
-  background: oklch(0.75 0.15 75 / 10%);
+  border: 1px solid color-mix(in srgb, var(--stale) 45%, transparent);
+  background: color-mix(in srgb, var(--stale) 10%, transparent);
   border-radius: 8px;
 }
 
@@ -666,7 +775,7 @@ empty until the API has events and stops. Layout only -- does not touch any
 
 .request-card-meta {
   font: 400 11px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.6);
+  color: var(--text-2);
 }
 
 .request-actions {
@@ -685,15 +794,15 @@ empty until the API has events and stops. Layout only -- does not touch any
 }
 
 .btn-dark {
-  background: #1c1917;
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 .btn-outline {
-  background: #fff;
-  border-color: rgba(28, 25, 23, 0.16);
+  background: var(--surface-card);
+  border-color: var(--border);
   font-weight: 500;
-  color: #1c1917;
+  color: var(--text);
 }
 
 .autonomy-block {
@@ -705,7 +814,7 @@ empty until the API has events and stops. Layout only -- does not touch any
 .autonomy-label {
   font: 600 11px Sora, sans-serif;
   letter-spacing: 0.04em;
-  color: rgba(28, 25, 23, 0.5);
+  color: var(--text-3);
 }
 
 .autonomy-bar {
@@ -713,15 +822,15 @@ empty until the API has events and stops. Layout only -- does not touch any
   height: 24px;
   border-radius: 5px;
   overflow: hidden;
-  background: rgba(28, 25, 23, 0.06);
+  background: var(--surface-tint);
 }
 
 .autonomy-segment.seg-engaged {
-  background: oklch(0.66 0.15 155 / 55%);
+  background: color-mix(in srgb, var(--live) 55%, transparent);
 }
 
 .autonomy-segment.seg-manual {
-  background: oklch(0.75 0.15 75);
+  background: var(--stale);
 }
 
 .autonomy-segment.seg-estop {
@@ -729,14 +838,14 @@ empty until the API has events and stops. Layout only -- does not touch any
 }
 
 .autonomy-segment.seg-gap {
-  background: rgba(28, 25, 23, 0.12);
+  background: var(--surface-tint);
 }
 
 .autonomy-scale {
   display: flex;
   justify-content: space-between;
   font: 400 10px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.4);
+  color: var(--text-3);
 }
 
 /* ---- Event log ---- */
@@ -750,7 +859,7 @@ empty until the API has events and stops. Layout only -- does not touch any
 
 .event-log-export {
   font: 400 11px Sora, sans-serif;
-  color: oklch(0.5 0.15 300);
+  color: var(--accent);
   cursor: pointer;
 }
 
@@ -758,13 +867,13 @@ empty until the API has events and stops. Layout only -- does not touch any
   display: flex;
   gap: 11px;
   padding: 11px 18px;
-  border-top: 1px solid rgba(28, 25, 23, 0.07);
+  border-top: 1px solid var(--border);
   cursor: pointer;
 }
 
 .event-time {
   font: 400 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
+  color: var(--text-3);
   width: 44px;
   flex: none;
 }
@@ -778,11 +887,11 @@ empty until the API has events and stops. Layout only -- does not touch any
 }
 
 .event-dot.dot-manual {
-  background: oklch(0.75 0.15 75);
+  background: var(--stale);
 }
 
 .event-dot.dot-engage {
-  background: oklch(0.6 0.15 155);
+  background: var(--live);
 }
 
 .event-dot.dot-estop {
@@ -802,7 +911,7 @@ empty until the API has events and stops. Layout only -- does not touch any
 
 .event-desc {
   font: 400 11px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.55);
+  color: var(--text-2);
 }
 
 /* ---- Rider panel ---- */
@@ -825,7 +934,7 @@ empty until the API has events and stops. Layout only -- does not touch any
 
 .rider-sub {
   font: 400 12px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.55);
+  color: var(--text-2);
 }
 
 .stop-picker {
@@ -833,7 +942,7 @@ empty until the API has events and stops. Layout only -- does not touch any
   flex-direction: column;
   gap: 9px;
   padding: 14px;
-  border: 1px solid rgba(28, 25, 23, 0.12);
+  border: 1px solid var(--border);
   border-radius: 10px;
 }
 
@@ -843,40 +952,40 @@ empty until the API has events and stops. Layout only -- does not touch any
   gap: 8px;
   font: 500 10.5px Sora, sans-serif;
   letter-spacing: 0.05em;
-  color: rgba(28, 25, 23, 0.5);
+  color: var(--text-3);
 }
 
 .stop-picker-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: oklch(0.62 0.17 300);
+  background: var(--accent);
 }
 
 .stop-distance {
   font: 400 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
+  color: var(--text-3);
 }
 
 .stop-select {
   width: 100%;
   padding: 10px 11px;
-  border: 1px solid rgba(28, 25, 23, 0.16);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fff;
-  color: #1c1917;
+  background: var(--surface-card);
+  color: var(--text);
   font: 400 13px Sora, sans-serif;
 }
 
 .stop-select:focus {
-  outline: 2px solid oklch(0.62 0.17 300);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-color: transparent;
 }
 
 .stop-select:disabled {
-  color: rgba(28, 25, 23, 0.45);
-  background: rgba(28, 25, 23, 0.04);
+  color: var(--text-3);
+  background: var(--surface-tint);
 }
 
 /* Confirmation or failure after a pickup request */
@@ -892,9 +1001,9 @@ empty until the API has events and stops. Layout only -- does not touch any
 }
 
 .rider-status.is-ok {
-  background: oklch(0.62 0.17 300 / 10%);
-  border: 1px solid oklch(0.62 0.17 300 / 35%);
-  color: oklch(0.42 0.15 300);
+  background: var(--range-selected);
+  border: 1px solid var(--accent);
+  color: var(--accent);
 }
 
 .rider-status.is-error {
@@ -910,8 +1019,8 @@ empty until the API has events and stops. Layout only -- does not touch any
   padding: 16px;
   border-radius: 10px;
   cursor: pointer;
-  background: #1c1917;
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink);
   border: none;
   text-align: left;
   width: 100%;
@@ -939,7 +1048,7 @@ empty until the API has events and stops. Layout only -- does not touch any
 
 .arrivals-label {
   font: 600 12px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.55);
+  color: var(--text-2);
 }
 
 .arrival-row {
@@ -947,15 +1056,15 @@ empty until the API has events and stops. Layout only -- does not touch any
   align-items: center;
   gap: 12px;
   padding: 12px 0;
-  border-top: 1px solid rgba(28, 25, 23, 0.08);
+  border-top: 1px solid var(--border);
 }
 
 .arrival-num {
   width: 36px;
   height: 36px;
   border-radius: 9px;
-  background: rgba(28, 25, 23, 0.06);
-  color: rgba(28, 25, 23, 0.55);
+  background: var(--surface-tint);
+  color: var(--text-2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -976,7 +1085,7 @@ empty until the API has events and stops. Layout only -- does not touch any
 
 .arrival-seats {
   font: 400 11.5px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.55);
+  color: var(--text-2);
 }
 
 .arrival-eta {
@@ -987,9 +1096,9 @@ empty until the API has events and stops. Layout only -- does not touch any
   margin: 0;
   padding: 12px 14px;
   border-radius: 10px;
-  background: rgba(28, 25, 23, 0.04);
+  background: var(--surface-tint);
   font: 400 11.5px/1.5 Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.6);
+  color: var(--text-2);
 }
 
 /* ---- Map pane: legend + route note overlaid on the Leaflet map ---- */
@@ -1010,11 +1119,11 @@ empty until the API has events and stops. Layout only -- does not touch any
   gap: 10px;
   flex-wrap: wrap;
   padding: 8px 11px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(28, 25, 23, 0.1);
+  background: var(--surface-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   font: 400 10.5px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.6);
+  color: var(--text-2);
 }
 
 .map-legend[hidden] {
@@ -1034,11 +1143,11 @@ empty until the API has events and stops. Layout only -- does not touch any
 }
 
 .map-legend-dot.dot-engaged {
-  background: oklch(0.66 0.15 155);
+  background: var(--live);
 }
 
 .map-legend-dot.dot-manual {
-  background: oklch(0.75 0.15 75);
+  background: var(--stale);
 }
 
 .map-legend-dot.dot-estop {
@@ -1046,19 +1155,19 @@ empty until the API has events and stops. Layout only -- does not touch any
 }
 
 .map-legend-dot.dot-offline {
-  background: rgba(28, 25, 23, 0.4);
+  background: var(--text-3);
 }
 
 /* ---- Stop markers (S07) ---- */
 
 .stop-label {
-  padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(28, 25, 23, 0.12);
-  border-radius: 5px;
+  padding: 3px 9px;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
   box-shadow: none;
-  font: 500 11px/1.3 Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.82);
+  font: 400 12px/1.3 var(--font-ui);
+  color: var(--text);
   white-space: nowrap;
 }
 
@@ -1080,19 +1189,19 @@ empty until the API has events and stops. Layout only -- does not touch any
 
 .stop-popup-id {
   font: 600 13px/1.35 Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.9);
+  color: var(--text);
 }
 
 .stop-popup-name {
   font: 500 13px/1.35 Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.7);
+  color: var(--text);
 }
 
 .stop-popup-label {
   margin-top: 8px;
   font: 500 9.5px 'IBM Plex Mono', monospace;
   letter-spacing: 0.06em;
-  color: rgba(28, 25, 23, 0.45);
+  color: var(--text-3);
 }
 
 .stop-popup-routes {
@@ -1100,11 +1209,11 @@ empty until the API has events and stops. Layout only -- does not touch any
   padding: 0;
   list-style: none;
   font: 400 11.5px/1.6 Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.75);
+  color: var(--text);
 }
 
 .stop-popup-routes .is-empty {
-  color: rgba(28, 25, 23, 0.45);
+  color: var(--text-3);
   font-style: italic;
 }
 
@@ -1137,13 +1246,13 @@ empty until the API has events and stops. Layout only -- does not touch any
 
 .util-toolbar-note {
   font: 400 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
+  color: var(--text-3);
 }
 
 .util-tabs {
   display: flex;
   gap: 2px;
-  background: rgba(28, 25, 23, 0.05);
+  background: var(--surface-tint);
   padding: 3px;
   border-radius: 8px;
 }
@@ -1153,15 +1262,15 @@ empty until the API has events and stops. Layout only -- does not touch any
   border-radius: 6px;
   cursor: pointer;
   font: 500 12.5px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.55);
+  color: var(--text-2);
   background: transparent;
   border: none;
 }
 
 .util-tab.is-active {
   font-weight: 600;
-  color: #1c1917;
-  background: #fff;
+  color: var(--text);
+  background: var(--surface-card);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
@@ -1172,8 +1281,8 @@ empty until the API has events and stops. Layout only -- does not touch any
 }
 
 .util-kpi-card {
-  background: #fff;
-  border: 1px solid rgba(28, 25, 23, 0.1);
+  background: var(--surface-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 16px;
   display: flex;
@@ -1184,7 +1293,7 @@ empty until the API has events and stops. Layout only -- does not touch any
 .util-kpi-label {
   font: 500 10px Sora, sans-serif;
   letter-spacing: 0.05em;
-  color: rgba(28, 25, 23, 0.5);
+  color: var(--text-3);
 }
 
 .util-kpi-value {
@@ -1194,12 +1303,12 @@ empty until the API has events and stops. Layout only -- does not touch any
 
 .util-kpi-formula {
   font: 400 10px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
+  color: var(--text-3);
 }
 
 .util-pie-card {
-  background: #fff;
-  border: 1px solid rgba(28, 25, 23, 0.1);
+  background: var(--surface-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 20px;
   display: flex;
@@ -1218,14 +1327,14 @@ empty until the API has events and stops. Layout only -- does not touch any
   width: 230px;
   height: 230px;
   border-radius: 50%;
-  background: rgba(28, 25, 23, 0.08);
+  background: var(--surface-tint);
 }
 
 .util-pie-center {
   position: absolute;
   inset: 58px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface-card);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1241,12 +1350,12 @@ empty until the API has events and stops. Layout only -- does not touch any
 .util-pie-label {
   font: 500 10px Sora, sans-serif;
   letter-spacing: 0.05em;
-  color: rgba(28, 25, 23, 0.5);
+  color: var(--text-3);
 }
 
 .util-pie-sub {
   font: 400 9.5px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.4);
+  color: var(--text-3);
 }
 
 .util-legend {
@@ -1269,7 +1378,7 @@ empty until the API has events and stops. Layout only -- does not touch any
 
 .util-legend-hours {
   font-family: 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.55);
+  color: var(--text-2);
 }
 
 .util-legend-pct {
@@ -1286,8 +1395,8 @@ empty until the API has events and stops. Layout only -- does not touch any
 }
 
 .util-tum-card {
-  background: #fff;
-  border: 1px solid rgba(28, 25, 23, 0.1);
+  background: var(--surface-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 20px;
   display: flex;
@@ -1304,7 +1413,7 @@ empty until the API has events and stops. Layout only -- does not touch any
   flex-direction: column;
   gap: 4px;
   font: 600 11px Sora, sans-serif;
-  color: #fff;
+  color: var(--accent-ink);
 }
 
 .util-tum-row {
@@ -1331,8 +1440,8 @@ empty until the API has events and stops. Layout only -- does not touch any
 }
 
 .util-tum-seg.is-ghost {
-  background: rgba(28, 25, 23, 0.08);
-  color: rgba(28, 25, 23, 0.55);
+  background: var(--surface-tint);
+  color: var(--text-2);
   font-weight: 500;
 }
 
@@ -1341,7 +1450,7 @@ empty until the API has events and stops. Layout only -- does not touch any
   font: 500 10px Sora, sans-serif;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: rgba(28, 25, 23, 0.5);
+  color: var(--text-3);
 }
 
 .util-tum-legend {
@@ -1349,7 +1458,7 @@ empty until the API has events and stops. Layout only -- does not touch any
   flex-wrap: wrap;
   gap: 14px;
   font: 400 10.5px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.6);
+  color: var(--text-2);
   padding-top: 4px;
 }
 
@@ -1360,8 +1469,8 @@ empty until the API has events and stops. Layout only -- does not touch any
 }
 
 .util-table {
-  background: #fff;
-  border: 1px solid rgba(28, 25, 23, 0.1);
+  background: var(--surface-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -1370,10 +1479,10 @@ empty until the API has events and stops. Layout only -- does not touch any
   display: grid;
   grid-template-columns: 1.1fr repeat(5, minmax(72px, 1fr));
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(28, 25, 23, 0.1);
+  border-bottom: 1px solid var(--border);
   font: 500 10px Sora, sans-serif;
   letter-spacing: 0.05em;
-  color: rgba(28, 25, 23, 0.5);
+  color: var(--text-3);
 }
 
 .util-table-row {
@@ -1383,17 +1492,17 @@ empty until the API has events and stops. Layout only -- does not touch any
   cursor: pointer;
   align-items: center;
   font: 500 12.5px Sora, sans-serif;
-  border-bottom: 1px solid rgba(28, 25, 23, 0.07);
+  border-bottom: 1px solid var(--border);
   font-family: 'IBM Plex Mono', monospace;
 }
 
 .util-table-row.is-offline {
-  background: repeating-linear-gradient(135deg, rgba(28, 25, 23, 0.03) 0 6px, transparent 6px 12px);
+  background: var(--surface-card-muted);
 }
 
 .util-table-row.util-table-average {
   font-weight: 600;
-  background: rgba(28, 25, 23, 0.03);
+  background: var(--surface-tint);
   cursor: default;
 }
 
@@ -1402,16 +1511,25 @@ empty until the API has events and stops. Layout only -- does not touch any
   font-weight: 600;
 }
 
+/* Admin link, on the blue header. */
 .admin-link {
-  padding: 7px 12px;
-  border-radius: 7px;
-  font: 500 12px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.8);
-  background: #fff;
-  border: 1px solid rgba(28, 25, 23, 0.14);
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-tab);
+  font: 600 13.5px var(--font-ui);
+  color: var(--header-ink);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--header-ink) 45%, transparent);
   text-decoration: none;
 }
 
 .admin-link:hover {
-  color: #1c1917;
+  background: var(--header-tray);
+}
+
+.admin-link:focus-visible {
+  outline: 2px solid var(--header-ink);
+  outline-offset: 2px;
 }

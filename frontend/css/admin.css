@@ -1,3 +1,7 @@
+/* The sign-in page (admin-login.html) loads this file but not tokens.css,
+   so the tokens are imported here too. Must stay the first rule. */
+@import url("tokens.css");
+
 /* ---- Admin page styles for the ADMIN PAGES ---- */
 
 .app-shell {
@@ -5,36 +9,38 @@
   flex-direction: column;
   height: 100%;
   font-family: Sora, system-ui, sans-serif;
-  background: #faf9f7;
-  color: #1c1917;
+  background: var(--surface-page);
+  color: var(--text);
 }
 
-/* Header */
+/* Header: the same blue header as the dashboard (docs design, section 1). */
 .app-header {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 22px;
   flex-wrap: wrap;
-  padding: 10px 16px;
-  background: #fff;
-  border-bottom: 1px solid rgba(28, 25, 23, 0.1);
+  min-height: 60px;
+  padding: 0 20px;
+  background: var(--header-bg);
+  color: var(--header-ink);
 }
 
 .app-header-brand {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 12px;
 }
 
 .app-header-brand-name {
-  font: 700 16px Sora, sans-serif;
+  font: 700 21px var(--font-ui);
   letter-spacing: -0.02em;
+  color: var(--header-ink);
 }
 
 .app-header-brand-tag {
-  font: 500 10px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
-  letter-spacing: 0.08em;
+  font: 500 10.5px var(--font-mono);
+  letter-spacing: 0.12em;
+  color: var(--uwa-gold);
 }
 
 .app-header-spacer { flex: 1; min-width: 8px; }
@@ -42,26 +48,36 @@
 .app-tabs {
   display: flex;
   gap: 2px;
-  background: rgba(28, 25, 23, 0.05);
-  padding: 3px;
-  border-radius: 8px;
+  padding: 4px;
+  border-radius: var(--radius-tray);
+  background: var(--header-tray);
 }
 
 .app-tab {
-  padding: 6px 14px;
-  border-radius: 6px;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: var(--radius-tab);
   cursor: pointer;
-  font: 500 12.5px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.55);
+  font: 500 14px var(--font-ui);
+  color: var(--header-ink-2);
   background: transparent;
   border: none;
 }
 
+.app-tab:hover:not(:disabled) {
+  color: var(--header-ink);
+}
+
 .app-tab.is-active {
   font-weight: 600;
-  color: #1c1917;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  color: var(--uwa-blue);
+  background: var(--surface-card);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+}
+
+.app-tab:focus-visible {
+  outline: 2px solid var(--header-ink);
+  outline-offset: 2px;
 }
 
 .app-tab:disabled {
@@ -69,22 +85,28 @@
   cursor: not-allowed;
 }
 
-/* Sign out button */
+/* Return to dashboard and sign out, styled like the dashboard's Admin link. */
 .btn-signout {
-  padding: 6px 12px;
-  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-tab);
   cursor: pointer;
-  font: 500 12px Sora, sans-serif;
+  font: 600 13.5px var(--font-ui);
   background: transparent;
-  border: 1px solid rgba(28, 25, 23, 0.16);
-  color: rgba(28, 25, 23, 0.7);
+  border: 1px solid color-mix(in srgb, var(--header-ink) 45%, transparent);
+  color: var(--header-ink);
   text-decoration: none;
 }
 
-.btn-signout:hover { 
-    background: rgba(28, 25, 23, 0.04); 
-    color: #1c1917;
+.btn-signout:hover {
+  background: var(--header-tray);
+}
 
+.btn-signout:focus-visible {
+  outline: 2px solid var(--header-ink);
+  outline-offset: 2px;
 }
 
 /* Main content area */
@@ -111,14 +133,14 @@
 
 .admin-section-sub {
   font: 400 12.5px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.5);
+  color: var(--text-3);
   margin: 0 0 22px;
 }
 
 /* Card */
 .admin-card {
-  background: #fff;
-  border: 1px solid rgba(28, 25, 23, 0.1);
+  background: var(--surface-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 20px;
   margin-bottom: 16px;
@@ -127,7 +149,7 @@
 .admin-card-title {
   font: 600 12px Sora, sans-serif;
   letter-spacing: 0.03em;
-  color: rgba(28, 25, 23, 0.5);
+  color: var(--text-3);
   margin: 0 0 14px;
 }
 
@@ -138,17 +160,17 @@
   gap: 10px;
   padding: 14px 16px;
   border-radius: 8px;
-  background: rgba(28, 25, 23, 0.04);
-  border: 1px dashed rgba(28, 25, 23, 0.16);
+  background: var(--surface-tint);
+  border: 1px dashed var(--border);
   font: 400 12.5px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.55);
+  color: var(--text-2);
 }
 
 .stub-notice-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: rgba(28, 25, 23, 0.25);
+  background: var(--border);
   flex: none;
 }
 
@@ -163,25 +185,25 @@
 .form-label {
   font: 600 11px Sora, sans-serif;
   letter-spacing: 0.04em;
-  color: rgba(28, 25, 23, 0.55);
+  color: var(--text-2);
 }
 
 .form-input,
 .form-select,
 .form-textarea {
   padding: 9px 11px;
-  border: 1px solid rgba(28, 25, 23, 0.16);
+  border: 1px solid var(--border);
   border-radius: 7px;
   font: 400 13px Sora, sans-serif;
-  background: #fff;
-  color: #1c1917;
+  background: var(--surface-card);
+  color: var(--text);
   width: 100%;
 }
 
 .form-input:focus,
 .form-select:focus,
 .form-textarea:focus {
-  outline: 2px solid #2f7d8f;
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-color: transparent;
 }
@@ -207,21 +229,21 @@
   border-radius: 7px;
   cursor: pointer;
   font: 600 12.5px Sora, sans-serif;
-  background: #1c1917;
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink);
   border: none;
 }
 
-.btn-primary:hover { background: #2d2926; }
+.btn-primary:hover { background: color-mix(in srgb, var(--accent) 85%, black); }
 
 .btn-outline {
   padding: 8px 14px;
   border-radius: 7px;
   cursor: pointer;
   font: 500 12.5px Sora, sans-serif;
-  background: #fff;
-  border: 1px solid rgba(28, 25, 23, 0.16);
-  color: #1c1917;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  color: var(--text);
 }
 
 /* Downtime table */
@@ -236,13 +258,13 @@
   padding: 10px 12px;
   font: 600 10px Sora, sans-serif;
   letter-spacing: 0.05em;
-  color: rgba(28, 25, 23, 0.5);
-  border-bottom: 1px solid rgba(28, 25, 23, 0.1);
+  color: var(--text-3);
+  border-bottom: 1px solid var(--border);
 }
 
 .downtime-table td {
   padding: 12px;
-  border-bottom: 1px solid rgba(28, 25, 23, 0.07);
+  border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
 
@@ -258,9 +280,9 @@
   border-radius: 5px;
   cursor: pointer;
   font: 500 11px Sora, sans-serif;
-  border: 1px solid rgba(28, 25, 23, 0.14);
-  background: #fff;
-  color: #1c1917;
+  border: 1px solid var(--border);
+  background: var(--surface-card);
+  color: var(--text);
 }
 
 .btn-xs.danger {
@@ -279,8 +301,8 @@
   display: none;
   padding: 10px 13px;
   border-radius: 7px;
-  background: oklch(0.75 0.15 75 / 12%);
-  border: 1px solid oklch(0.75 0.15 75 / 45%);
+  background: color-mix(in srgb, var(--stale) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stale) 45%, transparent);
   font: 400 12px Sora, sans-serif;
   color: oklch(0.42 0.12 60);
   margin-bottom: 10px;
@@ -293,7 +315,7 @@
   margin: 0;
   padding: 14px 0;
   font: 400 12px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.45);
+  color: var(--text-3);
 }
 
 /* Route selector (operator tab) */
@@ -307,7 +329,7 @@
 .route-select-label {
   font: 600 11px Sora, sans-serif;
   letter-spacing: 0.04em;
-  color: rgba(28, 25, 23, 0.55);
+  color: var(--text-2);
   white-space: nowrap;
 }
 
@@ -321,7 +343,7 @@
   gap: 6px 12px;
   padding: 12px 14px;
   border-radius: 8px;
-  background: rgba(28, 25, 23, 0.04);
+  background: var(--surface-tint);
   font: 400 12.5px Sora, sans-serif;
 }
 
@@ -334,16 +356,16 @@
   border-radius: 999px;
   font: 600 10px Sora, sans-serif;
   letter-spacing: 0.05em;
-  background: rgba(28, 25, 23, 0.08);
-  color: rgba(28, 25, 23, 0.6);
+  background: var(--surface-tint);
+  color: var(--text-2);
 }
 
 .operator-badge.is-live {
-  background: oklch(0.72 0.14 150 / 18%);
-  color: oklch(0.42 0.12 150);
+  background: color-mix(in srgb, var(--live) 18%, transparent);
+  color: var(--live-ink);
 }
 
-.operator-vehicle-detail { color: rgba(28, 25, 23, 0.55); }
+.operator-vehicle-detail { color: var(--text-2); }
 
 .operator-stops-head {
   display: flex;
@@ -354,7 +376,7 @@
 
 .operator-updated {
   font: 400 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
+  color: var(--text-3);
 }
 
 .operator-empty,
@@ -366,8 +388,8 @@
 }
 
 .operator-empty {
-  background: rgba(28, 25, 23, 0.04);
-  color: rgba(28, 25, 23, 0.6);
+  background: var(--surface-tint);
+  color: var(--text-2);
 }
 
 .operator-error {
@@ -388,14 +410,14 @@
   align-items: center;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid rgba(28, 25, 23, 0.07);
+  border-bottom: 1px solid var(--border);
 }
 
 .operator-stop:last-child { border-bottom: none; }
 
 .operator-stop-index {
   font: 500 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.4);
+  color: var(--text-3);
   text-align: right;
 }
 
@@ -405,16 +427,16 @@
   margin-left: 8px;
   font: 600 10px Sora, sans-serif;
   letter-spacing: 0.05em;
-  color: #2f7d8f;
+  color: var(--accent);
 }
 
 .operator-stop-count {
   text-align: right;
   font: 400 12px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.4);
+  color: var(--text-3);
 }
 
-.operator-stop.has-waiting .operator-stop-count { color: #1c1917; }
+.operator-stop.has-waiting .operator-stop-count { color: var(--text); }
 
 .operator-stop-count strong { font: 700 16px Sora, sans-serif; }
 
@@ -431,12 +453,12 @@
   border-radius: 7px;
   cursor: pointer;
   font: 600 12px Sora, sans-serif;
-  border: 1px solid #2f7d8f;
-  background: #2f7d8f;
-  color: #fff;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
-.operator-collect:hover { background: #276a79; }
+.operator-collect:hover { background: color-mix(in srgb, var(--accent) 85%, black); }
 
 .operator-collect:disabled {
   opacity: 0.5;
@@ -455,14 +477,14 @@
   align-items: center;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid rgba(28, 25, 23, 0.07);
+  border-bottom: 1px solid var(--border);
 }
 
 .stop-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #2f7d8f;
+  background: var(--accent);
   flex: none;
 }
 
@@ -470,7 +492,7 @@
 
 .stop-coords {
   font: 400 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
+  color: var(--text-3);
 }
 
 /* ---- Login page styles ---- */
@@ -480,16 +502,16 @@
   align-items: center;
   justify-content: center;
   min-height: 100%;
-  background: #faf9f7;
+  background: var(--surface-page);
   font-family: Sora, system-ui, sans-serif;
-  color: #1c1917;
+  color: var(--text);
 }
 
 .login-card {
   width: 100%;
   max-width: 360px;
-  background: #fff;
-  border: 1px solid rgba(28, 25, 23, 0.1);
+  background: var(--surface-card);
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 32px;
   display: flex;
@@ -510,14 +532,14 @@
 
 .login-brand-tag {
   font: 500 10px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
+  color: var(--text-3);
   letter-spacing: 0.08em;
 }
 
 .login-title {
   font: 600 14px Sora, sans-serif;
   margin: 0;
-  color: rgba(28, 25, 23, 0.7);
+  color: var(--text);
 }
 
 .login-error {
@@ -534,7 +556,7 @@
 
 .login-note {
   font: 400 11px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.4);
+  color: var(--text-3);
   margin: 0;
   text-align: center;
 }

@@ -7,9 +7,12 @@ document.addEventListener('DOMContentLoaded', () => {
     operator: document.getElementById('panel-operator'),
     rider: document.getElementById('panel-rider'),
   };
+  const brandTag = document.getElementById('app-brand-tag');
 
   function setView(view) {
     tabs.forEach((tab) => tab.classList.toggle('is-active', tab.dataset.view === view));
+    // Riders see the shuttle; everyone else is running it.
+    brandTag.textContent = view === 'rider' ? 'CAMPUS SHUTTLE' : 'SHUTTLE OPS';
 
     if (view === 'utilisation') {
       viewMap.hidden = true;
