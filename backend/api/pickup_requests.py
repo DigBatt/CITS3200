@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, current_app, jsonify, request
 
+from backend.auth import admin_required
 from backend.models import PickupRequest, format_timestamp
 from backend.pickup_requests import PickupRequestStore, waiting_at_stops
 from backend.stops import StopNetwork
@@ -91,9 +92,11 @@ def create_pickup_request():
 
 
 @bp.get("/api/pickup-requests")
+@admin_required
 def list_pickup_requests():
     """
-    Every pickup request, ascending by `created_at`. For the operator view.
+    Every pickup request, ascending by `created_at`. For the operator view
+    and the admin's review of the day, so signed in only.
 
     Query params:
         status  optional; one of `open`, `collected`, `expired`.
@@ -104,6 +107,7 @@ def list_pickup_requests():
 
 
 @bp.get("/api/routes/<route_id>/waiting")
+@admin_required
 def route_waiting(route_id: str):
     """
     Riders waiting along a route, for the operator view (S09.2).
@@ -150,6 +154,7 @@ def route_waiting(route_id: str):
 
 
 @bp.post("/api/stops/<stop_id>/collect")
+@admin_required
 def collect_at_stop(stop_id: str):
     """
     The operator has picked up the riders waiting at a stop (S10).

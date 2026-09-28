@@ -36,6 +36,7 @@ class Config:
     utilisation: Optional[dict[str, Any]]
     logger: Optional[dict[str, Any]]
     pickup_requests: Optional[dict[str, Any]]
+    admin: Optional[dict[str, Any]]
     stops: StopNetwork
 
     def vehicle(self, vehicle_id: str) -> Optional[Vehicle]:
@@ -96,6 +97,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
             utilisation=app.get("utilisation"),
             logger=logger,
             pickup_requests=app.get("pickup_requests"),
+            admin=app.get("admin"),
             stops=_parse_stops(stops_raw, stops_path, bounds),
         )
     except (AttributeError, KeyError, TypeError, ValueError) as exc:

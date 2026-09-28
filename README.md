@@ -23,6 +23,22 @@ The dashboard runs on the committed sample data with no client access and no
 further setup. None of it is a live feed, and only one of the two sample
 files contains real measurements, see [data/README.md](data/README.md).
 
+## Admin sign-in
+
+The admin page (`/admin`, which holds the operator view) needs signing in with
+one shared account. Its credentials live in `config/secrets.yaml`, which is
+git-ignored and must never be committed:
+
+```bash
+cp config/secrets.example.yaml config/secrets.yaml
+python -c "import secrets; print(secrets.token_hex(32))"     # paste as secret_key
+python -c "from werkzeug.security import generate_password_hash as h; print(h(input('Password: ')))"
+                                                             # paste as admin.password_hash
+```
+
+Without the file the rest of the app still runs; only sign-in is refused.
+Limits and details: [docs/api.md](docs/api.md#administrator-sign-in).
+
 ## Live data
 
 The logger polls each vehicle's REV tracking endpoint (`source_url` in

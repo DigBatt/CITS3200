@@ -1,38 +1,50 @@
-// Administrator sign-in (S13).
-//
-// Posts the password to /api/admin/login. The endpoint does not exist yet,
-// so the catch below reports that the backend is unreachable rather than
-// letting anyone through.
+
+function nextPath() {
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\')) {
+    return next;
+  }
+  return '/admin';
+}
+
+function showLoginError(message) {
+  const errorEl = document.getElementById('login-error');
+  errorEl.textContent = message;
+  errorEl.classList.add('visible');
+}
 
 async function attemptLogin() {
-  const password = document.getElementById('login-password').value;
-  const errorEl  = document.getElementById('login-error');
+  const username = document.getElementById('login-username').value.trim();
+  const passwordEl = document.getElementById('login-password');
 
-  if (!password) return;
+  if (!username || !passwordEl.value) return;
 
+  let res;
   try {
-    const res = await fetch('/api/admin/login', {
+    res = await fetch('/api/admin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ username, password: passwordEl.value }),
     });
-
-    if (res.ok) {
-      sessionStorage.setItem('admin_session', '1');
-      window.location.href = '/admin';
-    } else {
-      errorEl.classList.add('visible');
-      document.getElementById('login-password').value = '';
-      document.getElementById('login-password').focus();
-    }
   } catch {
-    // TODO: remove once S13 provides the endpoint.
-    errorEl.textContent = 'Could not reach the server. Is the backend running?';
-    errorEl.classList.add('visible');
+    showLoginError('Could not reach the server. Is the backend running?');
+    return;
   }
+
+  if (res.ok) {
+    window.location.href = nextPath();
+    return;
+  }
+
+  const body = await res.json().catch(() => null);
+  showLoginError(body?.error?.message ?? `Sign-in failed (${res.status}).`);
+  passwordEl.value = '';
+  passwordEl.focus();
 }
 
 document.getElementById('btn-login').addEventListener('click', attemptLogin);
-document.getElementById('login-password').addEventListener('keydown', e => {
-  if (e.key === 'Enter') attemptLogin();
+['login-username', 'login-password'].forEach((id) => {
+  document.getElementById(id).addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') attemptLogin();
+  });
 });
