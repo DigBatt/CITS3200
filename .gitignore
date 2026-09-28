@@ -10,3 +10,6 @@ claude.md
 data/live/
 mobile/node_modules
 mobile/.env
+
+# S13 admin credentials and session key; see config/secrets.example.yaml
+config/secrets.yaml

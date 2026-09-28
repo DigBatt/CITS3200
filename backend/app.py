@@ -3,19 +3,26 @@ Run as `python -m backend.app`
 """
 
 from __future__ import annotations
+import logging
+from datetime import timedelta
 from pathlib import Path
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, redirect, send_from_directory
 from backend.api.metrics import bp as metrics_bp
 from backend.api.pickup_requests import bp as pickup_requests_bp
 from backend.api.positions import bp as positions_bp
 from backend.api.stops import bp as stops_bp
 from backend.api.vehicles import bp as vehicles_bp
+from backend.auth import admin_required, load_secrets, signed_in
+from backend.auth import bp as auth_bp
 from backend.config import DEFAULT_CONFIG_DIR, ConfigError, load_config
 from backend.pickup_requests import PickupRequestStore
 from backend.repository import CsvRepository
 from backend.repository.base import RepositoryError
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
+DEFAULT_SESSION_HOURS = 12
+
+log = logging.getLogger(__name__)
 
 
 def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Flask:
@@ -25,7 +32,8 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Flask:
     Parameters
     ----------
     config_dir
-        The directory holding app.yaml, vehicles.yaml and stops.yaml.
+        The directory holding app.yaml, vehicles.yaml and stops.yaml, and
+        the uncommitted secrets.yaml the admin sign-in reads (S13).
 
     Returns
     -------
@@ -45,6 +53,17 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Flask:
     app.config["REPOSITORY"] = CsvRepository.from_config(config)
     app.config["PICKUP_REQUEST_STORE"] = PickupRequestStore()
 
+    secrets = load_secrets(config_dir)
+    if secrets is None:
+        log.warning("No %s/secrets.yaml: admin sign-in is disabled.", config_dir)
+    else:
+        app.secret_key = secrets.secret_key
+    app.config["ADMIN_ACCOUNT"] = secrets.admin if secrets else None
+    session_hours = (config.admin or {}).get("session_hours", DEFAULT_SESSION_HOURS)
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=session_hours)
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+    app.register_blueprint(auth_bp)
     app.register_blueprint(positions_bp)
     app.register_blueprint(vehicles_bp)
     app.register_blueprint(metrics_bp)
@@ -59,11 +78,22 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Flask:
         return send_from_directory(FRONTEND, "index.html")
 
     @app.get("/admin")
+    @admin_required
     def admin():
         return send_from_directory(FRONTEND, "admin.html")
 
+    @app.get("/admin.html")
+    def admin_file():
+        """
+        The static folder would otherwise serve the page itself here, around
+        the sign-in on /admin.
+        """
+        return redirect("/admin")
+
     @app.get("/admin-login")
     def admin_login():
+        if signed_in():
+            return redirect("/admin")
         return send_from_directory(FRONTEND, "admin-login.html")
 
     @app.errorhandler(RepositoryError)

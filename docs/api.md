@@ -16,7 +16,13 @@ Always shaped:
 ```
 
 Codes: `bad_timestamp`, `bad_range` (from > to), `unknown_vehicle`,
-`unknown_stop`, `unknown_route`, `data_unavailable`.
+`unknown_stop`, `unknown_route`, `data_unavailable`, `not_signed_in`,
+`bad_credentials`, `admin_not_configured`.
+
+**Signing in.** Endpoints marked *Admin only* answer `401` `not_signed_in`
+until the browser has signed in through `POST /api/admin/login` (see
+[Administrator sign-in](#administrator-sign-in)). Everything else, including
+everything the rider view uses, needs no sign-in.
 
 ---
 
@@ -227,6 +233,8 @@ genuinely new request is `201`.
 
 ### `GET /api/pickup-requests`
 
+*Admin only.*
+
 Every pickup request, ascending by `created_at`. For the operator view to
 poll so a bus doesn't skip a stop with a rider waiting.
 
@@ -248,6 +256,8 @@ requests are read or opened, not by a background job.
 The store is in memory, so a restart clears every request, open or closed.
 
 ### `GET /api/routes/<id>/waiting`
+
+*Admin only.*
 
 S09.2. The riders waiting along one route, for the operator view to poll
 (`/admin`, Operator view tab, every 10 s). `404` `unknown_route` if the route
@@ -287,6 +297,8 @@ recorded position, labelled with its age.
 
 ### `POST /api/stops/<id>/collect`
 
+*Admin only.*
+
 The operator has picked up the riders at a stop. Every `open` request at
 the stop becomes `collected`, whichever route the rider was waiting for, since
 requests belong to a stop and not a route. No body. `404` `unknown_stop` if the
@@ -302,7 +314,38 @@ A rider who asks again at the same stop afterwards opens a new request.
 
 ---
 
-## Not implemented yet
+## Administrator sign-in
 
-The rider-facing stop picker page (S08.4). Pickup requests that survive a
-restart.
+S13. One shared account, set in a `config/secrets.yaml` (copy
+`config/secrets.example.yaml`). Signing in sets a flag in Flask's signed
+session cookie (`HttpOnly`, `SameSite=Lax`), which lasts
+`admin.session_hours` in `config/app.yaml`.
+
+Admin only: the `/admin` page, `GET /api/pickup-requests`,
+`GET /api/routes/<id>/waiting` and `POST /api/stops/<id>/collect`. A
+signed-out request for `/admin` is redirected to
+`/admin-login?next=<the page asked for>`, which returns there after signing in.
+
+**Limits.** One account shared by every operator and administrator, so anyone
+who can use the operator view can also change downtime and snapshot settings.
+There is no lockout after repeated wrong passwords, and the site must be
+served over HTTPS for the cookie and password to be safe in transit.
+
+### `POST /api/admin/login`
+
+```json
+{ "username": "admin", "password": "..." }
+```
+
+`200` `{ "signed_in": true }` and the session cookie. `401` `bad_credentials`
+for a wrong or missing username or password. `503` `admin_not_configured` if
+there is no `config/secrets.yaml`.
+
+### `POST /api/admin/logout`
+
+Ends the session. Always `200` `{ "signed_in": false }`.
+
+### `GET /api/admin/me`
+
+`200` `{ "signed_in": true | false }`. Never `401`, so the admin page can check
+without tripping its own signed-out handling.

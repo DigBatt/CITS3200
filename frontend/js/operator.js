@@ -27,6 +27,8 @@ let operatorInFlight = false;
 
 async function operatorFetch(path) {
   const response = await fetch(path, { cache: 'no-store' });
+  // the sign-in expired while the view was open (redirectToSignIn is in admin.js).
+  if (response.status === 401) redirectToSignIn();
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
@@ -182,6 +184,7 @@ async function collectAtStop(button) {
   button.disabled = true;
   try {
     const response = await fetch(`/api/stops/${encodeURIComponent(button.dataset.stopId)}/collect`, { method: 'POST' });
+    if (response.status === 401) redirectToSignIn();
     if (!response.ok) {
       const body = await response.json().catch(() => null);
       throw new Error(body?.error?.message ?? `Request failed (${response.status})`);

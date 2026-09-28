@@ -1,23 +1,27 @@
-// Admin page logic: auth guard, tab switching, and downtime records.
-//
-// Downtime is held in memory until the /api/downtime endpoints exist (S18).
-// Each TODO below marks where the fetch call replaces the local array.
+function redirectToSignIn() {
+  const here = window.location.pathname + window.location.search;
+  window.location.href = `/admin-login?${new URLSearchParams({ next: here })}`;
+}
 
-// ---- Auth guard ----
-// Redirect to the sign-in page if there is no admin session.
-// Disabled until S13 (auth backend) provides /api/admin/me.
-// function checkAuth() {
-//   const loggedIn = sessionStorage.getItem('admin_session');
-//   if (!loggedIn) {
-//     window.location.href = '/admin-login';
-//   }
-// }
-// checkAuth();
+async function checkSignedIn() {
+  try {
+    const { signed_in: signedIn } = await fetch('/api/admin/me', { cache: 'no-store' }).then((r) => r.json());
+    if (!signedIn) redirectToSignIn();
+  } catch {
+    // Server unreachable: the admin endpoints will fail on their own.
+  }
+}
+checkSignedIn();
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) checkSignedIn();
+});
 
-document.getElementById('btn-signout').addEventListener('click', () => {
-  // STUB: call POST /api/admin/logout once S13 exists.
-  sessionStorage.removeItem('admin_session');
-  window.location.href = '/';
+document.getElementById('btn-signout').addEventListener('click', async () => {
+  try {
+    await fetch('/api/admin/logout', { method: 'POST' });
+  } finally {
+    window.location.href = '/';
+  }
 });
 
 // ---- Tab switching ----

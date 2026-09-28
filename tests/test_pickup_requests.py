@@ -11,6 +11,7 @@ import yaml
 
 from backend.app import create_app
 from backend.config import DEFAULT_CONFIG_DIR
+from tests.admin_support import sign_in, write_admin_secrets
 
 
 def stop(stop_id, latitude=-31.98, longitude=115.82, name=None):
@@ -32,6 +33,7 @@ def config_dir(tmp_path):
     for name in ("app.yaml", "vehicles.yaml", "stops.yaml"):
         shutil.copy(DEFAULT_CONFIG_DIR / name, tmp_path / name)
     (tmp_path / "stops.yaml").write_text(yaml.safe_dump(NETWORK, sort_keys=False), encoding="utf-8")
+    write_admin_secrets(tmp_path)
     return tmp_path
 
 
@@ -42,7 +44,8 @@ def app(config_dir):
 
 @pytest.fixture
 def client(app):
-    return app.test_client()
+    # Signed in: the operator and list endpoints are admin-only (S13).
+    return sign_in(app.test_client())
 
 
 # ---- S08.3: create-request endpoint ----
@@ -110,7 +113,8 @@ def test_different_riders_at_the_same_stop_are_not_duplicates(app):
     response = rider_b.post("/api/pickup-requests", json={"stop_id": "reid-library"})
 
     assert response.status_code == 201
-    listed = rider_a.get("/api/pickup-requests").get_json()["requests"]
+    # Listing is admin-only (S13), so check as the admin, not as either rider.
+    listed = sign_in(app.test_client()).get("/api/pickup-requests").get_json()["requests"]
     assert len(listed) == 2
 
 

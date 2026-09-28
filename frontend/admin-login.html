@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
-  Administrator sign-in (S13). One shared account; the password is checked
-  by /api/admin/login, which is not implemented yet.
+  Administrator sign-in . checked by
+  /api/admin/login against config/secrets.yaml.
 -->
 <html lang="en">
 <head>
@@ -24,12 +24,18 @@
     <p class="login-title">Administrator sign-in</p>
 
     <div class="form-group">
+      <label class="form-label" for="login-username">USERNAME</label>
+      <input type="text" class="form-input" id="login-username"
+             placeholder="admin" autocomplete="username" autocapitalize="none" spellcheck="false">
+    </div>
+
+    <div class="form-group">
       <label class="form-label" for="login-password">PASSWORD</label>
       <input type="password" class="form-input" id="login-password"
              placeholder="Enter admin password" autocomplete="current-password">
     </div>
 
-    <div class="login-error" id="login-error">Incorrect password. Please try again.</div>
+    <div class="login-error" id="login-error">Incorrect username or password. Please try again.</div>
 
     <button type="button" class="btn-primary" id="btn-login">Sign in</button>
 

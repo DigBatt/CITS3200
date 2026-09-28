@@ -16,6 +16,7 @@ import yaml
 
 from backend.app import FRONTEND, create_app
 from backend.config import DEFAULT_CONFIG_DIR
+from tests.admin_support import ADMIN_PASSWORD, ADMIN_USERNAME, sign_in, write_admin_secrets
 from backend.models import PickupRequest
 from backend.pickup_requests import waiting_at_stops
 
@@ -41,6 +42,7 @@ def config_dir(tmp_path):
     for name in ("app.yaml", "vehicles.yaml"):
         shutil.copy(DEFAULT_CONFIG_DIR / name, tmp_path / name)
     (tmp_path / "stops.yaml").write_text(yaml.safe_dump(NETWORK, sort_keys=False), encoding="utf-8")
+    write_admin_secrets(tmp_path)
     return tmp_path
 
 
@@ -51,7 +53,8 @@ def app(config_dir):
 
 @pytest.fixture
 def client(app):
-    return app.test_client()
+    # Signed in: the operator and list endpoints are admin-only (S13).
+    return sign_in(app.test_client())
 
 
 def open_request(app, stop_id, rider, minutes_ago):
@@ -214,7 +217,13 @@ def post_request(server, stop_id):
 def page(browser, server):
     context = browser.new_context()
     page = context.new_page()
+    # S13: signed out, /admin goes to the sign-in page and comes back after,
+    # keeping the route and vehicle.
     page.goto(f"{server}/admin?route=loop&vehicle=1")
+    page.fill("#login-username", ADMIN_USERNAME)
+    page.fill("#login-password", ADMIN_PASSWORD)
+    page.click("#btn-login")
+    page.wait_for_url(f"{server}/admin?route=loop&vehicle=1")
     page.wait_for_selector("#operator-stops .operator-stop")
     yield page
     context.close()
