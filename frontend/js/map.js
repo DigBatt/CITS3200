@@ -79,7 +79,7 @@ function drawStops(stops, { popupHtml = null } = {}) {
       pane: 'stops',
       ...STOP_NEUTRAL,
     })
-      .bindTooltip(stop.name, {
+      .bindTooltip(stop.id, {
         permanent: true,
         direction: 'top',
         offset: [0, -7],
