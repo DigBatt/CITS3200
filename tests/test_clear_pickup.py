@@ -13,6 +13,7 @@ import yaml
 
 from backend.app import create_app
 from backend.config import DEFAULT_CONFIG_DIR
+from tests.admin_support import sign_in, write_admin_secrets
 from backend.models import PickupRequest
 from backend.pickup_requests import PickupRequestStore
 
@@ -44,6 +45,7 @@ def config_dir(tmp_path):
     app_config["pickup_requests"] = {"expire_after_seconds": EXPIRE_AFTER_MINUTES * 60}
     (tmp_path / "app.yaml").write_text(yaml.safe_dump(app_config, sort_keys=False), encoding="utf-8")
     (tmp_path / "stops.yaml").write_text(yaml.safe_dump(NETWORK, sort_keys=False), encoding="utf-8")
+    write_admin_secrets(tmp_path)
     return tmp_path
 
 
@@ -54,7 +56,8 @@ def app(config_dir):
 
 @pytest.fixture
 def client(app):
-    return app.test_client()
+    # Signed in: the operator and list endpoints are admin-only (S13).
+    return sign_in(app.test_client())
 
 
 def open_request(app, stop_id, rider, minutes_ago):
@@ -207,7 +210,7 @@ def test_no_expiry_configured_means_requests_stay_open(config_dir):
     app = create_app(config_dir)
     open_request(app, "shared", "rider-a", minutes_ago=24 * 60)
 
-    assert waiting(app.test_client(), "loop")["shared"] == 1
+    assert waiting(sign_in(app.test_client()), "loop")["shared"] == 1
 
 
 # ---- Criterion 3: cleared requests stay in the record ----
