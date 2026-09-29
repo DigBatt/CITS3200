@@ -1,6 +1,6 @@
 # nUWAy Fleet Dashboard
 
-A single dashboard for the UWA REV Project's nUWAy autonomous shuttle fleet.
+A single dashboard for the UWA REV Project's nUWAy autonomous shuttle bus fleet.
 
 Replaces the existing per vehicle page at `revproject.com/vehicles/nuway.php`,
 which shows a live snapshot only and overwrites positions week by week.
