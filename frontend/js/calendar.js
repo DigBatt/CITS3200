@@ -28,6 +28,9 @@
 
 (function () {
   const DAY_MS = 86400000;
+  const MINUTE_MS = 60000;
+  // Matches the dashboard's live poll (config/app.yaml).
+  const EXTENT_LIVE_REFRESH_MS = 15000;
   const DAY_MINUTES = 1440;
   const HOUR_LABELS = [0, 6, 12, 18, 24];
   const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -60,6 +63,13 @@
     // week containing it. Held as a date, not an offset, so a caller can open
     // the calendar on a day the user picked elsewhere.
     let anchor = startOfDay(options.anchor ?? new Date());
+    // The dashboard's period, when the calendar also picks it (see
+    // createRangeTools). The admin page passes none.
+    const range = options.range ?? null;
+    const tools = range ? createRangeTools(range, { onPicked: showSpan }) : null;
+    let extent = null;
+    let extentKey = null;
+    let extentAt = 0;
 
     let schedule = null;
     let vehicles = [];
@@ -172,6 +182,7 @@
           <div class="cal-day-body">
             ${HOUR_LABELS.slice(1, -1).map((hour) => `<div class="cal-gridline" style="top:${pct(hour / 24)}"></div>`).join('')}
             ${lanes || '<p class="cal-no-vehicles">No vehicles shown</p>'}
+            ${range ? ['before', 'after'].map((side) => `<div class="cal-outside" data-cal-outside="${side}" data-day="${day.getTime()}" title="Outside the selected period" hidden></div>`).join('') : ''}
             ${nowLine}
           </div>
         </div>`;
@@ -201,7 +212,7 @@
             <button type="button" class="cal-today" data-cal-step="0"${isOnToday() ? ' disabled' : ''}>Today</button>
             <button type="button" class="cal-step" data-cal-step="1" aria-label="Next ${step}" title="Next ${step}">&#8250;</button>
           </div>
-          <span class="cal-range">${escape(rangeLabel())}</span>
+          ${tools ? '<div data-cal-tools></div>' : `<span class="cal-range">${escape(rangeLabel())}</span>`}
           ${viewToggle}
         </div>`;
     }
@@ -247,6 +258,9 @@
             <span class="cal-key"><span class="cal-swatch is-unscheduled"></span>Non-scheduled</span>
             <span class="cal-key"><span class="cal-swatch is-downtime"></span>Downtime</span>
             <span class="cal-key"><span class="cal-swatch is-now"></span>Now</span>
+            ${range ? `
+            <span class="cal-key"><span class="cal-swatch is-outside-period"></span>Outside selected period</span>
+            <span class="cal-key"><span class="cal-measure-dot"></span>First / last measurement</span>` : ''}
           </div>
           <div class="cal-grid">
             <div class="cal-hours">
@@ -256,6 +270,96 @@
           </div>
           <p class="cal-caption">${escape(caption())}</p>
         </div>`;
+
+      if (tools) {
+        container.querySelector('[data-cal-tools]').replaceWith(tools.element);
+        tools.setLabel(rangeLabel());
+        paintRange();
+      }
+    }
+
+    // ---- The period, when this calendar picks it ----
+
+    // Leave the window clear and shade the rest of each day: a band before
+    // it and a band after it, either of which may be empty, or the whole day
+    // when the window misses it. Done in place, so a slider drag does not
+    // rebuild the board under the pointer.
+    function paintSelection(win) {
+      container.querySelectorAll('[data-cal-outside]').forEach((band) => {
+        const dayStart = Number(band.dataset.day);
+        const dayEnd = dayStart + DAY_MS;
+        // endMs is the start of the last minute included.
+        const selFrom = win.startMs;
+        const selTo = win.endMs + MINUTE_MS;
+        const misses = selTo <= dayStart || selFrom >= dayEnd;
+
+        let from;
+        let to;
+        if (band.dataset.calOutside === 'before') {
+          from = dayStart;
+          to = misses ? dayEnd : Math.min(Math.max(selFrom, dayStart), dayEnd);
+        } else {
+          from = misses ? dayEnd : Math.max(Math.min(selTo, dayEnd), dayStart);
+          to = dayEnd;
+        }
+
+        band.hidden = to <= from;
+        if (band.hidden) return;
+        band.style.top = pct((from - dayStart) / DAY_MS);
+        band.style.height = pct((to - from) / DAY_MS);
+        // A line only where the band meets the selection, so its edge reads
+        // clearly; not at midnight, where the band just runs off the day.
+        band.classList.toggle('meets-selection', !misses);
+      });
+    }
+
+    // The first and last measurement in the span, for the slider's dots and
+    // zoom. Fetched again only when the span or the vehicles shown change,
+    // or every poll interval while live, since new data keeps arriving then.
+    async function loadExtent() {
+      const win = range.window();
+      if (shown && shown.size === 0) {
+        extentKey = 'none';
+        extent = null;
+        return;
+      }
+      const ids = shown && shown.size < vehicles.length ? [...shown].join(',') : undefined;
+      const key = `${win.spanStartMs}|${win.live ? 'live' : win.spanEndMs}|${ids ?? 'all'}`;
+      if (key === extentKey && !(win.live && Date.now() - extentAt > EXTENT_LIVE_REFRESH_MS)) return;
+      extentKey = key;
+      extentAt = Date.now();
+
+      let next = null;
+      try {
+        const data = await getPositionsExtent({
+          vehicles: ids,
+          from: new Date(win.spanStartMs).toISOString(),
+          // Live leaves `to` to the server's default of now.
+          to: win.live ? undefined : new Date(win.spanEndMs + MINUTE_MS - 1).toISOString(),
+        });
+        if (data.first && data.last) next = { first: Date.parse(data.first), last: Date.parse(data.last) };
+      } catch {
+        // No dots, and no zoom, is the honest fallback.
+      }
+      if (key !== extentKey) return;
+      extent = next;
+      paintRange();
+    }
+
+    function paintRange() {
+      if (!range) return;
+      const win = range.window();
+      tools.update(win, extent);
+      paintSelection(win);
+      loadExtent();
+    }
+
+    // Bring a newly picked span into view: its first day starts the week, or
+    // sits in the middle of the 3 days.
+    function showSpan(startDate) {
+      const first = startOfDay(new Date(`${startDate}T00:00`));
+      anchor = span >= 7 ? first : new Date(first.getTime() + DAY_MS);
+      refresh();
     }
 
     container.addEventListener('click', (event) => {
@@ -290,10 +394,14 @@
     });
 
     refresh();
-    timer = setInterval(render, 60000);
+    // Redraws for the moving now line, but not under a held slider thumb.
+    timer = setInterval(() => {
+      if (!tools?.isSliding()) render();
+    }, 60000);
 
     return {
       refresh,
+      paintRange,
       // Open on a particular day, for the mini calendar handing one over.
       goTo(date) {
         anchor = startOfDay(date);
@@ -303,6 +411,219 @@
         clearInterval(timer);
         timer = null;
       },
+    };
+  }
+
+
+  // ---- Range tools, for the full calendar on the dashboard ----
+  //
+  // There the full calendar also picks the period, between the visible days'
+  // label and the 3/7 day toggle:
+  //   - the label drops down to a month to drag a span of days across, which
+  //     can run well past the 3 or 7 days on screen;
+  //   - a slider over that span, with a thumb for each end of the window;
+  //   - dots on the track at the first and last measurement in the span, and
+  //     a Zoom to data toggle that narrows the track to between them;
+  //   - Live, as in the dock, since the dock is behind the overlay.
+  //
+  // `range` is the dashboard's adapter over js/timeline.js:
+  //   get(), select(a, b), max()   as for the mini month
+  //   window()                     { spanStartMs, spanEndMs, startMs, endMs, live }
+  //   scrub({ startMs?, endMs? })  move an end while a thumb is held
+  //   release()                    the thumb was let go
+  //   setLive(on)
+  //
+  // Built once and moved back into each re-render of the calendar, so a held
+  // thumb and the open dropdown survive the board redrawing around them.
+
+  function createRangeTools(range, { onPicked }) {
+    const element = document.createElement('div');
+    element.className = 'cal-tools';
+    element.innerHTML = `
+      <div class="cal-range-pick">
+        <button type="button" class="cal-range-btn" data-cal-range-toggle aria-expanded="false" aria-haspopup="dialog"
+                title="Choose the period, across as many days as you like">
+          <span class="cal-range"></span>
+          <span class="cal-range-chevron" aria-hidden="true">&#9662;</span>
+        </button>
+        <div class="cal-range-pop" role="dialog" aria-label="Choose the period" hidden>
+          <p class="cal-range-hint">Drag across days to choose the period.</p>
+          <div class="cal-range-mini"></div>
+        </div>
+      </div>
+      <div class="cal-slider">
+        <button type="button" class="cal-slider-btn cal-slider-live" data-cal-live
+                title="Set the end of the period to now, and keep it there">
+          <span class="cal-slider-live-dot" aria-hidden="true"></span>Live
+        </button>
+        <div class="cal-slider-body">
+          <div class="cal-slider-track">
+            <div class="cal-slider-rail">
+              <div class="cal-slider-fill"></div>
+              <span class="cal-measure-dot" data-cal-dot="first" hidden></span>
+              <span class="cal-measure-dot" data-cal-dot="last" hidden></span>
+            </div>
+            <input type="range" class="cal-slider-input" data-cal-thumb="start" min="0" max="1" step="1" aria-label="Start of the period">
+            <input type="range" class="cal-slider-input" data-cal-thumb="end" min="0" max="1" step="1" aria-label="End of the period">
+          </div>
+          <div class="cal-slider-ends">
+            <span data-cal-end-label="start"></span>
+            <span data-cal-end-label="end"></span>
+          </div>
+        </div>
+        <button type="button" class="cal-slider-btn" data-cal-zoom aria-pressed="false"
+                title="Zoom the slider in to between the first and last measurement">Zoom to data</button>
+      </div>`;
+
+    const toggle = element.querySelector('[data-cal-range-toggle]');
+    const label = element.querySelector('.cal-range');
+    const pop = element.querySelector('.cal-range-pop');
+    const miniHost = element.querySelector('.cal-range-mini');
+    const liveButton = element.querySelector('[data-cal-live]');
+    const zoomButton = element.querySelector('[data-cal-zoom]');
+    const fill = element.querySelector('.cal-slider-fill');
+    const startInput = element.querySelector('[data-cal-thumb="start"]');
+    const endInput = element.querySelector('[data-cal-thumb="end"]');
+    const dots = {
+      first: element.querySelector('[data-cal-dot="first"]'),
+      last: element.querySelector('[data-cal-dot="last"]'),
+    };
+    const endLabels = {
+      start: element.querySelector('[data-cal-end-label="start"]'),
+      end: element.querySelector('[data-cal-end-label="end"]'),
+    };
+
+    let mini = null;
+    let zoom = false;
+    let sliding = false;
+    // The track's scale, in ms, as last drawn; the thumbs' values are whole
+    // minutes from `lo`.
+    let lo = 0;
+    let hi = MINUTE_MS;
+
+    const floorMinute = (ms) => Math.floor(ms / MINUTE_MS) * MINUTE_MS;
+    const ceilMinute = (ms) => Math.ceil(ms / MINUTE_MS) * MINUTE_MS;
+    const toValue = (ms) => Math.max(0, Math.min(Math.round((ms - lo) / MINUTE_MS), Number(startInput.max)));
+    const toMs = (value) => lo + Number(value) * MINUTE_MS;
+    const instant = (ms) => Timeline.formatInstant(ms);
+
+    // ---- The dropdown ----
+
+    function setOpen(open) {
+      pop.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(open));
+      if (!open) return;
+      // Built on first open, so a closed dropdown costs nothing.
+      if (!mini) {
+        mini = createMini(miniHost, {
+          expand: false,
+          range: {
+            get: range.get,
+            max: range.max,
+            select(start, end) {
+              range.select(start, end);
+              setOpen(false);
+              onPicked(start, end);
+            },
+          },
+        });
+      }
+      // Open on the month the span starts in, not wherever it was left.
+      mini.show(new Date(`${range.get().start}T00:00`));
+      mini.paint();
+    }
+
+    toggle.addEventListener('click', () => setOpen(pop.hidden));
+    // Escape closes the dropdown first, and only the dropdown: the overlay's
+    // own Escape handler sits on the document, above this.
+    element.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !pop.hidden) {
+        event.stopPropagation();
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+    document.addEventListener('pointerdown', (event) => {
+      if (!pop.hidden && !element.querySelector('.cal-range-pick').contains(event.target)) setOpen(false);
+    });
+
+    // ---- The slider ----
+
+    startInput.addEventListener('input', () => range.scrub({ startMs: toMs(startInput.value) }));
+    endInput.addEventListener('input', () => range.scrub({ endMs: toMs(endInput.value) }));
+    for (const input of [startInput, endInput]) {
+      input.addEventListener('change', () => range.release());
+      input.addEventListener('pointerdown', () => { sliding = true; });
+    }
+    window.addEventListener('pointerup', () => { sliding = false; });
+
+    liveButton.addEventListener('click', () => range.setLive(!range.window().live));
+    zoomButton.addEventListener('click', () => {
+      zoom = !zoom;
+      update(range.window(), lastExtent);
+    });
+
+    let lastExtent = null;
+
+    function placeDot(dot, ms, what) {
+      dot.hidden = ms === undefined || ms < lo || ms > hi;
+      if (dot.hidden) return;
+      dot.style.left = pct((ms - lo) / (hi - lo));
+      dot.title = `${what} measurement: ${instant(ms)}`;
+    }
+
+    function update(win, extent) {
+      lastExtent = extent;
+      const zoomed = zoom && Boolean(extent);
+      zoomButton.disabled = !extent;
+      zoomButton.classList.toggle('is-on', zoomed);
+      zoomButton.setAttribute('aria-pressed', String(zoomed));
+      zoomButton.title = extent
+        ? 'Zoom the slider in to between the first and last measurement'
+        : 'No measurements in this period to zoom to';
+
+      if (zoomed) {
+        lo = floorMinute(extent.first);
+        hi = Math.max(ceilMinute(extent.last), lo + MINUTE_MS);
+      } else {
+        lo = win.spanStartMs;
+        hi = Math.max(win.spanEndMs, lo + MINUTE_MS);
+      }
+      const max = Math.round((hi - lo) / MINUTE_MS);
+      startInput.max = max;
+      endInput.max = max;
+
+      // A thumb outside a zoomed track sits at its edge; the labels under
+      // the track still give the real time.
+      const startValue = toValue(win.startMs);
+      const endValue = toValue(win.endMs);
+      startInput.value = startValue;
+      endInput.value = endValue;
+      endInput.disabled = win.live;
+      // With the thumbs close together, the one that can still move away
+      // has to be on top, or it cannot be grabbed.
+      startInput.classList.toggle('is-top', startValue > max / 2);
+
+      fill.style.left = pct(startValue / max);
+      fill.style.width = pct((endValue - startValue) / max);
+      placeDot(dots.first, extent?.first, 'First');
+      placeDot(dots.last, extent?.last, 'Last');
+
+      endLabels.start.textContent = instant(win.startMs);
+      endLabels.end.textContent = win.live ? 'Now' : instant(win.endMs);
+
+      liveButton.classList.toggle('is-on', win.live);
+      liveButton.setAttribute('aria-pressed', String(win.live));
+      if (mini && !pop.hidden) mini.paint();
+    }
+
+    return {
+      element,
+      update,
+      setLabel(text) {
+        label.textContent = text;
+      },
+      isSliding: () => sliding,
     };
   }
 
@@ -415,7 +736,7 @@
       // No title: the dock is unlabelled by design, the overlay names itself.
       // The month name toggles the grid rather than opening the calendar, so
       // the dock can be folded down to a bar and back.
-      const expand = range
+      const expand = range && options.expand !== false
         ? '<button type="button" class="mini-step mini-expand" data-mini-expand aria-label="Open the full calendar" title="Open the full calendar">&#10530;</button>'
         : '';
       const head = `
@@ -543,7 +864,18 @@
     });
 
     refresh();
-    return { refresh, paint };
+    return {
+      refresh,
+      paint,
+      // Page to the month holding `date`.
+      show(date) {
+        const next = new Date(date.getFullYear(), date.getMonth(), 1);
+        if (next.getTime() === month.getTime()) return;
+        month = next;
+        render();
+        refresh();
+      },
+    };
   }
 
 
@@ -565,7 +897,7 @@
         full.goTo(day ?? new Date());
       } else {
         // Opens on the week; the 3 day option is in the calendar's controls.
-        full = create(body, { days: 7, anchor: day ?? new Date() });
+        full = create(body, { days: 7, anchor: day ?? new Date(), range: options.range });
       }
       close.focus();
     }
@@ -606,8 +938,12 @@
     return {
       open,
       close: shut,
-      // Repaint the selected days, after the range changes elsewhere.
-      paintRange: () => mini.paint(),
+      // Repaint the selected days, and the full calendar's slider and
+      // selection while it is open, after the range changes elsewhere.
+      paintRange() {
+        mini.paint();
+        if (!overlay.hidden) full?.paintRange();
+      },
       refresh() {
         mini.refresh();
         full?.refresh();

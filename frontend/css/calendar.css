@@ -1,6 +1,13 @@
 /* Service calendar (S21). Shared by the admin Schedule tab and the dashboard
    Schedule view, so it depends on no page specific styles. */
 
+/* On :root rather than .cal, since the mini month sits outside .cal and
+   downtime has to read the same in both. Orange rather than red, so it is
+   not mistaken for the red now line and today marker. */
+:root {
+  --cal-downtime: #f97316;
+}
+
 .cal {
   display: flex;
   flex-direction: column;
@@ -71,6 +78,12 @@
 .cal-swatch.is-scheduled { background: var(--cal-scheduled); border-color: var(--cal-scheduled-edge); }
 .cal-swatch.is-unscheduled { background: transparent; }
 .cal-swatch.is-downtime {
+  background: repeating-linear-gradient(45deg, var(--cal-downtime) 0 3px, transparent 3px 6px);
+  border-color: var(--cal-downtime);
+}
+/* Outside the selected period wears what downtime used to: neutral
+   hatching. The selection itself stays clear. */
+.cal-swatch.is-outside-period {
   background: repeating-linear-gradient(45deg, currentColor 0 3px, transparent 3px 6px);
   opacity: 0.8;
 }
@@ -220,12 +233,33 @@
   right: 1px;
   min-height: 2px;
   border-radius: 2px;
-  background: repeating-linear-gradient(45deg, currentColor 0 4px, transparent 4px 8px);
-  border: 1px solid currentColor;
+  background: repeating-linear-gradient(45deg, var(--cal-downtime) 0 4px, transparent 4px 8px);
+  border: 1px solid var(--cal-downtime);
 }
+
+/* Time outside the selected period, across every lane of the day, so the
+   selection is what stands out clear. Light enough to read the roster and
+   downtime through, and it passes the pointer on to them. */
+.cal-outside {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(45deg, currentColor 0 4px, transparent 4px 8px);
+  opacity: 0.3;
+}
+
+.cal-outside[hidden] { display: none; }
+
+/* The edge that meets the selection: the bottom of the band before it, the
+   top of the band after it. */
+.cal-outside.meets-selection[data-cal-outside='before'] { border-bottom: 1px solid currentColor; }
+.cal-outside.meets-selection[data-cal-outside='after'] { border-top: 1px solid currentColor; }
 
 .cal-now {
   position: absolute;
+  z-index: 2;
   left: 0;
   right: 0;
   border-top: 2px solid var(--cal-now);
@@ -371,7 +405,7 @@
 }
 
 .mini-mark.is-service { background: rgba(56, 189, 248, 0.9); }
-.mini-mark.is-downtime { background: #ef4444; }
+.mini-mark.is-downtime { background: var(--cal-downtime); }
 
 .mini-legend {
   display: flex;
@@ -478,4 +512,202 @@ body.is-overlaid { overflow: hidden; }
 @media (max-width: 720px) {
   .cal-overlay { padding: 0; }
   .cal-overlay-panel { width: 100vw; height: 100vh; border-radius: 0; }
+}
+
+
+/* ---- Range tools: the period, picked from the full calendar ----
+   Sits between the visible days' label and the 3/7 day toggle, and takes
+   the room between them. Wraps under the navigation on a narrow screen. */
+
+.cal-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.cal-range-pick { position: relative; }
+
+.cal-range-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font: inherit;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--cal-line);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cal-range-btn:hover,
+.cal-range-btn[aria-expanded='true'] { border-color: currentColor; }
+
+.cal-range-chevron { font-size: 0.6rem; opacity: 0.6; }
+
+.cal-range-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
+  width: 16rem;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(28, 25, 23, 0.18);
+}
+
+.cal-range-pop[hidden] { display: none; }
+
+.cal-range-hint {
+  margin: 0 0 0.4rem;
+  font-size: 0.68rem;
+  opacity: 0.7;
+}
+
+.cal-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 18rem;
+}
+
+.cal-slider-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  font: inherit;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--cal-line);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cal-slider-btn.is-on { border-color: currentColor; font-weight: 600; }
+.cal-slider-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.cal-slider-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cal-line);
+}
+
+.cal-slider-live.is-on .cal-slider-live-dot { background: var(--cal-now); }
+
+.cal-slider-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Two range inputs laid over one track. Only their thumbs take the pointer,
+   so either can be grabbed wherever it sits. */
+.cal-slider-track {
+  position: relative;
+  height: 1.25rem;
+}
+
+/* Inset by the thumb's radius, so the fill and the dots line up with the
+   thumbs' centres rather than the inputs' edges. */
+.cal-slider-rail {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: var(--cal-line);
+}
+
+.cal-slider-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.45;
+}
+
+.cal-measure-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2f7d8f;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.cal-slider-rail .cal-measure-dot {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.cal-measure-dot[hidden] { display: none; }
+
+.cal-slider-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  z-index: 2;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.cal-slider-input.is-top { z-index: 3; }
+
+.cal-slider-input::-webkit-slider-runnable-track { height: 100%; background: transparent; }
+.cal-slider-input::-moz-range-track { background: transparent; }
+
+.cal-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 14px;
+  height: 14px;
+  margin-top: calc((1.25rem - 14px) / 2);
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid currentColor;
+  cursor: grab;
+}
+
+.cal-slider-input::-moz-range-thumb {
+  pointer-events: auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid currentColor;
+  cursor: grab;
+}
+
+.cal-slider-input:active::-webkit-slider-thumb { cursor: grabbing; }
+.cal-slider-input:disabled::-webkit-slider-thumb { border-color: var(--cal-line); cursor: not-allowed; }
+.cal-slider-input:disabled::-moz-range-thumb { border-color: var(--cal-line); cursor: not-allowed; }
+.cal-slider-input:focus-visible::-webkit-slider-thumb { outline: 2px solid #2f7d8f; outline-offset: 2px; }
+
+.cal-slider-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.64rem;
+  opacity: 0.7;
+  white-space: nowrap;
 }

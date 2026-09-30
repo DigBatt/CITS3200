@@ -111,6 +111,33 @@ array.
 
 ---
 
+## `GET /api/positions/extent`
+
+The first and last stored position in a period, without the positions
+themselves. Same parameters, defaults and errors as `/api/positions`. The
+dashboard calendar's time slider uses it to mark, and optionally zoom to, the
+span that actually holds data, without downloading every row over a range of
+days.
+
+```json
+{
+  "from": "2025-09-03T16:00:00Z",
+  "to": "2025-09-04T15:59:59Z",
+  "first": "2025-09-04T08:21:10.484987Z",
+  "last": "2025-09-04T08:58:37.495682Z",
+  "vehicles": [
+    { "vehicle_id": "1", "count": 439, "first": "2025-09-04T08:21:10.484987Z", "last": "2025-09-04T08:58:37.495682Z" },
+    { "vehicle_id": "3", "count": 0, "first": null, "last": null }
+  ]
+}
+```
+
+`first` and `last` span every selected vehicle, and are `null` when nothing is
+in range. Rows without a fix (`gps_status: -1`) count, since they are still
+measurements.
+
+---
+
 ## `GET /api/events`
 
 Engage/disengage events, not implemented yet.

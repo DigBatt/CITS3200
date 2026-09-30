@@ -21,6 +21,11 @@ function getPositions(query) {
   return request('/api/positions', query);
 }
 
+// Just the first and last position in a period, for the calendar's slider.
+function getPositionsExtent(query) {
+  return request('/api/positions/extent', query);
+}
+
 function getMetrics(query) {
   return request('/api/metrics', query);
 }

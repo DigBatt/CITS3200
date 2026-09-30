@@ -114,6 +114,11 @@ document.addEventListener('DOMContentLoaded', () => {
       get: () => timelineControl?.getDates(),
       select: (start, end) => timelineControl?.setDates(start, end),
       max: () => Timeline.getPerthDateString(),
+      // For the full calendar's slider, over the same state as the dock's.
+      window: () => timelineControl?.getWindow(),
+      scrub: (ends) => timelineControl?.scrub(ends),
+      release: () => timelineControl?.release(),
+      setLive: (on) => timelineControl?.setLive(on),
     },
   });
 
