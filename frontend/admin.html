@@ -78,63 +78,63 @@
       </div>
     </div>
 
-<!-- ---- Figures view (#70): figures populated by #71 ---- -->
-<div class="admin-panel" id="tab-figures" hidden>
-  <h1 class="admin-section-title">Figures</h1>
-  <p class="admin-section-sub">
-    View fleet performance figures for the selected reporting period.
-  </p>
+    <!-- ---- Figures (#70, #71): every GMG time usage model figure for a
+         period, from /api/metrics. A figure the data cannot support shows as
+         unavailable with the reason, never as zero. Rendered by js/figures.js. ---- -->
+    <div class="admin-panel" id="tab-figures" hidden>
+      <h1 class="admin-section-title">Figures</h1>
+      <p class="admin-section-sub">
+        Fleet performance under the GMG time usage model, for the reporting period below.
+      </p>
 
-  <!-- Reporting period -->
-  <div class="admin-card">
-    <p class="admin-card-title">REPORTING PERIOD</p>
+      <!-- Reporting period: whole days, Perth time -->
+      <div class="admin-card">
+        <p class="admin-card-title">REPORTING PERIOD</p>
 
-    <div class="figures-period">
-      <div>
-        <span class="figures-label">FROM</span>
-        <span class="figures-period-value" id="figures-from">—</span>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="figures-from-date">FROM</label>
+            <input type="date" class="form-input" id="figures-from-date">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="figures-to-date">TO</label>
+            <input type="date" class="form-input" id="figures-to-date">
+          </div>
+        </div>
+
+        <div class="figures-period">
+          <div>
+            <span class="figures-label">COVERING</span>
+            <span class="figures-period-value"><span id="figures-from">&mdash;</span> &rarr; <span id="figures-to">&mdash;</span></span>
+          </div>
+          <div>
+            <span class="figures-label">VEHICLES</span>
+            <span class="figures-period-value" id="figures-scope">&mdash;</span>
+          </div>
+        </div>
+
+        <p class="form-warning figures-error" id="figures-error" role="alert"></p>
       </div>
 
-      <div>
-        <span class="figures-label">TO</span>
-        <span class="figures-period-value" id="figures-to">—</span>
+      <div class="admin-card">
+        <p class="admin-card-title">KEY PERFORMANCE INDICATORS</p>
+        <div class="figures-grid" id="figures-kpis" aria-live="polite"></div>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">TIME CATEGORIES</p>
+        <table class="figures-time">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Time</th>
+              <th>Share of calendar time</th>
+            </tr>
+          </thead>
+          <tbody id="figures-time"></tbody>
+        </table>
       </div>
     </div>
-  </div>
-
-  <!-- Figure cards -->
-  <div class="admin-card">
-    <p class="admin-card-title">FLEET FIGURES</p>
-
-    <div class="figures-grid">
-
-      <div class="figure-card">
-        <p class="figure-name">Asset utilisation</p>
-        <p class="figure-value" id="figure-asset-utilisation">—</p>
-        <p class="figure-definition">
-          Operating time as a proportion of total calendar time.
-        </p>
-      </div>
-
-      <div class="figure-card">
-        <p class="figure-name">Operating efficiency</p>
-        <p class="figure-value" id="figure-operating-efficiency">—</p>
-        <p class="figure-definition">
-          Working time as a proportion of operating time.
-        </p>
-      </div>
-
-      <div class="figure-card">
-        <p class="figure-name">Effective utilisation</p>
-        <p class="figure-value" id="figure-effective-utilisation">—</p>
-        <p class="figure-definition">
-          Working time during scheduled service hours as a proportion of scheduled time.
-        </p>
-      </div>
-
-    </div>
-  </div>
-</div>
 
     <!-- ---- Downtime (S18-S20): stored in memory until /api/downtime exists ---- -->
     <div class="admin-panel" id="tab-downtime" hidden>
@@ -249,7 +249,14 @@
   </main>
 </div>
 
+<!-- The Figures tab reuses the dashboard's API wrappers, Perth time
+     formatting and GMG figure definitions. -->
+<script src="js/api.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/format.js"></script>
+<script src="js/tum.js"></script>
 <script src="js/admin.js"></script>
 <script src="js/operator.js"></script>
+<script src="js/figures.js"></script>
 </body>
 </html>

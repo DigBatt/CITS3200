@@ -122,7 +122,75 @@ I dont know the format of the data we get here yet, so this is mostly a placehol
 
 ## `GET /api/metrics`
 
-This will be for utilisation figures. Not implemented yet.
+Utilisation figures from the GMG time usage model
+([GMG Time Utilisation Model.md](GMG%20Time%20Utilisation%20Model.md)), per
+vehicle over a period. Same `vehicles`, `from` and `to` parameters, defaults
+and errors as `/api/positions`. Thresholds come from the `utilisation` block of
+`config/app.yaml`.
+
+```json
+{
+  "from": "2025-09-03T16:00:00.000000Z",
+  "to": "2025-09-04T15:59:59.999999Z",
+  "vehicles": [
+    {
+      "vehicle_id": "1",
+      "from": "2025-09-03T16:00:00.000000Z",
+      "to": "2025-09-04T15:59:59.999999Z",
+      "buckets": {
+        "calendar_seconds": 86399.999999,
+        "scheduled_seconds": 32400.0,
+        "unscheduled_seconds": 53999.999999,
+        "operating_seconds": 2247.01,
+        "working_seconds": 2164.54,
+        "scheduled_working_seconds": 2164.54,
+        "operating_delay_seconds": 82.47,
+        "standby_seconds": 0.0,
+        "not_reporting_seconds": 84152.99,
+        "downtime_seconds": null,
+        "available_seconds": null,
+        "productive_seconds": null
+      },
+      "kpis": {
+        "asset_utilisation": 0.026,
+        "effective_utilisation": 0.0668,
+        "operating_efficiency": 0.9633,
+        "uptime": null,
+        "mechanical_availability": null,
+        "physical_availability": null,
+        "use_of_availability": null,
+        "production_effectiveness": null
+      },
+      "unavailable": {
+        "uptime": "needs downtime; no fault or maintenance log in the data",
+        "...": "one entry per figure above that cannot be given"
+      }
+    }
+  ]
+}
+```
+
+Times are seconds and KPIs are fractions (`0.026` is 2.6%).
+
+**Unavailable is not zero.** A bucket or KPI the data cannot support is
+`null`, and `unavailable` gives the reason under the same key. Every `null`
+has a reason (`tests/test_metrics_unavailable.py`), and a figure with a reason
+is not to be shown as a number even if it has one: with no depot configured,
+`standby_seconds` is `0` but has a reason, since stopped time is then counted
+as operating delay. What stays unavailable, and why:
+
+| Figure | Unavailable when |
+|---|---|
+| `downtime_seconds`, `available_seconds`, `uptime`, `mechanical_availability`, `physical_availability`, `use_of_availability` | Always: needs a fault or maintenance log. |
+| `productive_seconds`, `production_effectiveness` | Always: needs passenger counts. |
+| `scheduled_seconds`, `unscheduled_seconds`, `scheduled_working_seconds`, `effective_utilisation` | No `utilisation.service_hours` configured. |
+| `effective_utilisation` | No scheduled time in the period, e.g. a weekend. |
+| `operating_efficiency` | No operating time in the period. |
+| `standby_seconds` | No `utilisation.depot` configured. |
+
+`calendar_seconds` covers the whole period, including any part still to come
+if `to` is in the future, where it counts as not reporting; leave `to` out to
+stop at now.
 
 ---
 

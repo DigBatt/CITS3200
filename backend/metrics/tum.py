@@ -408,6 +408,11 @@ def summarise(
         )
         result.unavailable["scheduled_seconds"] = result.unavailable["effective_utilisation"]
         result.unavailable["scheduled_working_seconds"] = result.unavailable["effective_utilisation"]
+        result.unavailable["unscheduled_seconds"] = result.unavailable["effective_utilisation"]
+    elif not scheduled:
+        # Scheduled time is known and is zero, e.g. a weekend: the ratio has
+        # nothing to divide by, which is not the same as 0%.
+        result.unavailable["effective_utilisation"] = "no scheduled service time in this window"
     if not operating:
         result.unavailable["operating_efficiency"] = "no operating time in this window"
     if not settings.has_depot:

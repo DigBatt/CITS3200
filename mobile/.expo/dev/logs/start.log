@@ -1,0 +1,73 @@
+{"_e":"root:init","_t":1790224249761,"format":"v0-jsonl","version":"57.0.26"}
+{"_e":"env:mode","_t":1790224249761,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1790224249762,"mode":"development","files":["../../../.env"],"env":{"EXPO_PUBLIC_API_PORT":"5001"}}
+{"_e":"devserver:start","_t":1790224249828,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../src/app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1790224249906,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1790224249955,"plugins":[]}
+{"_e":"metro:instantiate","_t":1790224250105,"atlas":false,"workers":7,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1790224276201,"id":"2","platform":"ios","environment":null,"entry":"node_modules/expo-router/entry.js"}
+{"_e":"metro:bundling:progress","_t":1790224276201,"id":"2","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1790224276203,"id":"2","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1790224276303,"id":"2","progress":0.2894685480489815,"total":526,"current":283}
+{"_e":"metro:bundling:progress","_t":1790224276403,"id":"2","progress":0.7784404664499455,"total":977,"current":862}
+{"_e":"metro:bundling:done","_t":1790224276517,"id":"2","total":977,"ms":316.117417}
+{"_e":"metro:server_log","_t":1790224345154,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","host.exp.Exponent","iPhone","60"]}
+{"_e":"metro:server_log","_t":1790224582277,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","host.exp.Exponent","iPhone","60"]}
+{"_e":"root:init","_t":1790241896794,"format":"v0-jsonl","version":"57.0.26"}
+{"_e":"env:mode","_t":1790241896794,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1790241896796,"mode":"development","files":["../../../.env"],"env":{"EXPO_PUBLIC_API_PORT":"5001"}}
+{"_e":"devserver:start","_t":1790241896940,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../src/app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1790241897086,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1790241897172,"plugins":[]}
+{"_e":"metro:instantiate","_t":1790241897379,"atlas":false,"workers":7,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1790242015009,"id":"3","platform":"ios","environment":null,"entry":"node_modules/expo-router/entry.js"}
+{"_e":"metro:bundling:progress","_t":1790242015010,"id":"3","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1790242015015,"id":"3","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1790242015115,"id":"3","progress":0.27078532235939645,"total":540,"current":281}
+{"_e":"metro:bundling:progress","_t":1790242015216,"id":"3","progress":0.765625,"total":1040,"current":910}
+{"_e":"metro:bundling:done","_t":1790242015309,"id":"3","total":1040,"ms":299.270625}
+{"_e":"metro:bundling:started","_t":1790251205832,"id":"6","platform":"ios","environment":null,"entry":"node_modules/expo-router/entry.js"}
+{"_e":"metro:bundling:progress","_t":1790251205832,"id":"6","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1790251205851,"id":"6","total":1,"ms":19.340084}
+{"_e":"metro:server_log","_t":1790251344846,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","host.exp.Exponent","iPhone","60"]}
+{"_e":"metro:bundling:started","_t":1790253281868,"id":"9","platform":"ios","environment":null,"entry":"node_modules/expo-router/entry.js"}
+{"_e":"metro:bundling:progress","_t":1790253281868,"id":"9","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1790253281904,"id":"9","total":1,"ms":36.214084}
+{"_e":"metro:server_log","_t":1790254041379,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","host.exp.Exponent","iPhone","60"]}
+{"_e":"root:init","_t":1790254714324,"format":"v0-jsonl","version":"57.0.26"}
+{"_e":"env:mode","_t":1790254714324,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1790254714325,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1790254716439,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../src/app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1790254716583,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1790254716662,"plugins":[]}
+{"_e":"metro:instantiate","_t":1790254716888,"atlas":false,"workers":7,"host":"::","port":8082}
+{"_e":"root:init","_t":1790254729116,"format":"v0-jsonl","version":"57.0.26"}
+{"_e":"env:mode","_t":1790254729116,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1790254729117,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1790254729189,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../src/app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1790254729251,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1790254729301,"plugins":[]}
+{"_e":"metro:instantiate","_t":1790254729426,"atlas":false,"workers":7,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1790254753952,"id":"2","platform":"ios","environment":null,"entry":"node_modules/expo-router/entry.js"}
+{"_e":"metro:bundling:progress","_t":1790254753952,"id":"2","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1790254753955,"id":"2","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1790254754055,"id":"2","progress":0.2682362677588091,"total":614,"current":318}
+{"_e":"metro:bundling:progress","_t":1790254754155,"id":"2","progress":0.7892125992293133,"total":1084,"current":963}
+{"_e":"metro:bundling:done","_t":1790254754231,"id":"2","total":1084,"ms":278.562459}
+{"_e":"metro:server_log","_t":1790254948465,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","host.exp.Exponent","iPhone","60"]}
+{"_e":"metro:server_log","_t":1790255780353,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","host.exp.Exponent","iPhone","60"]}
+{"_e":"metro:server_log","_t":1790257814961,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","host.exp.Exponent","iPhone","60"]}
+{"_e":"root:init","_t":1790258140307,"format":"v0-jsonl","version":"57.0.26"}
+{"_e":"env:mode","_t":1790258140307,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1790258140308,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1790258140457,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../src/app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1790258140593,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1790258140686,"plugins":[]}
+{"_e":"metro:instantiate","_t":1790258140909,"atlas":false,"workers":7,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1790331186886,"id":"4","platform":"ios","environment":null,"entry":"node_modules/expo-router/entry.js"}
+{"_e":"metro:bundling:progress","_t":1790331186887,"id":"4","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1790331186890,"id":"4","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1790331186990,"id":"4","progress":0.3249863693755739,"total":528,"current":301}
+{"_e":"metro:bundling:progress","_t":1790331187093,"id":"4","progress":0.7856783266106813,"total":1065,"current":944}
+{"_e":"metro:bundling:done","_t":1790331187186,"id":"4","total":1065,"ms":299.227708}
+{"_e":"metro:server_log","_t":1790331281104,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","host.exp.Exponent","iPhone","60"]}
