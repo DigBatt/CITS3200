@@ -19,10 +19,12 @@ from backend.stops import StopsError, parse_stops
 BOUNDS = {"latitude": [-36.0, -13.0], "longitude": [112.0, 130.0]}
 
 # The three stops the Client named, at the coordinates agreed for S06.2.
+# business-school was later corrected to the actual car park rather than the
+# point on the current GPS track (config/stops.yaml's comment on that stop).
 CLIENT_STOPS = {
     "reid-library": (-31.97901221771226, 115.8183554056777),
     "civ-mech": (-31.980743857374474, 115.81720535774184),
-    "business-school": (-31.985583444723204, 115.82089500479223),
+    "business-school": (-31.9848813, 115.8201024),
 }
 
 

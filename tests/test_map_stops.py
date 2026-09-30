@@ -108,8 +108,8 @@ def test_every_configured_stop_is_drawn(page):
     assert page.locator(STOP_PATHS).count() == 4
 
 
-def test_each_stop_shows_its_name(page):
-    assert labels(page) == ["North End", "Orphan Stop", "Shared Stop", "South End"]
+def test_each_stop_shows_its_id(page):
+    assert labels(page) == ["north-end", "orphan", "shared", "south-end"]
 
 
 def test_stops_are_drawn_under_the_vehicles(page):
@@ -158,13 +158,13 @@ def test_selected_route_stops_are_distinct_from_the_rest(page):
     highlighted = page.locator(f'{STOP_PATHS}[fill="{ON_ROUTE_COLOUR}"]')
     assert highlighted.count() == 2  # north-end and shared
 
-    assert labels(page, ".stop-label.is-dimmed") == ["Orphan Stop", "South End"]
+    assert labels(page, ".stop-label.is-dimmed") == ["orphan", "south-end"]
 
 
 def test_a_stop_on_two_routes_is_highlighted_on_each(page):
     for route in ("North Route", "South Route"):
         select_route(page, route)
-        assert "Shared Stop" not in labels(page, ".stop-label.is-dimmed")
+        assert "shared" not in labels(page, ".stop-label.is-dimmed")
 
 
 def test_all_routes_clears_the_highlighting(page):

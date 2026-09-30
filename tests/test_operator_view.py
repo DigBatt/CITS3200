@@ -231,7 +231,7 @@ def page(browser, server):
 
 def test_page_shows_stops_in_order_with_empty_state(page):
     names = page.locator(".operator-stop-name").all_inner_texts()
-    assert [n.split("VEHICLE HERE")[0].strip() for n in names] == ["North End", "Shared", "South End"]
+    assert [n.split("VEHICLE HERE")[0].strip() for n in names] == ["north-end", "shared", "south-end"]
     assert page.locator("#operator-empty").is_visible()
 
 
