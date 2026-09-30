@@ -443,6 +443,68 @@
   cursor: default;
 }
 
+/* Figures view (#70) */
+.figures-period {
+  display: flex;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+.figures-period > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.figures-label {
+  font: 600 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+.figures-period-value {
+  font: 500 12px 'IBM Plex Mono', monospace;
+  color: #1c1917;
+}
+
+.figures-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.figure-card {
+  padding: 16px;
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-radius: 8px;
+  background: rgba(28, 25, 23, 0.02);
+}
+
+.figure-name {
+  margin: 0 0 10px;
+  font: 600 12px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.7);
+}
+
+.figure-value {
+  margin: 0 0 10px;
+  font: 600 22px 'IBM Plex Mono', monospace;
+  color: #1c1917;
+}
+
+.figure-definition {
+  margin: 0;
+  font: 400 11.5px Sora, sans-serif;
+  line-height: 1.5;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+@media (max-width: 700px) {
+  .figures-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Stops list — used by S06 once stops are configured */
 .stops-list {
   display: flex;
