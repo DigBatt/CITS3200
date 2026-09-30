@@ -40,18 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // The docked mini month, on screen for every view. Same wiring as the
-  // admin page, so the two behave identically.
-  ServiceCalendar.mount({
-    mini: document.getElementById('dashboard-mini'),
-    overlay: document.getElementById('cal-overlay'),
-    body: document.getElementById('cal-overlay-body'),
-    close: document.getElementById('cal-overlay-close'),
-  }, {
-    // Folded to start on a narrow screen, where a month would cover the map.
-    // The month name unfolds it.
-    collapsed: window.innerWidth < 760,
-  });
+  // The docked mini month and the timeline under it are mounted by main.js,
+  // which owns the range they pick.
 
   // The header wraps at narrow widths, so its height is measured rather than
   // assumed; the dock hangs just below whatever it ends up being.

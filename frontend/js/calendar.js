@@ -316,9 +316,21 @@
   //
   // It says nothing about which vehicle: at this size a mark per bus would be
   // unreadable, and the full view is one click away for that.
+  //
+  // Given `options.range`, it is also the dashboard's date picker: pressing a
+  // day and dragging across others selects them, and the full calendar moves
+  // to an expand button in the head, since a day press no longer opens it.
+  // The range itself is owned by the caller (js/timeline.js on the dashboard):
+  //   range.get()          -> { start, end } as local "YYYY-MM-DD"
+  //   range.select(a, b)   <- the days the operator let go on, a <= b
+  //   range.max()          -> the last selectable day; later ones are shown
+  //                           but cannot be picked
+
+  const isoDate = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
   function createMini(container, options = {}) {
     const onOpen = options.onOpen ?? (() => {});
+    const range = options.range ?? null;
     // Collapsed shows the month bar alone, which is the whole dock on a small
     // screen where a full month would bury what is behind it.
     let collapsed = Boolean(options.collapsed);
@@ -328,6 +340,8 @@
     let schedule = null;
     let downtime = [];
     let error = null;
+    // A drag in progress: the day it started on and the day under the pointer.
+    let drag = null;
 
     // Six weeks from the Monday on or before the 1st, so the grid never jumps
     // height between months.
@@ -375,18 +389,23 @@
       }
 
       const today = startOfDay(new Date()).getTime();
+      const max = range?.max();
       const grid = cells()
         .map((day) => {
           const marks = [
             hasService(day) ? '<span class="mini-mark is-service"></span>' : '',
             hasDowntime(day) ? '<span class="mini-mark is-downtime"></span>' : '',
           ].join('');
+          const future = Boolean(max) && isoDate(day) > max;
           const classes = [
             'mini-day',
             day.getMonth() === month.getMonth() ? '' : 'is-outside',
             day.getTime() === today ? 'is-today' : '',
+            future ? 'is-future' : '',
           ].filter(Boolean).join(' ');
-          return `<button type="button" class="${classes}" data-mini-day="${day.toISOString()}">
+          // aria-disabled rather than disabled: a disabled button swallows
+          // the pointer events a drag passing over it still needs.
+          return `<button type="button" class="${classes}" data-mini-day="${day.toISOString()}" data-mini-date="${isoDate(day)}"${future ? ' aria-disabled="true"' : ''}>
                     <span class="mini-num">${day.getDate()}</span>
                     <span class="mini-marks">${marks}</span>
                   </button>`;
@@ -396,8 +415,12 @@
       // No title: the dock is unlabelled by design, the overlay names itself.
       // The month name toggles the grid rather than opening the calendar, so
       // the dock can be folded down to a bar and back.
+      const expand = range
+        ? '<button type="button" class="mini-step mini-expand" data-mini-expand aria-label="Open the full calendar" title="Open the full calendar">&#10530;</button>'
+        : '';
       const head = `
         <div class="mini-head">
+          ${expand}
           <button type="button" class="mini-step" data-mini-month="-1" aria-label="Previous month">&#8249;</button>
           <button type="button" class="mini-month" data-mini-toggle aria-expanded="${!collapsed}"
                   title="${collapsed ? 'Show the month' : 'Hide the month'}">
@@ -407,10 +430,11 @@
           <button type="button" class="mini-step" data-mini-month="1" aria-label="Next month">&#8250;</button>
         </div>`;
 
+      const ranged = range ? ' is-ranged' : '';
       container.innerHTML = collapsed
-        ? `<div class="mini is-collapsed">${head}</div>`
+        ? `<div class="mini is-collapsed${ranged}">${head}</div>`
         : `
-        <div class="mini">
+        <div class="mini${ranged}">
           ${head}
           <div class="mini-dows">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d) => `<span>${d}</span>`).join('')}</div>
           <div class="mini-grid">${grid}</div>
@@ -419,12 +443,75 @@
             <span><span class="mini-mark is-downtime"></span>Downtime</span>
           </div>
         </div>`;
+      paint();
+    }
+
+    // Marks the selected days in place, without rebuilding the grid, so a
+    // drag can repaint on every move without losing the pointer.
+    function paint() {
+      if (!range) return;
+      let start;
+      let end;
+      if (drag) {
+        [start, end] = [drag.from, drag.over].sort();
+      } else {
+        ({ start, end } = range.get() ?? {});
+      }
+      container.querySelectorAll('[data-mini-date]').forEach((cell) => {
+        const date = cell.dataset.miniDate;
+        const inside = Boolean(start) && date >= start && date <= end;
+        cell.classList.toggle('is-in-range', inside);
+        cell.classList.toggle('is-range-start', inside && date === start);
+        cell.classList.toggle('is-range-end', inside && date === end);
+        cell.setAttribute('aria-pressed', String(inside));
+      });
+    }
+
+    // Days under the pointer, clamped to the last selectable one so a drag
+    // running on into the future still ends on today.
+    function dateAt(x, y) {
+      const cell = document.elementFromPoint(x, y)?.closest('[data-mini-date]');
+      if (!cell || !container.contains(cell)) return null;
+      const max = range.max();
+      return cell.dataset.miniDate > max ? max : cell.dataset.miniDate;
+    }
+
+    if (range) {
+      container.addEventListener('pointerdown', (event) => {
+        const cell = event.target.closest('[data-mini-date]');
+        if (!cell || event.button !== 0 || cell.getAttribute('aria-disabled') === 'true') return;
+        // Keeps the press from selecting text or scrolling while dragging.
+        event.preventDefault();
+        drag = { from: cell.dataset.miniDate, over: cell.dataset.miniDate };
+        container.setPointerCapture(event.pointerId);
+        paint();
+      });
+      container.addEventListener('pointermove', (event) => {
+        if (!drag) return;
+        const date = dateAt(event.clientX, event.clientY);
+        if (date && date !== drag.over) {
+          drag.over = date;
+          paint();
+        }
+      });
+      container.addEventListener('pointerup', () => {
+        if (!drag) return;
+        const [start, end] = [drag.from, drag.over].sort();
+        drag = null;
+        range.select(start, end);
+        paint();
+      });
+      container.addEventListener('pointercancel', () => {
+        drag = null;
+        paint();
+      });
     }
 
     container.addEventListener('click', (event) => {
       const toggle = event.target.closest('[data-mini-toggle]');
       const step = event.target.closest('[data-mini-month]');
       const day = event.target.closest('[data-mini-day]');
+      const expand = event.target.closest('[data-mini-expand]');
 
       // Folding and paging both stay inside the dock, so they are checked
       // before the click can fall through to opening the full calendar.
@@ -439,11 +526,24 @@
         refresh();
         return;
       }
+      if (expand) {
+        onOpen(range ? new Date(`${range.get().end}T00:00`) : new Date());
+        return;
+      }
+      if (range) {
+        // A mouse or touch press was handled as a drag. A keyboard press
+        // (detail 0) picks the one day, so the grid still works without one.
+        if (day && event.detail === 0 && day.getAttribute('aria-disabled') !== 'true') {
+          range.select(day.dataset.miniDate, day.dataset.miniDate);
+          paint();
+        }
+        return;
+      }
       if (day) onOpen(new Date(day.dataset.miniDay));
     });
 
     refresh();
-    return { refresh };
+    return { refresh, paint };
   }
 
 
@@ -475,14 +575,19 @@
       document.body.classList.remove('is-overlaid');
     }
 
-    const mini = createMini(miniElement, { onOpen: open, collapsed: options.collapsed });
+    const mini = createMini(miniElement, { onOpen: open, collapsed: options.collapsed, range: options.range });
 
     // A click anywhere on the dock that is not a day or a month arrow still
-    // does the obvious thing.
+    // does the obvious thing. Not when picking a range, where a stray click
+    // at the end of a drag would open the overlay over the selection.
     miniElement.addEventListener('click', (event) => {
+      if (options.range) return;
       if (!event.target.closest('[data-mini-day], [data-mini-month], [data-mini-toggle]')) open();
     });
     miniElement.addEventListener('keydown', (event) => {
+      // Only the dock itself: Enter on a day or arrow inside it is that
+      // button's own click.
+      if (event.target !== miniElement) return;
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         open();
@@ -501,6 +606,8 @@
     return {
       open,
       close: shut,
+      // Repaint the selected days, after the range changes elsewhere.
+      paintRange: () => mini.paint(),
       refresh() {
         mini.refresh();
         full?.refresh();

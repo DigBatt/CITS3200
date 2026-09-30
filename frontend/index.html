@@ -42,16 +42,15 @@
       <div class="app-avatar" data-stub="current-user">JD</div>
     </header>
 
-    <!-- Mini month, docked top right under the header. Deliberately
-         unlabelled; clicking a day opens the full calendar on that day.
+    <!-- Mini month, docked top right under the header, and the period
+         control under it. Drag across days to choose the dates; the Live
+         button and the start/end sliders under it set the times. The expand
+         button in the month bar opens the full calendar.
          AUTH (S13): view only, and the reads behind it stay public. -->
-    <aside class="mini-cal-dock" id="mini-cal-dock">
-      <div id="dashboard-mini" role="button" tabindex="0" aria-haspopup="dialog"
-           aria-label="Service calendar, click a day to open"></div>
+    <aside class="mini-cal-dock is-ranged" id="mini-cal-dock">
+      <div id="dashboard-mini" aria-label="Service calendar, drag across days to choose the period"></div>
+      <div id="timeline-container"></div>
     </aside>
-
-    <!-- ============ Date/time range control ============ -->
-    <div id="timeline-container"></div>
 
     <!-- ============ Vehicle filter chips, rendered by js/vehicles.js ============ -->
     <div class="filter-bar">

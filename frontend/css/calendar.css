@@ -383,6 +383,41 @@
 .mini-legend span { display: inline-flex; align-items: center; gap: 0.25rem; }
 .mini-legend .mini-mark { width: 0.6rem; flex: none; }
 
+/* Range picking (the dashboard dock). Days join into one band across a
+   week, so the columns close up, and a press on the grid drags rather than
+   scrolls or selects text. */
+.mini.is-ranged .mini-grid {
+  column-gap: 0;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mini-day.is-in-range {
+  border-radius: 0;
+  background: rgba(47, 125, 143, 0.16);
+}
+
+.mini-day.is-in-range:hover { background: rgba(47, 125, 143, 0.26); }
+.mini-day.is-range-start { border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
+.mini-day.is-range-end { border-top-right-radius: 5px; border-bottom-right-radius: 5px; }
+
+.mini-day.is-range-start,
+.mini-day.is-range-end {
+  background: rgba(47, 125, 143, 0.32);
+  font-weight: 600;
+}
+
+/* Nothing has happened there yet, so it cannot be picked. */
+.mini-day.is-future {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.mini-day.is-future:hover { background: transparent; }
+
+.mini-expand { font-size: 0.75rem; }
+
 /* ---- Full calendar overlay ---- */
 
 .cal-overlay {
