@@ -160,7 +160,7 @@ function renderStops(data, hereStopId) {
   operatorEls.stops.innerHTML = data.stops.map((stop, index) => `
     <li class="operator-stop ${stop.waiting ? 'has-waiting' : ''}" data-stop-id="${operatorEscape(stop.id)}">
       <span class="operator-stop-index">${index + 1}</span>
-      <span class="operator-stop-name">${operatorEscape(stop.name)}${
+      <span class="operator-stop-name">${operatorEscape(stop.id)}${
         stop.id === hereStopId ? '<span class="operator-stop-here">VEHICLE HERE</span>' : ''
       }</span>
       <span class="operator-stop-count">
