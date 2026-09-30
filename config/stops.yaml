@@ -12,9 +12,9 @@ stops:
     longitude: 115.81720535774184
 
   - id: business-school   # this is the actual business school car park and not the location on the current gps track the buses follow.
-    name: Outside the Business School carpark
-    latitude: -31.985583444723204
-    longitude: 115.82089500479223
+    name: Business School carpark on Underwood Parade
+    latitude: -31.9848813
+    longitude: 115.8201024
 
   - id: guild-village
     name: Intersection of Saw Promenade and Graduates walk
@@ -47,7 +47,7 @@ stops:
     longitude: 115.8165538
 
   - id: law-library
-    name: In wide path outside Law library 
+    name: North side of Law library 
     latitude: -31.9793561
     longitude: 115.8194325
 
