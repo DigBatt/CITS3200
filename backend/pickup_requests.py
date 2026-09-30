@@ -99,6 +99,41 @@ class PickupRequestStore:
                 self._requests[r.id] = r
         return sorted(closed, key=lambda r: r.created_at)
 
+    def get(self, request_id: str) -> Optional[PickupRequest]:
+        """
+        One request by id, or None if there is no such id.
+        """
+        with self._lock:
+            return self._requests.get(request_id)
+
+    def most_recent_for_rider(self, rider_token: str) -> Optional[PickupRequest]:
+        """
+        This rider's own latest request, any status, or None if they have
+        never made one. Backs the rider's own view of their request
+        (GET /api/pickup-requests/mine), which is deliberately not the
+        admin-only full list (S13) since a rider needs no sign-in.
+        """
+        with self._lock:
+            mine = [r for r in self._requests.values() if r.rider_token == rider_token]
+        return max(mine, key=lambda r: r.created_at) if mine else None
+
+    def cancel(self, request_id: str, now: datetime) -> Optional[PickupRequest]:
+        """
+        The rider withdraws their own request (S15). Ownership is the
+        caller's job to check first; this only re-checks that the request is
+        still open, atomically with the write, so a request an admin just
+        collected (or that just expired) is not overwritten by a late cancel.
+
+        Returns the cancelled request, or None if it was not open.
+        """
+        with self._lock:
+            existing = self._requests.get(request_id)
+            if existing is None or existing.status != PickupRequest.OPEN:
+                return None
+            cancelled = replace(existing, status=PickupRequest.CANCELLED, cleared_at=now)
+            self._requests[request_id] = cancelled
+            return cancelled
+
     def expire(self, now: datetime, max_age: timedelta) -> list[PickupRequest]:
         """
         Mark open requests older than `max_age` as expired (S10). Kept like

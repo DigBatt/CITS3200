@@ -16,8 +16,9 @@ Always shaped:
 ```
 
 Codes: `bad_timestamp`, `bad_range` (from > to), `unknown_vehicle`,
-`unknown_stop`, `unknown_route`, `data_unavailable`, `not_signed_in`,
-`bad_credentials`, `admin_not_configured`.
+`unknown_stop`, `unknown_route`, `unknown_request`, `not_your_request`,
+`request_not_open`, `data_unavailable`, `not_signed_in`, `bad_credentials`,
+`admin_not_configured`.
 
 **Signing in.** Endpoints marked *Admin only* answer `401` `not_signed_in`
 until the browser has signed in through `POST /api/admin/login` (see
@@ -247,13 +248,47 @@ poll so a bus doesn't skip a stop with a rider waiting.
 ```
 
 A request leaves `open` once: `collected` when the operator clears its
-stop, or `expired` when it has been open longer than
-`pickup_requests.expire_after_seconds` in `config/app.yaml`. Either way the
-record is kept with `cleared_at` set, so `?status=collected` and
-`?status=expired` are the admin's record of the day. Expiry is applied when
-requests are read or opened, not by a background job.
+stop, `expired` when it has been open longer than
+`pickup_requests.expire_after_seconds` in `config/app.yaml`, or `cancelled`
+when the rider withdraws it themselves (`POST /api/pickup-requests/<id>/cancel`
+below). Either way the record is kept with `cleared_at` set, so
+`?status=collected` and `?status=expired` are the admin's record of the day.
+Expiry is applied when requests are read or opened, not by a background job.
 
 The store is in memory, so a restart clears every request, open or closed.
+
+### `GET /api/pickup-requests/mine`
+
+S15. The calling rider's own most recent request, any status, identified by
+the `rider_token` cookie — not admin-only, since it only ever answers with
+the caller's own request. Backs the rider view polling to notice its own
+request going `collected` (to show a "leave a review" prompt) or `expired`.
+
+```json
+{ "request": { "...": "as in POST above" } }
+```
+
+`{"request": null}` if this rider has no `rider_token` cookie yet, or has
+never made a request — not an error, since that is the normal state before a
+rider's first request.
+
+### `POST /api/pickup-requests/<id>/cancel`
+
+S15. The rider withdraws their own request. No body. Ownership is the same
+`rider_token` cookie POST /api/pickup-requests uses, so no sign-in is needed,
+but a rider cannot cancel someone else's request.
+
+`404` `unknown_request` if the id is not on record. `403` `not_your_request`
+if the caller's cookie does not match the request's rider. `409`
+`request_not_open` if it has already been collected, expired, or cancelled.
+Otherwise `200`:
+
+```json
+{ "request": { "...": "as in POST above, with status cancelled and cleared_at set" } }
+```
+
+A rider who asks again at the same stop afterwards opens a new request, the
+same as after being collected.
 
 ### `GET /api/routes/<id>/waiting`
 

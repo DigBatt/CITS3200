@@ -144,6 +144,7 @@ class PickupRequest:
     OPEN = "open"
     COLLECTED = "collected"
     EXPIRED = "expired"
+    CANCELLED = "cancelled"
 
     def to_dict(self) -> dict[str, Any]:
         return {

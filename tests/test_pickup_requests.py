@@ -132,6 +132,91 @@ def test_list_can_filter_by_status(client):
     assert client.get("/api/pickup-requests?status=collected").get_json()["requests"] == []
 
 
+# ---- S15: GET /api/pickup-requests/mine ----
+
+
+def test_mine_is_null_with_no_rider_cookie(client):
+    assert client.get("/api/pickup-requests/mine").get_json()["request"] is None
+
+
+def test_mine_returns_my_own_open_request(client):
+    created = client.post("/api/pickup-requests", json={"stop_id": "reid-library"}).get_json()["request"]
+    mine = client.get("/api/pickup-requests/mine").get_json()["request"]
+    assert mine["id"] == created["id"]
+    assert mine["status"] == "open"
+
+
+def test_mine_does_not_see_another_riders_request(app):
+    rider_a = app.test_client()
+    rider_b = app.test_client()
+    rider_a.post("/api/pickup-requests", json={"stop_id": "reid-library"})
+
+    assert rider_b.get("/api/pickup-requests/mine").get_json()["request"] is None
+
+
+# ---- S15: POST /api/pickup-requests/<id>/cancel ----
+
+
+def test_cancel_own_open_request(client):
+    created = client.post("/api/pickup-requests", json={"stop_id": "reid-library"}).get_json()["request"]
+
+    response = client.post(f"/api/pickup-requests/{created['id']}/cancel")
+    assert response.status_code == 200
+    body = response.get_json()["request"]
+    assert body["status"] == "cancelled"
+    assert body["cleared_at"] is not None
+
+    assert client.get("/api/pickup-requests/mine").get_json()["request"]["status"] == "cancelled"
+
+
+def test_cancel_unknown_id_is_404(client):
+    response = client.post("/api/pickup-requests/does-not-exist/cancel")
+    assert response.status_code == 404
+    assert response.get_json()["error"]["code"] == "unknown_request"
+
+
+def test_cancel_someone_elses_request_is_403(app):
+    rider_a = app.test_client()
+    rider_b = app.test_client()
+    created = rider_a.post("/api/pickup-requests", json={"stop_id": "reid-library"}).get_json()["request"]
+
+    response = rider_b.post(f"/api/pickup-requests/{created['id']}/cancel")
+    assert response.status_code == 403
+    assert response.get_json()["error"]["code"] == "not_your_request"
+
+
+def test_cancel_needs_no_login(client):
+    """
+    No auth header, no admin session: just the rider_token cookie. S08.5-style
+    guarantee extended to S15's rider-facing endpoints.
+    """
+    created = client.post("/api/pickup-requests", json={"stop_id": "reid-library"}).get_json()["request"]
+    response = client.post(f"/api/pickup-requests/{created['id']}/cancel")
+    assert response.status_code == 200
+
+
+def test_cancelling_an_already_collected_request_is_409(client):
+    created = client.post("/api/pickup-requests", json={"stop_id": "reid-library"}).get_json()["request"]
+    client.post("/api/stops/reid-library/collect")
+
+    response = client.post(f"/api/pickup-requests/{created['id']}/cancel")
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "request_not_open"
+
+
+def test_cancelling_frees_the_stop_for_a_new_request(client):
+    """
+    Cancelling closes the request, so it is no longer "open" and the
+    no-duplicate rule (S08.3) does not block a fresh one at the same stop.
+    """
+    created = client.post("/api/pickup-requests", json={"stop_id": "reid-library"}).get_json()["request"]
+    client.post(f"/api/pickup-requests/{created['id']}/cancel")
+
+    second = client.post("/api/pickup-requests", json={"stop_id": "reid-library"})
+    assert second.status_code == 201
+    assert second.get_json()["request"]["id"] != created["id"]
+
+
 # ---- S08.5: a new stop appearing in the list ----
 
 

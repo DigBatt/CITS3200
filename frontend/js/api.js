@@ -53,3 +53,22 @@ async function createPickupRequest(stopId) {
   }
   return { request: body.request, created: response.status === 201 };
 }
+
+// GET /api/pickup-requests/mine. No auth: identified by the rider_token
+// cookie (S08.2, S15). Resolves to { request: null } if this rider has no
+// cookie yet, or has never made a request — the normal state, not an error.
+function getMyPickupRequest() {
+  return request('/api/pickup-requests/mine');
+}
+
+// POST /api/pickup-requests/<id>/cancel (S15). Resolves to the cancelled
+// request, or throws with the API's message (e.g. it was already collected).
+async function cancelPickupRequest(requestId) {
+  const response = await fetch(`/api/pickup-requests/${encodeURIComponent(requestId)}/cancel`, { method: 'POST' });
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
+  }
+  return body.request;
+}
