@@ -26,12 +26,13 @@
       <span class="app-header-brand-tag">ADMIN</span>
     </div>
 
-    <nav class="app-tabs" id="admin-tabs" aria-label="Admin sections">
-      <button type="button" class="app-tab is-active" data-tab="operator">Operator view</button>
-      <button type="button" class="app-tab" data-tab="downtime">Downtime</button>
-      <button type="button" class="app-tab" data-tab="snapshots">Snapshots</button>
-      <button type="button" class="app-tab" data-tab="stops">Stops &amp; routes</button>
-    </nav>
+<nav class="app-tabs" id="admin-tabs" aria-label="Admin sections">
+  <button type="button" class="app-tab is-active" data-tab="operator">Operator view</button>
+  <button type="button" class="app-tab" data-tab="figures">Figures</button>
+  <button type="button" class="app-tab" data-tab="downtime">Downtime</button>
+  <button type="button" class="app-tab" data-tab="snapshots">Snapshots</button>
+  <button type="button" class="app-tab" data-tab="stops">Stops &amp; routes</button>
+</nav>
 
     <div class="app-header-spacer"></div>
 
@@ -76,6 +77,64 @@
         <ol class="operator-stops" id="operator-stops"></ol>
       </div>
     </div>
+
+<!-- ---- Figures view (#70): figures populated by #71 ---- -->
+<div class="admin-panel" id="tab-figures" hidden>
+  <h1 class="admin-section-title">Figures</h1>
+  <p class="admin-section-sub">
+    View fleet performance figures for the selected reporting period.
+  </p>
+
+  <!-- Reporting period -->
+  <div class="admin-card">
+    <p class="admin-card-title">REPORTING PERIOD</p>
+
+    <div class="figures-period">
+      <div>
+        <span class="figures-label">FROM</span>
+        <span class="figures-period-value" id="figures-from">—</span>
+      </div>
+
+      <div>
+        <span class="figures-label">TO</span>
+        <span class="figures-period-value" id="figures-to">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Figure cards -->
+  <div class="admin-card">
+    <p class="admin-card-title">FLEET FIGURES</p>
+
+    <div class="figures-grid">
+
+      <div class="figure-card">
+        <p class="figure-name">Asset utilisation</p>
+        <p class="figure-value" id="figure-asset-utilisation">—</p>
+        <p class="figure-definition">
+          Operating time as a proportion of total calendar time.
+        </p>
+      </div>
+
+      <div class="figure-card">
+        <p class="figure-name">Operating efficiency</p>
+        <p class="figure-value" id="figure-operating-efficiency">—</p>
+        <p class="figure-definition">
+          Working time as a proportion of operating time.
+        </p>
+      </div>
+
+      <div class="figure-card">
+        <p class="figure-name">Effective utilisation</p>
+        <p class="figure-value" id="figure-effective-utilisation">—</p>
+        <p class="figure-definition">
+          Working time during scheduled service hours as a proportion of scheduled time.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</div>
 
     <!-- ---- Downtime (S18-S20): stored in memory until /api/downtime exists ---- -->
     <div class="admin-panel" id="tab-downtime" hidden>
