@@ -44,6 +44,7 @@ async function load() {
   if (request !== latestLoad) return;
 
   if (positions.status === 'fulfilled') {
+    View3D.update(positions.value.vehicles);
     const selection = JSON.stringify(query);
     const drawn = drawTracks(positions.value.vehicles, { fit: selection !== lastFitted });
     if (drawn > 0) lastFitted = selection;
@@ -59,6 +60,7 @@ async function load() {
     // A failed request means there's no valid current selection -- the map
     // shouldn't keep showing whatever trail was drawn before this attempt.
     drawTracks([]);
+    View3D.update([]);
     setStatus(humanizeError(positions.reason.message));
   }
 
