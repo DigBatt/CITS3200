@@ -5,13 +5,10 @@
 // Owns: vehicle markers, position trails, event markers, stop markers.
 
 let map = null;
-const layers = { trails: null, stops: null };
+const layers = { trails: null, stops: null, route: null };
 
 let pendingFit = null;
 
-// Every stop label drawn at once is unreadable when zoomed out past the
-// campus, so below this the names are hidden and the markers stay.
-const STOP_LABEL_MIN_ZOOM = 15;
 
 // Stops are drawn in their own pane, under the trails and vehicle markers.
 let stopRenderer = null;
@@ -42,6 +39,12 @@ const STOP_OFF_ROUTE = {
   fillOpacity: 0.65,
 };
 
+const ROUTE_FALLBACK_COLOUR = '#7c3aed';
+
+// Set true while fine-tuning demo paths. Clicking the map then prints a YAML
+// path point ready to paste into config/stops.yaml.
+const ROUTE_POINT_DEBUG = false;
+
 // The Leaflet style for one stop under the current selection. Kept free of
 // Leaflet and of the DOM so it can be tested on its own.
 function styleForStop(stop, selectedRouteId, routeColour) {
@@ -58,13 +61,21 @@ function initMap() {
   }).addTo(map);
 
   map.createPane('stops').style.zIndex = 350; // below overlayPane (400)
+  map.createPane('routes').style.zIndex = 340; // route line sits behind stop markers
   stopRenderer = L.svg({ pane: 'stops' });
 
+  layers.route = L.layerGroup().addTo(map);
   layers.stops = L.layerGroup().addTo(map);
   layers.trails = L.layerGroup().addTo(map);
 
-  map.on('zoomend', applyStopLabelZoom);
-  applyStopLabelZoom();
+
+  if (ROUTE_POINT_DEBUG) {
+    map.on('click', (event) => {
+      console.log(
+        `  - { latitude: ${event.latlng.lat.toFixed(7)}, longitude: ${event.latlng.lng.toFixed(7)} }`
+      );
+    });
+  }
 }
 
 // Draw the configured stops. They come from config and change only on a
@@ -79,8 +90,8 @@ function drawStops(stops, { popupHtml = null } = {}) {
       pane: 'stops',
       ...STOP_NEUTRAL,
     })
-      .bindTooltip(stop.id, {
-        permanent: true,
+      .bindTooltip(stop.name, {
+        permanent: false,
         direction: 'top',
         offset: [0, -7],
         className: 'stop-label',
@@ -95,19 +106,31 @@ function drawStops(stops, { popupHtml = null } = {}) {
   return stops.length;
 }
 
-// Restyle the drawn stops for the selected route, or for none. The stops a
-// route serves stay full strength; the rest fade, labels included.
-function highlightRoute(stops, selectedRouteId, routeColour) {
+// Restyle the drawn stops for the selected route, or for none. Normal routes
+// fade unrelated stops; demo routes can hide them completely. Labels appear
+// only while the pointer is over a marker.
+function setStopMarkerVisible(marker, visible) {
+  marker.options.routeVisible = visible;
+  const element = marker.getElement();
+  if (!element) return;
+  element.style.display = visible ? '' : 'none';
+  element.style.pointerEvents = visible ? '' : 'none';
+}
+
+function highlightRoute(stops, selectedRouteId, routeColour, hideOtherStops = false) {
   for (const stop of stops) {
     const marker = stopMarkers.get(stop.id);
     if (!marker) continue;
 
+    const onSelectedRoute = Boolean(selectedRouteId) && stop.routes.includes(selectedRouteId);
+    const visible = !hideOtherStops || !selectedRouteId || onSelectedRoute;
+
     marker.setStyle(styleForStop(stop, selectedRouteId, routeColour));
 
-    // Null while the layer is hidden by the Stops toggle, since a tooltip has
-    // no element until it is on the map.
-    const label = marker.getTooltip()?.getElement();
-    label?.classList.toggle('is-dimmed', Boolean(selectedRouteId) && !stop.routes.includes(selectedRouteId));
+    // Demo routes can request a clean map containing only their named
+    // landmarks. Geometry-only path points never become markers at all.
+    setStopMarkerVisible(marker, visible);
+    if (!visible) marker.closeTooltip();
   }
 }
 
@@ -116,13 +139,33 @@ function highlightRoute(stops, selectedRouteId, routeColour) {
 function setStopsVisible(visible) {
   if (visible) {
     layers.stops.addTo(map);
+    for (const marker of stopMarkers.values()) {
+      setStopMarkerVisible(marker, marker.options.routeVisible !== false);
+    }
   } else {
     map.removeLayer(layers.stops);
   }
 }
 
-function applyStopLabelZoom() {
-  map.getContainer().classList.toggle('hide-stop-labels', map.getZoom() < STOP_LABEL_MIN_ZOOM);
+// Draw the selected configured route if it has map geometry. Routes without a
+// path keep the existing stop-highlighting behaviour and simply draw no line.
+function drawRoutePath(route, { fit = true } = {}) {
+  layers.route.clearLayers();
+
+  if (!route?.path || route.path.length < 2) return 0;
+
+  const points = route.path.map((point) => [point.latitude, point.longitude]);
+  const line = L.polyline(points, {
+    pane: 'routes',
+    color: route.colour ?? ROUTE_FALLBACK_COLOUR,
+    weight: 5,
+    opacity: 0.85,
+    dashArray: '10 8',
+    interactive: false,
+  }).addTo(layers.route);
+
+  if (fit) fitTo(line.getBounds());
+  return points.length;
 }
 
 function drawTracks(vehicles, { fit = true } = {}) {

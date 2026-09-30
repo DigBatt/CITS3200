@@ -51,6 +51,39 @@ stops:
     latitude: -31.9793561
     longitude: 115.8194325
 
+  # Named landmarks used by the three demonstration routes. These are the
+  # only additional points that should be visible; all other route coordinates
+  # below are geometry only.
+  - id: robotics-lab
+    name: UWA Robotics Lab
+    latitude: -31.98061
+    longitude: 115.81694
+
+  - id: bayliss-building
+    name: Bayliss Building
+    latitude: -31.98195
+    longitude: 115.81832
+
+  - id: james-oval
+    name: James Oval
+    latitude: -31.98016
+    longitude: 115.81796
+
+  - id: great-court
+    name: Great Court
+    latitude: -31.97788
+    longitude: 115.81776
+
+  - id: andrews-garden
+    name: Andrews Garden
+    latitude: -31.97712
+    longitude: 115.81708
+
+  - id: sunken-garden
+    name: Sunken Garden
+    latitude: -31.97675
+    longitude: 115.81669
+
 
 routes:
   - id: full-campus-loop
@@ -82,3 +115,137 @@ routes:
     colour: "#6A1B9A"
     loop: true
     stops: [reid-library, law-library, guild-village, barry-marshall]
+
+  # Demo 1. Point-to-point. The hidden path points follow the corrected
+  # client sketch. Only Business School, Bayliss Building and the Robotics Lab
+  # are visible markers; the extra points exist only to turn at path corners.
+  - id: demo-business-robotics
+    name: "Demo: Business School → Bayliss → Robotics"
+    colour: "#7C3AED"
+    loop: false
+    hide_other_stops: true
+    stops: [business-school, bayliss-building, robotics-lab]
+    path:
+      # South end beside the Business School, then north along the campus path.
+      - { latitude: -31.9859447, longitude: 115.8201492 }
+      - { latitude: -31.9849615, longitude: 115.8201922 }
+      - { latitude: -31.9848796, longitude: 115.8201492 }
+      - { latitude: -31.9848887, longitude: 115.8194830 }
+      - { latitude: -31.9848432, longitude: 115.8188383 }
+      - { latitude: -31.9848068, longitude: 115.8187739 }
+      # Hidden corner points keep the line on the north/south pedestrian route.
+      - { latitude: -31.9840239, longitude: 115.8187309 }
+      - { latitude: -31.9835505, longitude: 115.8188383 }
+      - { latitude: -31.9827312, longitude: 115.8188061 }
+      - { latitude: -31.9824217, longitude: 115.8187416 }
+      - { latitude: -31.9810652, longitude: 115.8187953 }
+      # Turn west through the Engineering / James Oval corridor.
+      - { latitude: -31.9809651, longitude: 115.8186879 }
+      - { latitude: -31.9809651, longitude: 115.8172051 }
+      - { latitude: -31.9809105, longitude: 115.8171621 }
+      - { latitude: -31.9805827, longitude: 115.8171836 }
+
+  # Demo 2. The visible route is a lollipop-shaped loop: a short approach from
+  # IOMRC, one lap around James Oval via Reid, then the same approach back.
+  # James Oval itself remains a visible landmark marker but is not a path point.
+  - id: demo-james-oval
+    name: "Demo: IOMRC → James Oval loop → Reid"
+    colour: "#E83EE8"
+    loop: true
+    hide_other_stops: true
+    stops: [marine-research, james-oval, reid-library]
+    path:
+      # IOMRC approach to the south-west corner of James Oval.
+      - { latitude: -31.9813364, longitude: 115.8164763 }
+      - { latitude: -31.9813455, longitude: 115.8169414 }
+      - { latitude: -31.9813228, longitude: 115.8171980 }
+      - { latitude: -31.9808777, longitude: 115.8171820 }
+      - { latitude: -31.9806052, longitude: 115.8172087 }
+      # Hidden corner points follow the west side of the oval.
+      - { latitude: -31.9803281, longitude: 115.8172408 }
+      - { latitude: -31.9799830, longitude: 115.8171980 }
+      - { latitude: -31.9796968, longitude: 115.8172034 }
+      - { latitude: -31.9795969, longitude: 115.8172194 }
+      - { latitude: -31.9794425, longitude: 115.8172996 }
+      - { latitude: -31.9792972, longitude: 115.8173264 }
+      - { latitude: -31.9792745, longitude: 115.8173798 }
+      # Across the north side and up to Reid Library.
+      - { latitude: -31.9792881, longitude: 115.8182192 }
+      - { latitude: -31.9792472, longitude: 115.8182459 }
+      - { latitude: -31.9790746, longitude: 115.8182619 }
+      - { latitude: -31.9790519, longitude: 115.8183101 }
+      - { latitude: -31.9790565, longitude: 115.8183689 }
+      # Down the east side and around the south side of James Oval.
+      - { latitude: -31.9793471, longitude: 115.8183528 }
+      - { latitude: -31.9794788, longitude: 115.8185239 }
+      - { latitude: -31.9796741, longitude: 115.8187057 }
+      - { latitude: -31.9797695, longitude: 115.8187538 }
+      - { latitude: -31.9802282, longitude: 115.8187805 }
+      - { latitude: -31.9803917, longitude: 115.8187324 }
+      - { latitude: -31.9805189, longitude: 115.8187271 }
+      - { latitude: -31.9807142, longitude: 115.8186094 }
+      - { latitude: -31.9808777, longitude: 115.8184437 }
+      - { latitude: -31.9809912, longitude: 115.8181550 }
+      - { latitude: -31.9809912, longitude: 115.8177541 }
+      - { latitude: -31.9808187, longitude: 115.8174440 }
+      - { latitude: -31.9806415, longitude: 115.8172782 }
+      - { latitude: -31.9806052, longitude: 115.8172087 }
+      # Retrace the IOMRC approach so the configured route is a loop.
+      - { latitude: -31.9808777, longitude: 115.8171820 }
+      - { latitude: -31.9813228, longitude: 115.8171980 }
+      - { latitude: -31.9813455, longitude: 115.8169414 }
+      - { latitude: -31.9813364, longitude: 115.8164763 }
+
+  # Demo 3. Loop-style route following the corrected yellow sketch. The path
+  # runs north from Robotics, loops around Great Court, includes the short
+  # Andrews/Sunken Garden spur, and retraces the southern approach. Only the
+  # named landmarks in stops are visible.
+  - id: demo-sunken-gardens
+    name: "Demo: Robotics → Reid → Great Court → Sunken Garden loop"
+    colour: "#58B947"
+    loop: true
+    hide_other_stops: true
+    stops: [robotics-lab, reid-library, great-court, andrews-garden, sunken-garden]
+    path:
+      # Robotics / James Oval western approach.
+      - { latitude: -31.9806899, longitude: 115.8171869 }
+      - { latitude: -31.9796112, longitude: 115.8172083 }
+      - { latitude: -31.9793336, longitude: 115.8172778 }
+      - { latitude: -31.9792789, longitude: 115.8173205 }
+      # West side of Great Court.
+      - { latitude: -31.9786554, longitude: 115.8173259 }
+      - { latitude: -31.9786144, longitude: 115.8172297 }
+      - { latitude: -31.9779180, longitude: 115.8172511 }
+      - { latitude: -31.9777997, longitude: 115.8172190 }
+      - { latitude: -31.9774629, longitude: 115.8172083 }
+      - { latitude: -31.9773491, longitude: 115.8171709 }
+      - { latitude: -31.9772125, longitude: 115.8171976 }
+      - { latitude: -31.9771261, longitude: 115.8171869 }
+      # Short west spur beside Andrews Drive / Sunken Garden, then back.
+      - { latitude: -31.9771397, longitude: 115.8170694 }
+      - { latitude: -31.9771079, longitude: 115.8167594 }
+      - { latitude: -31.9771397, longitude: 115.8170694 }
+      - { latitude: -31.9771261, longitude: 115.8171869 }
+      # North and east sides of Great Court.
+      - { latitude: -31.9770942, longitude: 115.8172030 }
+      - { latitude: -31.9771033, longitude: 115.8175984 }
+      - { latitude: -31.9770760, longitude: 115.8182129 }
+      - { latitude: -31.9770760, longitude: 115.8182824 }
+      - { latitude: -31.9771215, longitude: 115.8183198 }
+      - { latitude: -31.9773036, longitude: 115.8183198 }
+      - { latitude: -31.9773673, longitude: 115.8182931 }
+      - { latitude: -31.9779544, longitude: 115.8182931 }
+      - { latitude: -31.9780682, longitude: 115.8183198 }
+      - { latitude: -31.9785097, longitude: 115.8183251 }
+      - { latitude: -31.9791196, longitude: 115.8183251 }
+      # South side near Reid, returning to the west-side approach.
+      - { latitude: -31.9792471, longitude: 115.8183038 }
+      - { latitude: -31.9792562, longitude: 115.8181809 }
+      - { latitude: -31.9792334, longitude: 115.8180312 }
+      - { latitude: -31.9792653, longitude: 115.8179030 }
+      - { latitude: -31.9792516, longitude: 115.8176411 }
+      - { latitude: -31.9792789, longitude: 115.8173205 }
+      # Retrace the southern approach to close the loop.
+      - { latitude: -31.9793336, longitude: 115.8172778 }
+      - { latitude: -31.9796112, longitude: 115.8172083 }
+      - { latitude: -31.9806899, longitude: 115.8171869 }

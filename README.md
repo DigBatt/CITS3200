@@ -23,6 +23,10 @@ The dashboard runs on the committed sample data with no client access and no
 further setup. None of it is a live feed, and only one of the two sample
 files contains real measurements, see [data/README.md](data/README.md).
 
+The route selector also includes three `Demo:` routes. Selecting one draws its
+configured `path` from `config/stops.yaml` as a dashed line and highlights its
+pickup stops. See [docs/stops-and-routes.md](docs/stops-and-routes.md).
+
 ## Admin sign-in
 
 The admin page (`/admin`, which holds the operator view) needs signing in with

@@ -35,6 +35,10 @@ routes:
     colour: "#d4741f"
     loop: true
     stops: [reid-library, civ-mech, business-school]
+    path:
+      - { latitude: -31.9790, longitude: 115.8184 }
+      - { latitude: -31.9807, longitude: 115.8172 }
+      - { latitude: -31.9856, longitude: 115.8209 }
 ```
 
 ---
@@ -65,6 +69,8 @@ be added before the route that uses it.
 | `stops` | list of stop ids | yes | The stops in the order the shuttle serves them. At least one. |
 | `colour` | text, `#rrggbb` | no | Highlight colour on the map. The frontend picks one if absent. |
 | `loop` | boolean | no, default `false` | `true` if the shuttle returns from the last stop to the first. |
+| `path` | list of coordinate points | no | Optional display geometry for drawing the route on the dashboard map. |
+| `hide_other_stops` | boolean | no, default `false` | When true, selecting the route shows only that route's named stop markers. Useful for clean demo routes. |
 
 - **Order matters.** `stops` is the service order, and the operator view (S09)
   shows it as given.
@@ -73,6 +79,12 @@ be added before the route that uses it.
   stop itself, so the two cannot disagree.
 - **A stop appears at most once in a route.** A loop is marked with
   `loop: true`, not by repeating the first stop at the end.
+- **`path` is map geometry, not service order.** Each path point has
+  `latitude` and `longitude`. Use it for bends, roads and landmarks that the
+  shuttle passes without turning them into pickup stops. If `path` is omitted,
+  the route selector still highlights its stops but no route line is drawn.
+- A configured `path` must contain at least two valid points.
+- `hide_other_stops: true` affects only the map display; it does not change route membership or remove configured stops.
 
 ---
 
@@ -110,6 +122,8 @@ Rejected:
   latitude and longitude written the wrong way round.
 - A route with no stops, naming a stop that is not configured, or naming the
   same stop twice.
+- A route `path` with fewer than two points, malformed coordinates, or points
+  outside the configured logger bounds.
 - A `colour` that is not `#rrggbb`.
 - An unknown key, which is almost always a typo (`lat`, `stop`).
 

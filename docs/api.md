@@ -169,13 +169,18 @@ Every route, in file order, with its stop ids in service order.
       "name": "Campus loop",
       "colour": "#d4741f",
       "loop": true,
-      "stop_ids": ["reid-library", "civ-mech", "business-school"]
+      "stop_ids": ["reid-library", "civ-mech", "business-school"],
+      "hide_other_stops": false,
+      "path": [
+        { "latitude": -31.9790, "longitude": 115.8184 },
+        { "latitude": -31.9807, "longitude": 115.8172 }
+      ]
     }
   ]
 }
 ```
 
-`colour` is `null` when the config does not set one.
+`colour` is `null` when the config does not set one. `path` is `[]` when no map geometry is configured. `hide_other_stops` defaults to `false`.
 
 ### `GET /api/routes/<id>`
 
@@ -187,6 +192,11 @@ One route, with its stops in full and in service order.
   "name": "Campus loop",
   "colour": "#d4741f",
   "loop": true,
+  "hide_other_stops": false,
+  "path": [
+    { "latitude": -31.9790, "longitude": 115.8184 },
+    { "latitude": -31.9807, "longitude": 115.8172 }
+  ],
   "stops": [
     { "id": "reid-library", "name": "Reid Library", "latitude": -31.97901221771226, "longitude": 115.8183554056777, "routes": ["campus-loop"] }
   ]

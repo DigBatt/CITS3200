@@ -43,6 +43,9 @@ routes:
     name: North Route
     colour: "#d4741f"
     stops: [north-end, shared]
+    path:
+      - {latitude: -31.9790, longitude: 115.8183}
+      - {latitude: -31.9807, longitude: 115.8172}
   - id: south
     name: South Route
     colour: "#2f7d8f"
@@ -51,6 +54,7 @@ routes:
 
 ON_ROUTE_COLOUR = "#d4741f"
 STOP_PATHS = ".leaflet-pane.leaflet-stops-pane path"
+ROUTE_PATHS = ".leaflet-pane.leaflet-routes-pane path"
 
 
 @pytest.fixture(scope="module")
@@ -88,7 +92,7 @@ def page(browser, server):
     page = context.new_page()
     page.goto(server)
     # The stops are fetched after load, so wait for them rather than sleeping.
-    page.wait_for_selector(".stop-label")
+    page.wait_for_selector(STOP_PATHS)
     yield page
     context.close()
 
@@ -108,8 +112,16 @@ def test_every_configured_stop_is_drawn(page):
     assert page.locator(STOP_PATHS).count() == 4
 
 
-def test_each_stop_shows_its_name(page):
-    assert labels(page) == ["North End", "Orphan Stop", "Shared Stop", "South End"]
+def test_stop_names_appear_only_on_hover(page):
+    seen = []
+    for index in range(4):
+        marker = page.locator(STOP_PATHS).nth(index)
+        marker.hover()
+        tooltip = page.locator(".stop-label")
+        tooltip.wait_for(state="visible")
+        seen.append(tooltip.text_content())
+        page.mouse.move(0, 0)
+    assert sorted(seen) == ["North End", "Orphan Stop", "Shared Stop", "South End"]
 
 
 def test_stops_are_drawn_under_the_vehicles(page):
@@ -118,13 +130,6 @@ def test_stops_are_drawn_under_the_vehicles(page):
         " overlay: getComputedStyle(document.querySelector('.leaflet-overlay-pane')).zIndex })"
     )
     assert int(panes["stops"]) < int(panes["overlay"])
-
-
-def test_labels_hide_when_zoomed_out(page):
-    page.evaluate("() => map.setZoom(13)")
-    page.wait_for_selector(".stop-label", state="hidden")
-    page.evaluate("() => map.setZoom(16)")
-    page.wait_for_selector(".stop-label", state="visible")
 
 
 def test_toggle_hides_and_restores_the_stops(page):
@@ -161,6 +166,14 @@ def test_selected_route_stops_are_distinct_from_the_rest(page):
     assert labels(page, ".stop-label.is-dimmed") == ["Orphan Stop", "South End"]
 
 
+def test_selected_route_with_path_draws_polyline(page):
+    select_route(page, "North Route")
+    assert page.locator(ROUTE_PATHS).count() == 1
+
+    select_route(page, "South Route")
+    assert page.locator(ROUTE_PATHS).count() == 0
+
+
 def test_a_stop_on_two_routes_is_highlighted_on_each(page):
     for route in ("North Route", "South Route"):
         select_route(page, route)
@@ -178,7 +191,7 @@ def test_all_routes_clears_the_highlighting(page):
 def test_selection_survives_a_reload(page, server):
     select_route(page, "South Route")
     page.reload()
-    page.wait_for_selector(".stop-label")
+    page.wait_for_selector(STOP_PATHS)
     assert page.locator("#route-filter-chips .chip.is-active").text_content() == "South Route"
 
 

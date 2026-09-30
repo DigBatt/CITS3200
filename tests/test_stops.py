@@ -85,6 +85,14 @@ def test_committed_config_has_a_route():
         assert network.stops_on_route(route.id)
 
 
+def test_committed_demo_routes_have_map_paths():
+    network = load_config().stops
+    for route_id in ("demo-business-robotics", "demo-james-oval", "demo-sunken-gardens"):
+        route = network.route(route_id)
+        assert route is not None
+        assert len(route.path) >= 2
+
+
 # ---- Parsing ----
 
 
@@ -104,7 +112,29 @@ def test_route_defaults():
     network = parse_stops(NETWORK)
     assert network.route("north").colour is None
     assert network.route("north").loop is False
+    assert network.route("north").path == ()
+    assert network.route("north").hide_other_stops is False
     assert network.route("south").loop is True
+
+
+def test_route_path_is_kept_in_order():
+    raw = {
+        "stops": [stop("a"), stop("b")],
+        "routes": [
+            {
+                "id": "demo",
+                "name": "Demo",
+                "stops": ["a", "b"],
+                "path": [
+                    {"latitude": -31.98, "longitude": 115.81},
+                    {"latitude": -31.97, "longitude": 115.82},
+                ],
+            }
+        ],
+    }
+    route = parse_stops(raw, bounds=BOUNDS).route("demo")
+    assert route.path == ((-31.98, 115.81), (-31.97, 115.82))
+    assert route.hide_other_stops is False
 
 
 def test_stop_on_no_route_is_kept_with_a_warning(caplog):
@@ -169,6 +199,10 @@ def with_route(**fields):
         (with_route(stops=None), "routes[0] (id 'r'): stops must be a non-empty list"),
         (with_route(colour="red"), "routes[0] (id 'r'): colour must be #rrggbb"),
         (with_route(loop="yes"), "routes[0] (id 'r'): loop must be true or false"),
+        (with_route(hide_other_stops="yes"), "routes[0] (id 'r'): hide_other_stops must be true or false"),
+        (with_route(path=[]), "routes[0] (id 'r'): path must be a list of at least two coordinate points"),
+        (with_route(path=[{"latitude": -31.98, "longitude": 115.82}]), "routes[0] (id 'r'): path must be a list of at least two coordinate points"),
+        (with_route(path=[{"latitude": "bad", "longitude": 115.82}, {"latitude": -31.97, "longitude": 115.82}]), "path[0]: latitude must be a number"),
         (
             {"stops": [stop("a")], "routes": [{"id": "r", "name": "R", "stops": ["a"]}] * 2},
             "routes[1] (id 'r'): duplicate route id, first used at routes[0]",
@@ -248,8 +282,8 @@ def test_unknown_stop_is_404(client):
 def test_list_routes(client):
     body = client.get("/api/routes").get_json()
     assert body["routes"] == [
-        {"id": "north", "name": "North", "colour": None, "loop": False, "stop_ids": ["a", "b"]},
-        {"id": "south", "name": "South", "colour": "#123abc", "loop": True, "stop_ids": ["d", "b"]},
+        {"id": "north", "name": "North", "colour": None, "loop": False, "stop_ids": ["a", "b"], "path": [], "hide_other_stops": False},
+        {"id": "south", "name": "South", "colour": "#123abc", "loop": True, "stop_ids": ["d", "b"], "path": [], "hide_other_stops": False},
     ]
 
 

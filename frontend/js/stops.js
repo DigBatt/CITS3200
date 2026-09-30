@@ -35,7 +35,9 @@
     selected = routeId;
     remember(routeId);
     render();
-    highlightRoute(stops, selected, routeOf(selected)?.colour);
+    const route = routeOf(selected);
+    highlightRoute(stops, selected, route?.colour, route?.hide_other_stops ?? false);
+    drawRoutePath(route);
     onChange?.(selected);
   }
 
@@ -108,7 +110,9 @@
     selected = recall();
     render();
     drawStops(stops, { popupHtml });
-    highlightRoute(stops, selected, routeOf(selected)?.colour);
+    const route = routeOf(selected);
+    highlightRoute(stops, selected, route?.colour, route?.hide_other_stops ?? false);
+    drawRoutePath(route, { fit: Boolean(route) });
   }
 
   // In service order, which is the route's order and not the stop file's.

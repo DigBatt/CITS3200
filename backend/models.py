@@ -81,6 +81,11 @@ class Route:
     stop_ids: tuple[str, ...]
     colour: Optional[str] = None
     loop: bool = False
+    # Optional display geometry for the dashboard map. Each tuple is
+    # (latitude, longitude). It is deliberately separate from stop_ids: a
+    # route can pass a landmark without making it a pickup stop.
+    path: tuple[tuple[float, float], ...] = ()
+    hide_other_stops: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -89,6 +94,11 @@ class Route:
             "colour": self.colour,
             "loop": self.loop,
             "stop_ids": list(self.stop_ids),
+            "path": [
+                {"latitude": latitude, "longitude": longitude}
+                for latitude, longitude in self.path
+            ],
+            "hide_other_stops": self.hide_other_stops,
         }
 
 

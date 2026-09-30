@@ -18,7 +18,7 @@ _COLOUR = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 _TOP_KEYS = {"stops", "routes"}
 _STOP_KEYS = {"id", "name", "latitude", "longitude"}
-_ROUTE_KEYS = {"id", "name", "stops", "colour", "loop"}
+_ROUTE_KEYS = {"id", "name", "stops", "colour", "loop", "path", "hide_other_stops"}
 
 
 class StopsError(Exception):
@@ -107,7 +107,7 @@ def parse_stops(
     route_ids: dict[str, int] = {}
     routes: dict[str, Route] = {}
     for index, entry in enumerate(route_entries):
-        route = _parse_route(entry, index, source, declared, route_ids, problems)
+        route = _parse_route(entry, index, source, bounds, declared, route_ids, problems)
         if route is not None:
             routes[route.id] = route
 
@@ -155,7 +155,7 @@ def _parse_stop(entry, index, source, bounds, declared, problems) -> Optional[St
     return Stop(id=stop_id, name=name, latitude=latitude, longitude=longitude)
 
 
-def _parse_route(entry, index, source, declared, route_ids, problems) -> Optional[Route]:
+def _parse_route(entry, index, source, bounds, declared, route_ids, problems) -> Optional[Route]:
     where = f"{source}: routes[{index}]"
     if not isinstance(entry, dict):
         problems.append(f"{where}: must be a mapping, got {_describe(entry)}")
@@ -197,9 +197,53 @@ def _parse_route(entry, index, source, declared, route_ids, problems) -> Optiona
     if not isinstance(loop, bool):
         problems.append(f"{where}: loop must be true or false, got {_describe(loop)}")
 
+    path = _parse_route_path(entry.get("path"), bounds, where, problems)
+
+    hide_other_stops = entry.get("hide_other_stops", False)
+    if not isinstance(hide_other_stops, bool):
+        problems.append(f"{where}: hide_other_stops must be true or false, got {_describe(hide_other_stops)}")
+
     if len(problems) > before:
         return None
-    return Route(id=route_id, name=name, stop_ids=tuple(stop_ids), colour=colour, loop=loop)
+    return Route(
+        id=route_id,
+        name=name,
+        stop_ids=tuple(stop_ids),
+        colour=colour,
+        loop=loop,
+        path=tuple(path),
+        hide_other_stops=hide_other_stops,
+    )
+
+
+def _parse_route_path(raw_path, bounds, where, problems) -> list[tuple[float, float]]:
+    """Parse optional map geometry for a configured route.
+
+    A path is display geometry rather than a stop list, so it may include
+    bends and landmarks that are not pickup stops. When present it needs at
+    least two latitude/longitude points so Leaflet can draw a line.
+    """
+    if raw_path is None:
+        return []
+    if not isinstance(raw_path, list) or len(raw_path) < 2:
+        problems.append(f"{where}: path must be a list of at least two coordinate points, got {_describe(raw_path)}")
+        return []
+
+    points: list[tuple[float, float]] = []
+    for index, point in enumerate(raw_path):
+        point_where = f"{where}: path[{index}]"
+        if not isinstance(point, dict):
+            problems.append(f"{point_where}: must be a mapping with latitude and longitude, got {_describe(point)}")
+            continue
+
+        before = len(problems)
+        _check_keys(point, {"latitude", "longitude"}, point_where, problems)
+        latitude = _parse_coordinate(point, "latitude", 90, bounds, point_where, problems)
+        longitude = _parse_coordinate(point, "longitude", 180, bounds, point_where, problems)
+        if len(problems) == before:
+            points.append((latitude, longitude))
+
+    return points
 
 
 def _parse_id(entry, where, problems) -> Optional[str]:
