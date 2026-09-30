@@ -992,6 +992,59 @@ empty until the API has events and stops. Layout only -- does not touch any
   color: rgba(28, 25, 23, 0.6);
 }
 
+/* ---- Rider: waiting for pickup, and collected (S15) ---- */
+
+.rider-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rider-waiting,
+.rider-collected {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  border-radius: 10px;
+}
+
+/* js/rider.js toggles the `hidden` attribute to switch between these three;
+   without this, the `display: flex` above (an author rule) would outrank the
+   browser's own `[hidden] { display: none }`, same as .rider-status[hidden]
+   already needs above. */
+.rider-picker[hidden],
+.rider-waiting[hidden],
+.rider-collected[hidden] {
+  display: none;
+}
+
+.rider-waiting-title,
+.rider-collected-title {
+  margin: 0;
+  font: 600 13px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.7);
+}
+
+.rider-waiting-stop {
+  margin: 0;
+  font: 700 20px 'IBM Plex Mono', monospace;
+  color: oklch(0.5 0.17 300);
+}
+
+.rider-waiting-note {
+  margin: 0 0 4px;
+  font: 400 11.5px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.55);
+}
+
+.rider-waiting .btn-outline {
+  align-self: stretch;
+  text-align: center;
+}
+
 /* ---- Map pane: legend + route note overlaid on the Leaflet map ---- */
 
 .map-pane {
@@ -1115,6 +1168,14 @@ empty until the API has events and stops. Layout only -- does not touch any
 
 /* Zoomed out past the campus the names collide, so only the markers show. */
 .hide-stop-labels .stop-label {
+  display: none;
+}
+
+/* Rider stop picker (S15): js/map.js:isolateStop() hides every stop marker
+   and label but the one chosen, to cut clutter while picking. Unlike
+   .is-dimmed above this fully hides rather than fades, and applies to the
+   marker itself as well as its label. */
+.is-hidden-stop {
   display: none;
 }
 

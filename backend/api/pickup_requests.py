@@ -1,9 +1,11 @@
-"""POST and GET /api/pickup-requests, GET /api/routes/<id>/waiting,
+"""POST and GET /api/pickup-requests, GET /api/pickup-requests/mine,
+POST /api/pickup-requests/<id>/cancel, GET /api/routes/<id>/waiting,
 POST /api/stops/<id>/collect.
 
-A rider asking to be collected at a stop, the operator's per-route view of
-who is waiting, and the operator clearing a stop once the riders are aboard.
-Response shapes and the rider-token cookie decision: docs/api.md.
+A rider asking to be collected at a stop (and checking on or cancelling that
+request themselves), the operator's per-route view of who is waiting, and the
+operator clearing a stop once the riders are aboard. Response shapes and the
+rider-token cookie decision: docs/api.md.
 """
 
 from __future__ import annotations
@@ -104,6 +106,66 @@ def list_pickup_requests():
     _expire_stale(datetime.now(timezone.utc))
     requests = _store().list(status=request.args.get("status"))
     return jsonify({"requests": [r.to_dict() for r in requests]})
+
+
+@bp.get("/api/pickup-requests/mine")
+def my_pickup_request():
+    """
+    The calling rider's own most recent pickup request, any status (S15).
+
+    Identified by the `rider_token` cookie (S08.2) — no sign-in needed, and
+    this is not admin-only, unlike GET /api/pickup-requests: it only ever
+    answers with the caller's own request, never anyone else's, so it carries
+    nothing the rider does not already know. Backs the rider view polling for
+    its own request going `collected`, `expired` or `cancelled`.
+
+    Returns
+    -------
+    flask.Response
+        `{"request": null}` if this rider has no `rider_token` cookie yet, or
+        has never made a request. Otherwise the same shape POST returns.
+    """
+    _expire_stale(datetime.now(timezone.utc))
+    rider_token = request.cookies.get(RIDER_TOKEN_COOKIE)
+    found = _store().most_recent_for_rider(rider_token) if rider_token else None
+    return jsonify({"request": found.to_dict() if found else None})
+
+
+@bp.post("/api/pickup-requests/<request_id>/cancel")
+def cancel_pickup_request(request_id: str):
+    """
+    The rider withdraws their own open request (S15).
+
+    Ownership is the `rider_token` cookie matching the request's — the same
+    identity POST /api/pickup-requests uses, so a rider needs no sign-in to
+    cancel, but also cannot cancel someone else's.
+
+    Returns
+    -------
+    flask.Response
+        `404` `unknown_request` if the id is not on record. `403`
+        `not_your_request` if the caller's `rider_token` (or the lack of one)
+        does not match. `409` `request_not_open` if it has already been
+        collected, expired, or cancelled. Otherwise `200` with the request,
+        now `cancelled` and `cleared_at` set.
+    """
+    store = _store()
+    existing = store.get(request_id)
+    if existing is None:
+        message = f"No pickup request with id '{request_id}'."
+        return jsonify({"error": {"code": "unknown_request", "message": message}}), 404
+
+    rider_token = request.cookies.get(RIDER_TOKEN_COOKIE)
+    if rider_token is None or existing.rider_token != rider_token:
+        message = "This pickup request does not belong to you."
+        return jsonify({"error": {"code": "not_your_request", "message": message}}), 403
+
+    cancelled = store.cancel(request_id, datetime.now(timezone.utc))
+    if cancelled is None:
+        message = "This request is no longer open, so it cannot be cancelled."
+        return jsonify({"error": {"code": "request_not_open", "message": message}}), 409
+
+    return jsonify({"request": cancelled.to_dict()})
 
 
 @bp.get("/api/routes/<route_id>/waiting")

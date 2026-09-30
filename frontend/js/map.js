@@ -111,6 +111,27 @@ function highlightRoute(stops, selectedRouteId, routeColour) {
   }
 }
 
+// Rider stop picker (S15): fully hide every stop marker and label but one, to
+// cut clutter while choosing. Pass null to show them all again — done
+// whenever the rider leaves the picker (map.js is shared with Fleet and
+// Operator, so this must not leak into their view of the map; js/rider.js
+// and js/panels.js are what keep it scoped to the Rider tab).
+function isolateStop(stopId) {
+  for (const [id, marker] of stopMarkers) {
+    const hide = stopId !== null && id !== stopId;
+    marker.getElement()?.classList.toggle('is-hidden-stop', hide);
+    marker.getTooltip()?.getElement()?.classList.toggle('is-hidden-stop', hide);
+  }
+}
+
+// Open a stop's existing popup (bound in Stops.init(), stops.js) so the rider
+// picker confirms which stop was chosen (S15) — the same popup every other
+// view already gets by clicking the marker directly. Leaflet auto-pans it
+// into view, and closes whatever popup was open before.
+function openStopPopup(stopId) {
+  stopMarkers.get(stopId)?.openPopup();
+}
+
 // Show or hide the whole stop layer. The markers are kept, so turning it back
 // on needs no refetch.
 function setStopsVisible(visible) {
