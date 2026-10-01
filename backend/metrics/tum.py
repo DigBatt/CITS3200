@@ -7,8 +7,8 @@ What the telemetry can and cannot answer:
     operating delay   stopped away from the depot, or no GPS fix
     standby           stopped at the depot, if a depot is configured
 
-    downtime          NOT derivable, needs a fault or maintenance log
-    available         NOT derivable, needs downtime
+    downtime          not in the telemetry; from the admin page's log (S19)
+    available         scheduled time less that downtime
     productive/non    NOT derivable, needs passenger counts
 """
 
@@ -34,6 +34,19 @@ BLOCKED_KPIS = {
     "use_of_availability": "needs available time, which needs downtime",
     "production_effectiveness": "needs productive time; no passenger counts in the data",
 }
+
+#: The KPIs a downtime log unblocks (S19)
+DOWNTIME_KPIS = ("uptime", "mechanical_availability", "physical_availability", "use_of_availability")
+
+
+def _ratio(numerator: Optional[float], denominator: Optional[float]) -> Optional[float]:
+    """
+    `numerator / denominator`, or None when either is unknown or the
+    denominator is zero, since nothing to divide by is not 0%.
+    """
+    if numerator is None or not denominator:
+        return None
+    return numerator / denominator
 
 
 class State(str, Enum):
@@ -485,6 +498,17 @@ def summarise(
         if periods is None
         else sum((seconds_within(span, periods) for span in classified if span.state == State.WORKING), 0.0)
     )
+    # Likewise operating time, so the availability KPIs compare like with
+    # like: AT is inside the roster, so OT/AT must be too, or it could top 100%.
+    scheduled_operating = (
+        None
+        if periods is None
+        else sum(
+            (seconds_within(span, periods) for span in classified if span.state in (State.WORKING, State.DELAY)),
+            0.0,
+        )
+    )
+    available = None if downtime_seconds is None else scheduled - downtime_seconds
 
     result = Utilisation(vehicle_id=vehicle_id, window_start=start, window_end=end)
     result.buckets = {
@@ -496,9 +520,10 @@ def summarise(
         "operating_seconds": operating,
         "scheduled_seconds": scheduled,
         "scheduled_working_seconds": scheduled_working,
+        "scheduled_operating_seconds": scheduled_operating,
         "unscheduled_seconds": calendar - scheduled if scheduled is not None else None,
         "downtime_seconds": downtime_seconds,
-        "available_seconds": None,
+        "available_seconds": available,
         "productive_seconds": None,
     }
     result.kpis = {
@@ -509,12 +534,31 @@ def summarise(
     }
 
     result.unavailable = dict(BLOCKED_KPIS)
+    if available is not None:
+        # S19: the admin page's downtime log unblocks the availability KPIs.
+        result.kpis["uptime"] = available / calendar
+        result.kpis["mechanical_availability"] = _ratio(scheduled_operating, scheduled_operating + downtime_seconds)
+        result.kpis["physical_availability"] = _ratio(available, scheduled)
+        result.kpis["use_of_availability"] = _ratio(scheduled_operating, available)
+        for name in DOWNTIME_KPIS:
+            del result.unavailable[name]
+        if result.kpis["mechanical_availability"] is None:
+            result.unavailable["mechanical_availability"] = "no operating time or downtime in service hours in this window"
+        if result.kpis["physical_availability"] is None:
+            result.unavailable["physical_availability"] = "no scheduled service time in this window"
+        if result.kpis["use_of_availability"] is None:
+            result.unavailable["use_of_availability"] = "no available time in this window"
+    elif downtime is not None:
+        # A log, but no timezone to place the roster in.
+        for name in DOWNTIME_KPIS:
+            result.unavailable[name] = "needs a timezone; config/app.yaml does not set display.timezone"
     if scheduled is None:
         result.unavailable["effective_utilisation"] = (
             "needs a timezone; config/app.yaml does not set display.timezone"
         )
         result.unavailable["scheduled_seconds"] = result.unavailable["effective_utilisation"]
         result.unavailable["scheduled_working_seconds"] = result.unavailable["effective_utilisation"]
+        result.unavailable["scheduled_operating_seconds"] = result.unavailable["effective_utilisation"]
         result.unavailable["unscheduled_seconds"] = result.unavailable["effective_utilisation"]
     elif settings.schedule is None or settings.schedule.is_empty_for(vehicle_id):
         # S21: nothing rostered is a real figure, not a missing one. Scheduled
@@ -531,8 +575,11 @@ def summarise(
         result.notes["scheduled_seconds"] = note
         result.notes["unscheduled_seconds"] = note
         if downtime is not None:
-            # S19: downtime only counts inside the roster, so with none it is 0.
+            # S19: downtime only counts inside the roster, so with none it is
+            # 0, and so is available time and uptime.
             result.notes["downtime_seconds"] = note
+            result.notes["available_seconds"] = note
+            result.notes["uptime"] = note
         result.unavailable["effective_utilisation"] = (
             "needs scheduled time; no service schedule is in the system"
         )
@@ -549,9 +596,10 @@ def summarise(
         )
     if downtime is None:
         result.unavailable["downtime_seconds"] = BLOCKED_KPIS["uptime"]
+        result.unavailable["available_seconds"] = BLOCKED_KPIS["physical_availability"]
     elif periods is None:
         result.unavailable["downtime_seconds"] = "needs a timezone; config/app.yaml does not set display.timezone"
-    result.unavailable["available_seconds"] = BLOCKED_KPIS["physical_availability"]
+        result.unavailable["available_seconds"] = result.unavailable["downtime_seconds"]
     result.unavailable["productive_seconds"] = BLOCKED_KPIS["production_effectiveness"]
 
     result.check()
