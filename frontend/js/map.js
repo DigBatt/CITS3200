@@ -113,9 +113,9 @@ function highlightRoute(stops, selectedRouteId, routeColour) {
 
 // Rider stop picker (S15): fully hide every stop marker and label but one, to
 // cut clutter while choosing. Pass null to show them all again — done
-// whenever the rider leaves the picker (map.js is shared with Fleet and
-// Operator, so this must not leak into their view of the map; js/rider.js
-// and js/panels.js are what keep it scoped to the Rider tab).
+// whenever the rider leaves the picker (map.js is shared with Fleet, so this
+// must not leak into its view of the map; js/rider.js and js/panels.js are
+// what keep it scoped to the Rider tab).
 function isolateStop(stopId) {
   for (const [id, marker] of stopMarkers) {
     const hide = stopId !== null && id !== stopId;

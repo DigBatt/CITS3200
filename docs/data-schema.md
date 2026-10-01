@@ -16,7 +16,6 @@ modelled as external.
 |---|---|---|
 | Vehicle | `config/vehicles.yaml` | Not a table. S02 requires the identity scheme to be held as configuration rather than in code, and FR-12 requires a new shuttle to need no code change. |
 | Position | `positions` | One telemetry sample for one vehicle at one instant. |
-| Event | `events` | An engage or disengage. **Schema not yet specified** |
 | Stop, Route | `config/stops.yaml` | Not tables. Stops to be added or moved without a code change. Format: [stops-and-routes.md](stops-and-routes.md). |
 
 ---
@@ -50,23 +49,7 @@ constraint, as we can model it on the dashboard as unknown.
 
 ---
 
-## 3. `events` not specified
-
-We do not know the format of the engage/disengage data yet.
-
-
-### What we need from the client before this section can be written
-
-1. How is a disengagement signalled
-   to the webserver? What does one look like?
-2. Is re-engagement emitted as its own record, or implied by the next engage?
-3. Is a cause available (operator takeover, fault, obstacle), and is it a
-   closed set or free text?
-4. Are events timestamped by the vehicle or by whatever receives them?
-
----
-
-## 4. Time
+## 3. Time
 
 - Stored **UTC**, always, with an explicit `Z`. No local times in the database.
 - Displayed in **Australia/Perth**. UTC+8 year round.

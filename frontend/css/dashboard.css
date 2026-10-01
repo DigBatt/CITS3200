@@ -171,9 +171,8 @@ main {
 Dashboard chrome carried over from drafts/kynan/Nuway Prototype.dc.html.
 
 Vehicle rows, the map legend and the utilisation view are rendered by
-js/vehicles.js and js/utilisation.js; the operator and rider panels stay
-empty until the API has events and stops. Layout only -- does not touch any
-`.timeline-*` rule above, which stays owned by the date-range picker.
+js/vehicles.js and js/utilisation.js, the rider panel by js/rider.js. Layout
+only -- does not touch any `.timeline-*` rule above, which stays owned by the date-range picker.
 */
 
 .app-shell {
@@ -185,7 +184,7 @@ empty until the API has events and stops. Layout only -- does not touch any
   color: #1c1917;
 }
 
-/* ---- Header: brand, view tabs, live clock, avatar ---- */
+/* ---- Header: brand, view tabs, admin link ---- */
 
 .app-header {
   display: flex;
@@ -242,41 +241,6 @@ empty until the API has events and stops. Layout only -- does not touch any
 .app-header-spacer {
   flex: 1;
   min-width: 8px;
-}
-
-.app-live-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  border: 1px solid rgba(28, 25, 23, 0.14);
-  border-radius: 7px;
-  font: 500 12px Sora, sans-serif;
-}
-
-.app-live-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: oklch(0.66 0.15 155);
-}
-
-.app-live-clock {
-  font: 400 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
-}
-
-.app-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: oklch(0.62 0.17 300);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font: 600 11px Sora, sans-serif;
-  flex: none;
 }
 
 /* ---- Filter bar: vehicle chips ---- */
@@ -369,7 +333,7 @@ empty until the API has events and stops. Layout only -- does not touch any
   border-color: #1c1917;
 }
 
-/* ---- Main content: fleet/operator/rider view vs. utilisation view ---- */
+/* ---- Main content: fleet/rider view vs. utilisation view ---- */
 
 .dashboard-view {
   height: 100%;
@@ -410,7 +374,7 @@ empty until the API has events and stops. Layout only -- does not touch any
   display: none;
 }
 
-/* ---- Sidebar: fleet / operator / rider panels ---- */
+/* ---- Sidebar: fleet / rider panels ---- */
 
 .sidebar {
   flex: 1 1 300px;
@@ -500,15 +464,9 @@ empty until the API has events and stops. Layout only -- does not touch any
   letter-spacing: 0.03em;
 }
 
-.badge-engaged,
 .badge-active {
   background: oklch(0.66 0.15 155 / 14%);
   color: oklch(0.45 0.13 155);
-}
-
-.badge-manual {
-  background: oklch(0.75 0.15 75 / 20%);
-  color: oklch(0.45 0.12 60);
 }
 
 .badge-idle,
@@ -650,49 +608,6 @@ empty until the API has events and stops. Layout only -- does not touch any
   font: 600 18px Sora, sans-serif;
 }
 
-/* ---- Operator panel ---- */
-
-.operator-header {
-  padding: 18px 18px 14px;
-  border-bottom: 1px solid rgba(28, 25, 23, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.operator-title-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.operator-id {
-  font: 600 18px Sora, sans-serif;
-  letter-spacing: -0.02em;
-}
-
-.operator-metrics-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  background: rgba(28, 25, 23, 0.09);
-  border: 1px solid rgba(28, 25, 23, 0.09);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.operator-metric {
-  background: #fff;
-  padding: 11px 13px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.operator-metric-value {
-  font: 600 16px 'IBM Plex Mono', monospace;
-}
-
 .request-card {
   display: flex;
   flex-direction: column;
@@ -742,115 +657,6 @@ empty until the API has events and stops. Layout only -- does not touch any
   border-color: rgba(28, 25, 23, 0.16);
   font-weight: 500;
   color: #1c1917;
-}
-
-.autonomy-block {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.autonomy-label {
-  font: 600 11px Sora, sans-serif;
-  letter-spacing: 0.04em;
-  color: rgba(28, 25, 23, 0.5);
-}
-
-.autonomy-bar {
-  display: flex;
-  height: 24px;
-  border-radius: 5px;
-  overflow: hidden;
-  background: rgba(28, 25, 23, 0.06);
-}
-
-.autonomy-segment.seg-engaged {
-  background: oklch(0.66 0.15 155 / 55%);
-}
-
-.autonomy-segment.seg-manual {
-  background: oklch(0.75 0.15 75);
-}
-
-.autonomy-segment.seg-estop {
-  background: oklch(0.6 0.19 25);
-}
-
-.autonomy-segment.seg-gap {
-  background: rgba(28, 25, 23, 0.12);
-}
-
-.autonomy-scale {
-  display: flex;
-  justify-content: space-between;
-  font: 400 10px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.4);
-}
-
-/* ---- Event log ---- */
-
-.event-log-header {
-  padding: 14px 18px 8px;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.event-log-export {
-  font: 400 11px Sora, sans-serif;
-  color: oklch(0.5 0.15 300);
-  cursor: pointer;
-}
-
-.event-row {
-  display: flex;
-  gap: 11px;
-  padding: 11px 18px;
-  border-top: 1px solid rgba(28, 25, 23, 0.07);
-  cursor: pointer;
-}
-
-.event-time {
-  font: 400 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.45);
-  width: 44px;
-  flex: none;
-}
-
-.event-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-top: 4px;
-  flex: none;
-}
-
-.event-dot.dot-manual {
-  background: oklch(0.75 0.15 75);
-}
-
-.event-dot.dot-engage {
-  background: oklch(0.6 0.15 155);
-}
-
-.event-dot.dot-estop {
-  background: oklch(0.6 0.19 25);
-}
-
-.event-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.event-title {
-  font: 600 12px Sora, sans-serif;
-}
-
-.event-desc {
-  font: 400 11px Sora, sans-serif;
-  color: rgba(28, 25, 23, 0.55);
 }
 
 /* ---- Rider panel ---- */
@@ -1132,18 +938,6 @@ empty until the API has events and stops. Layout only -- does not touch any
   width: 8px;
   height: 8px;
   border-radius: 50%;
-}
-
-.map-legend-dot.dot-engaged {
-  background: oklch(0.66 0.15 155);
-}
-
-.map-legend-dot.dot-manual {
-  background: oklch(0.75 0.15 75);
-}
-
-.map-legend-dot.dot-estop {
-  background: oklch(0.6 0.19 25);
 }
 
 .map-legend-dot.dot-offline {
