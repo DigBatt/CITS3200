@@ -1696,4 +1696,21 @@ empty until the API has events and stops. Layout only -- does not touch any
   .campus3d-bar { top: 56px; max-width: calc(100% - 24px); }
   .campus3d-who { min-width: 0; }
   .campus3d-hint { display: none; }
+
+  .stop-picker {
+    padding-left: 0;
+    padding-right: 0;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+
+  .stop-select {
+    padding: 14px 12px;
+    font-size: 17px;
+  }
+
+  .stop-select option {
+    font-size: 17px;
+  }
 }
