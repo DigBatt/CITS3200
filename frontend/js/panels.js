@@ -8,22 +8,26 @@ document.addEventListener('DOMContentLoaded', () => {
     rider: document.getElementById('panel-rider'),
   };
 
-  // S11: the vehicle/route chips and the date-range picker are Fleet/
-  // Operator/Utilisation tools an ordinary rider has no use for (S11.2) --
-  // most people who open the site land on this view, and S11.1/S11.3 are
-  // about it fitting one screen on a phone without scrolling past them
-  // first. Hidden rather than removed, since Utilisation still needs the
-  // vehicle chips to scope its report.
+  // S11: the vehicle/route chips and the date-range picker are tools an
+  // ordinary rider has no use for (S11.2) -- most people who open the site
+  // land on this view, and S11.1/S11.3 are about it fitting one screen on a
+  // phone without scrolling past them first. The route chips also serve no
+  // purpose on Utilisation, which scopes its report by vehicle, not route.
+  // Hidden rather than removed either way, since e.g. Utilisation still
+  // needs the vehicle chips.
   //
   // `riderOverrides` is null when nothing has been overridden; while it
   // holds a value, the Rider tab's "today, live, every vehicle" forcing is
   // in effect and that value is what gets put back on leaving.
   let riderOverrides = null;
 
-  function setRiderChromeHidden(hidden) {
-    document.getElementById('timeline-container')?.classList.toggle('is-rider-hidden', hidden);
-    document.getElementById('vehicle-filter')?.classList.toggle('is-rider-hidden', hidden);
-    document.getElementById('route-filter')?.classList.toggle('is-rider-hidden', hidden);
+  function updateChromeVisibility(view) {
+    const hideVehicle = view === 'rider';
+    const hideRoute = view === 'rider' || view === 'utilisation';
+    const hideTimeline = view === 'rider';
+    document.getElementById('vehicle-filter')?.classList.toggle('is-chrome-hidden', hideVehicle);
+    document.getElementById('route-filter')?.classList.toggle('is-chrome-hidden', hideRoute);
+    document.getElementById('timeline-container')?.classList.toggle('is-chrome-hidden', hideTimeline);
   }
 
   function enterRiderDefaults() {
@@ -34,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     timelineControl?.setLiveToday();
     Vehicles.select(null); // every vehicle, not whatever one Fleet/Operator had picked
-    setRiderChromeHidden(true);
   }
 
   function leaveRiderDefaults() {
@@ -42,7 +45,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (riderOverrides.timeline) timelineControl?.setFieldState(riderOverrides.timeline);
     Vehicles.select(riderOverrides.vehicle);
     riderOverrides = null;
-    setRiderChromeHidden(false);
   }
 
   function setView(view) {
@@ -55,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       leaveRiderDefaults();
     }
+    updateChromeVisibility(view);
 
     if (view === 'utilisation') {
       viewMap.hidden = true;
@@ -94,6 +97,49 @@ document.addEventListener('DOMContentLoaded', () => {
       utilTumCard.hidden = !isTum;
     });
   });
+
+  // Collapsible vehicle/route filter bars: click the "VEHICLE" or "ROUTE"
+  // label to fold away its chip row, for a less cluttered or larger map on
+  // a smaller screen. Remembered per browser, the same way Stops remembers
+  // the selected route (js/stops.js), so it stays folded across reloads.
+  function initCollapsibleFilterBar(barId, storageKey) {
+    const bar = document.getElementById(barId);
+    const label = bar?.querySelector('.filter-bar-label');
+    if (!bar || !label) return;
+
+    function apply(collapsed) {
+      bar.classList.toggle('is-collapsed', collapsed);
+      label.setAttribute('aria-expanded', String(!collapsed));
+    }
+
+    function remember(collapsed) {
+      try {
+        if (collapsed) localStorage.setItem(storageKey, '1');
+        else localStorage.removeItem(storageKey);
+      } catch (error) {
+        /* storage unavailable */
+      }
+    }
+
+    function recall() {
+      try {
+        return localStorage.getItem(storageKey) === '1';
+      } catch (error) {
+        return false;
+      }
+    }
+
+    label.addEventListener('click', () => {
+      const collapsed = !bar.classList.contains('is-collapsed');
+      apply(collapsed);
+      remember(collapsed);
+    });
+
+    apply(recall());
+  }
+
+  initCollapsibleFilterBar('vehicle-filter', 'nuway.vehicleFilterCollapsed');
+  initCollapsibleFilterBar('route-filter', 'nuway.routeFilterCollapsed');
 
   // Header clock: cosmetic only.
   const clock = document.getElementById('app-clock');

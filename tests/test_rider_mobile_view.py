@@ -187,3 +187,66 @@ def test_no_horizontal_scroll_on_a_phone(page):
     page.set_viewport_size({"width": 390, "height": 844})
     go_to_rider(page)
     assert page.evaluate("document.documentElement.scrollWidth") == page.evaluate("document.documentElement.clientWidth")
+
+
+# ---- S11 follow-up: route chips serve no purpose on Utilisation either ----
+
+
+def test_utilisation_has_no_route_filter(page):
+    page.get_by_role("button", name="Utilisation", exact=True).click()
+    assert page.locator("#route-filter").is_hidden()
+
+
+def test_utilisation_still_has_the_vehicle_filter(page):
+    page.get_by_role("button", name="Utilisation", exact=True).click()
+    assert page.locator("#vehicle-filter").is_visible()
+
+
+def test_route_filter_reappears_back_on_fleet(page):
+    page.get_by_role("button", name="Utilisation", exact=True).click()
+    go_to_fleet(page)
+    assert page.locator("#route-filter").is_visible()
+
+
+# ---- Collapsible vehicle/route filter bars ----
+
+
+def test_clicking_the_label_collapses_the_chip_row(page):
+    page.click("#vehicle-filter .filter-bar-label")
+    assert page.locator("#vehicle-filter-chips").is_hidden()
+    assert page.get_attribute("#vehicle-filter .filter-bar-label", "aria-expanded") == "false"
+
+
+def test_clicking_again_expands_it(page):
+    page.click("#vehicle-filter .filter-bar-label")
+    page.click("#vehicle-filter .filter-bar-label")
+    assert page.locator("#vehicle-filter-chips").is_visible()
+    assert page.get_attribute("#vehicle-filter .filter-bar-label", "aria-expanded") == "true"
+
+
+def test_vehicle_and_route_collapse_independently(page):
+    page.click("#vehicle-filter .filter-bar-label")
+    assert page.locator("#vehicle-filter-chips").is_hidden()
+    assert page.locator("#route-filter-chips").is_visible()
+
+
+def test_collapsed_state_is_remembered_across_a_reload(page):
+    page.click("#vehicle-filter .filter-bar-label")
+    page.click("#route-filter .filter-bar-label")
+
+    page.reload(wait_until="networkidle")
+
+    assert page.locator("#vehicle-filter-chips").is_hidden()
+    assert page.locator("#route-filter-chips").is_hidden()
+
+
+def test_collapsing_does_not_change_the_underlying_selection(page):
+    """
+    Folding the row away must not clear whichever chip was active -- the
+    selection the chip represents, not the row's visibility, is what the map
+    and the rest of the page actually read.
+    """
+    page.click('#vehicle-filter-chips .chip[data-vehicle="2"]')
+    page.click("#vehicle-filter .filter-bar-label")
+    page.click("#vehicle-filter .filter-bar-label")  # expand again to inspect it
+    assert page.locator('#vehicle-filter-chips .chip[data-vehicle="2"]').get_attribute("class") == "chip is-active"

@@ -295,15 +295,55 @@ empty until the API has events and stops. Layout only -- does not touch any
   display: none;
 }
 
-.is-rider-hidden {
+/* Forced hidden for the current view (js/panels.js:updateChromeVisibility) --
+   the Rider tab has no use for any of these, and Utilisation none for route. */
+.is-chrome-hidden {
   display: none;
 }
 
+/* A real <button> (js/panels.js makes it fold the chip row away), reset back
+   to reading like the plain label it was. */
 .filter-bar-label {
   flex: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: none;
+  background: none;
   font: 500 10px Sora, sans-serif;
   letter-spacing: 0.05em;
   color: rgba(28, 25, 23, 0.45);
+  cursor: pointer;
+}
+
+.filter-bar-label:hover {
+  color: rgba(28, 25, 23, 0.75);
+}
+
+.filter-bar-label:focus-visible {
+  outline: 2px solid oklch(0.62 0.17 300);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* Disclosure chevron, pointing down expanded and sideways collapsed. */
+.filter-bar-label::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.filter-bar.is-collapsed .filter-bar-label::after {
+  transform: rotate(-45deg);
+}
+
+.filter-bar.is-collapsed .chip-row {
+  display: none;
 }
 
 .chip-row {
