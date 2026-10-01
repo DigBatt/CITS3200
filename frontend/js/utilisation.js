@@ -160,10 +160,22 @@
     ].join('');
   }
 
+  // S19: each bus's own account of its downtime, under both the pie and the
+  // time model. Only buses with any recorded; hidden when none have.
+  function renderDowntimeNote(entries) {
+    const note = document.getElementById('util-downtime-note');
+    const lines = entries
+      .filter((entry) => entry.downtime?.recorded_seconds)
+      .map((entry) => (entries.length > 1 ? `${Vehicles.nameOf(entry.vehicle_id)}: ` : '') + entry.downtime.summary);
+    note.innerHTML = lines.map((line) => `<p>${escapeHtml(line)}</p>`).join('');
+    note.hidden = !lines.length;
+  }
+
   function draw(figures, entries, pooled) {
     renderKpis(figures);
     renderPie(figures);
     renderTimeModel(figures, pooled);
+    renderDowntimeNote(entries);
     renderTable(entries, pooled ? figures : null);
   }
 

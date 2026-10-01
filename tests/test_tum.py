@@ -384,3 +384,24 @@ def test_without_storage_the_downtime_kpis_stay_unavailable(tmp_path):
         for name in DOWNTIME_KPIS:
             assert entry["kpis"][name] is None
             assert entry["unavailable"][name] == BLOCKED_KPIS[name]
+
+
+def test_editing_and_deleting_downtime_changes_the_figures(tmp_path):
+    # S19 AC2 and S20: no restart between changes, the same app throughout.
+    client = sign_in(create_app(make_config(tmp_path)).test_client())
+    record = client.post("/api/downtime", json={
+        "vehicle_id": "1",
+        "start": "2025-09-04T02:00:00Z",  # 10:00-11:00 in Perth
+        "end": "2025-09-04T03:00:00Z",
+        "reason": "Brake inspection",
+    }).get_json()["record"]
+    assert metrics_by_vehicle(client)["1"]["buckets"]["downtime_seconds"] == HOUR
+
+    edited = client.patch(f"/api/downtime/{record['id']}", json={"end": "2025-09-04T04:00:00Z"})
+    assert edited.status_code == 200
+    assert metrics_by_vehicle(client)["1"]["buckets"]["downtime_seconds"] == 2 * HOUR
+
+    assert client.delete(f"/api/downtime/{record['id']}").status_code == 204
+    bus_1 = metrics_by_vehicle(client)["1"]
+    assert bus_1["buckets"]["downtime_seconds"] == 0
+    assert "downtime_seconds" not in bus_1["notes"]

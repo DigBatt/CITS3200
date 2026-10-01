@@ -238,6 +238,13 @@ empty until the API has events and stops. Layout only. The period control's
   overflow-y: auto;
 }
 
+/* Cards keep their height and the view scrolls instead. Left to shrink, the
+   table (overflow: hidden) was squashed and its rows cut off once the cards
+   above it outgrew the screen. */
+.view-utilisation > * {
+  flex-shrink: 0;
+}
+
 /* Utilisation palette: one colour per time category, read by utilisation.js. */
 .view-utilisation {
   --util-ct: oklch(0.72 0.09 300);
@@ -1253,6 +1260,29 @@ empty until the API has events and stops. Layout only. The period control's
   display: none;
 }
 
+/* S19: how the downtime log was applied, one line per bus that has any */
+.util-downtime-note {
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-left: 3px solid var(--util-dt);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font: 400 12px/1.5 Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.75);
+}
+
+.util-downtime-note p {
+  margin: 0;
+}
+
+.util-downtime-note p + p {
+  margin-top: 4px;
+}
+
+.util-downtime-note[hidden] {
+  display: none;
+}
+
 .util-tum-rows {
   display: flex;
   flex-direction: column;
@@ -1598,5 +1628,16 @@ empty until the API has events and stops. Layout only. The period control's
 
   .stop-select option {
     font-size: 17px;
+  }
+
+  /* The Utilisation table's six columns are wider than a phone: it scrolls
+     sideways on its own rather than cutting off NOT REPORTING. */
+  .util-table {
+    overflow-x: auto;
+  }
+
+  .util-table-header,
+  .util-table-row {
+    min-width: 560px;
   }
 }

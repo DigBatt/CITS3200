@@ -172,31 +172,45 @@ and errors as `/api/positions`. Thresholds come from the `utilisation` block of
         "operating_seconds": 2247.01,
         "working_seconds": 2164.54,
         "scheduled_working_seconds": 2164.54,
+        "scheduled_operating_seconds": 2247.01,
         "operating_delay_seconds": 82.47,
         "standby_seconds": 0.0,
-        "not_reporting_seconds": 84152.99,
-        "downtime_seconds": null,
-        "available_seconds": null,
+        "not_reporting_seconds": 80552.99,
+        "downtime_seconds": 3600.0,
+        "available_seconds": 28800.0,
         "productive_seconds": null
       },
       "kpis": {
         "asset_utilisation": 0.026,
         "effective_utilisation": 0.0668,
         "operating_efficiency": 0.9633,
-        "uptime": null,
-        "mechanical_availability": null,
-        "physical_availability": null,
-        "use_of_availability": null,
+        "uptime": 0.3333,
+        "mechanical_availability": 0.3843,
+        "physical_availability": 0.8889,
+        "use_of_availability": 0.078,
         "production_effectiveness": null
       },
       "unavailable": {
-        "uptime": "needs downtime; no fault or maintenance log in the data",
+        "production_effectiveness": "needs productive time; no passenger counts in the data",
         "...": "one entry per figure above that cannot be given"
+      },
+      "notes": {
+        "downtime_seconds": "1 h of downtime recorded: 1 h in service hours counted as downtime, in place of 1 h not reporting."
+      },
+      "downtime": {
+        "recorded_seconds": 3600.0,
+        "counted_seconds": 3600.0,
+        "outside_roster_seconds": 0.0,
+        "replaced_seconds": { "not_reporting_seconds": 3600.0 },
+        "summary": "1 h of downtime recorded: 1 h in service hours counted as downtime, in place of 1 h not reporting."
       }
     }
   ]
 }
 ```
+
+The example has one downtime record, 10:00-11:00 Perth time; see **Downtime**
+below.
 
 Times are seconds and KPIs are fractions (`0.026` is 2.6%).
 
@@ -209,9 +223,12 @@ as operating delay. What stays unavailable, and why:
 
 | Figure | Unavailable when |
 |---|---|
-| `downtime_seconds`, `available_seconds`, `uptime`, `mechanical_availability`, `physical_availability`, `use_of_availability` | Always: needs a fault or maintenance log. |
+| `downtime_seconds`, `available_seconds`, `uptime`, `mechanical_availability`, `physical_availability`, `use_of_availability` | No downtime log: `storage.directory` is not set, so there are no downtime records at all. Also no `display.timezone`, as below. |
+| `mechanical_availability` | No operating time and no downtime inside service hours in the period. |
+| `physical_availability` | No scheduled time in the period. |
+| `use_of_availability` | No available time in the period, e.g. down for the whole roster. |
 | `productive_seconds`, `production_effectiveness` | Always: needs passenger counts. |
-| `scheduled_seconds`, `unscheduled_seconds`, `scheduled_working_seconds`, `effective_utilisation` | No `display.timezone` configured, so the roster cannot be placed on a clock. |
+| `scheduled_seconds`, `unscheduled_seconds`, `scheduled_working_seconds`, `scheduled_operating_seconds`, `effective_utilisation` | No `display.timezone` configured, so the roster cannot be placed on a clock. |
 | `effective_utilisation` | Nothing rostered for the vehicle (see **Empty schedules**), or no scheduled time in the period, e.g. a weekend. |
 | `operating_efficiency` | No operating time in the period. |
 | `standby_seconds` | No `utilisation.depot` configured. |
@@ -220,6 +237,36 @@ as operating delay. What stays unavailable, and why:
 a figure that *is* given but needs explaining, such as a scheduled time of `0`
 because nothing is rostered (see **Empty schedules** under `PUT /api/schedule`).
 A note never stands in for a value; it is said beside it.
+
+**Downtime** (S19). The records entered on the admin page (see **Downtime**
+below) are applied to each vehicle's figures:
+
+- Overlapping records for a vehicle count once.
+- Only downtime inside the vehicle's own roster counts. GMG nests downtime
+  inside scheduled time (`AT = ST − DT`), so a repair while the bus was not
+  rostered takes nothing from its availability. Nothing rostered makes
+  downtime `0`, with a note.
+- Counted downtime replaces whatever the telemetry said over the same time, so
+  working, operating delay, standby, not reporting and downtime still add up
+  to `calendar_seconds`.
+- The availability KPIs use `scheduled_operating_seconds`, operating time
+  inside the roster, so that operating and available time are measured over
+  the same hours: `mechanical_availability` is
+  `scheduled_operating / (scheduled_operating + downtime)` and
+  `use_of_availability` is `scheduled_operating / available`.
+- With no downtime log at all (`storage.directory` unset), `downtime` is
+  `null` and the figures that need it are unavailable rather than at 100%.
+  A log with no records for a vehicle is a real `0`.
+
+`downtime` says how much was recorded and what was done with it:
+`recorded_seconds` in the period, `counted_seconds` inside the roster (the
+`downtime_seconds` bucket), `outside_roster_seconds` left out, and
+`replaced_seconds`, the telemetry time it took the place of, by bucket. Working
+time in `replaced_seconds` means the bus was moving during recorded downtime,
+which may mean a record is wrong. `summary` says the same in one sentence, and
+is also `notes.downtime_seconds` when anything was recorded. Only durations are
+given: a record's `reason` stays behind the admin-only `/api/downtime`, though
+`/api/metrics` needs no sign-in.
 
 `calendar_seconds` covers the whole period, including any part still to come
 if `to` is in the future, where it counts as not reporting; leave `to` out to
@@ -251,7 +298,8 @@ mini month and draws them in each vehicle's lane. Same `vehicles`, `from` and
 
 Operating time is the time usage model's, working plus operating delay, so the
 intervals add up to the `operating_seconds` `/api/metrics` reports for the same
-window. Scheduled time is the vehicle's own roster (see `GET /api/schedule`), so
+window, as long as no downtime is recorded in it: `/api/metrics` takes
+recorded downtime out of operating time (S19), and this endpoint does not yet. Scheduled time is the vehicle's own roster (see `GET /api/schedule`), so
 an interval is cut wherever its service period opens or closes. With nothing
 rostered, everything is `in_schedule: false`; `in_schedule` is `null` only when
 no `display.timezone` is configured, since the roster cannot then be placed on
