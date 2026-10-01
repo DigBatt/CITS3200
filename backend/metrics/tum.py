@@ -349,7 +349,12 @@ def seconds_within(span: Span, periods: Sequence[tuple[datetime, datetime]]) -> 
 
 
 def summarise(
-    vehicle_id: str, positions: Sequence[Position], start: datetime, end: datetime, settings: Settings
+    vehicle_id: str,
+    positions: Sequence[Position],
+    start: datetime,
+    end: datetime,
+    settings: Settings,
+    downtime: Optional[Sequence[tuple[datetime, datetime]]] = None,
 ) -> Utilisation:
     """
     Buckets and KPIs for one vehicle over one window.
@@ -362,6 +367,12 @@ def summarise(
     start, end : datetime
         The reporting window, UTC.
     settings : Settings
+    downtime : sequence of (datetime, datetime) or None
+        This vehicle's downtime as disjoint periods clipped to the window,
+        from `backend.downtime.merged_intervals`. None means there is no
+        downtime log at all, so the KPIs that need downtime stay blocked; an
+        empty list means the log exists and records none. Not yet applied to
+        the figures (S19).
 
     Returns
     -------
