@@ -8,8 +8,11 @@ __pycache__/
 .env
 claude.md
 data/live/
-mobile/node_modules
-mobile/.env
+mobile
+mobile
 
 # S13 admin credentials and session key; see config/secrets.example.yaml
 config/secrets.yaml
+
+# Log files, wherever a tool writes them (e.g. Expo's mobile/.expo/dev/logs/).
+*.log
