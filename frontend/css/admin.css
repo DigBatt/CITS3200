@@ -844,32 +844,3 @@
 .sched-remove-label { opacity: 0.7; }
 .sched-remove input[type="date"] { font-size: 0.72rem; padding: 0.15rem 0.3rem; width: auto; }
 
-/* The mini month, docked top right under the header buttons.
-   It floats so the panels keep their own width; .admin-panel is capped at
-   860px, so on a wide screen the two never meet. Below that the dock goes
-   back into the flow above the panel. */
-.mini-cal-dock {
-  float: right;
-  position: sticky;
-  top: 12px;
-  z-index: 5;
-  width: 15rem;
-  margin: 12px 16px 12px 24px;
-  padding: 10px;
-  background: #fff;
-  border: 1px solid rgba(28, 25, 23, 0.1);
-  border-radius: 10px;
-  cursor: pointer;
-}
-
-.mini-cal-dock:hover { border-color: rgba(28, 25, 23, 0.25); }
-
-@media (max-width: 1180px) {
-  .mini-cal-dock {
-    float: none;
-    position: static;
-    margin: 16px 24px 0;
-    width: auto;
-    max-width: 18rem;
-  }
-}

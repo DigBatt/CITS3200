@@ -38,6 +38,16 @@
 
     <div class="app-header-spacer"></div>
 
+    <!-- The calendar's month bar, here in the header, and the month it opens
+         as an overlay below. A day, or the expand button, opens the full
+         calendar. AUTH (S13): view only, and the reads behind it stay public. -->
+    <div class="period-picker">
+      <div class="period-bar" id="mini-calendar-head"></div>
+      <div class="period-panel" id="mini-calendar-panel" hidden>
+        <div id="mini-calendar" aria-label="Service calendar, click a day to open it"></div>
+      </div>
+    </div>
+
     <!-- Return to dashboard and sign out -->
     <a href="/" class="btn-signout">Return to Dashboard</a>
     <button type="button" class="btn-signout" id="btn-signout">Sign out</button>
@@ -45,14 +55,6 @@
 
   <!-- ============ Main ============ -->
   <main class="admin-main">
-
-    <!-- Mini month, docked top right under the header buttons. Deliberately
-         unlabelled; clicking a day opens the full calendar on that day.
-         AUTH (S13): view only, and the reads behind it stay public. -->
-    <aside class="mini-cal-dock">
-      <div id="mini-calendar" role="button" tabindex="0" aria-haspopup="dialog"
-           aria-label="Service calendar, click a day to open"></div>
-    </aside>
 
     <!-- ---- Operator view (S09): driven by js/operator.js ---- -->
     <div class="admin-panel" id="tab-operator">

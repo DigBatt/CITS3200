@@ -510,7 +510,12 @@ loadSchedule();
 
 const calendar = ServiceCalendar.mount({
   mini: document.getElementById('mini-calendar'),
+  head: document.getElementById('mini-calendar-head'),
+  panel: document.getElementById('mini-calendar-panel'),
   overlay: document.getElementById('cal-overlay'),
   body: document.getElementById('cal-overlay-body'),
   close: document.getElementById('cal-overlay-close'),
+}, {
+  // The month bar sits in the header and opens the month as an overlay.
+  collapsed: true,
 });

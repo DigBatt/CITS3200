@@ -53,15 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // The docked mini month and the timeline under it are mounted by main.js,
   // which owns the range they pick.
 
-  // The header wraps at narrow widths, so its height is measured rather than
-  // assumed; the dock hangs just below whatever it ends up being.
-  const dock = document.getElementById('mini-cal-dock');
-  const header = document.querySelector('.app-header');
-  const placeDock = () => {
-    dock.style.top = `${header.getBoundingClientRect().bottom + 10}px`;
-  };
-  placeDock();
-  window.addEventListener('resize', placeDock);
+  // The calendar's month bar and its overlay are placed by js/calendar.js.
 
   // Header clock: cosmetic only.
   const clock = document.getElementById('app-clock');

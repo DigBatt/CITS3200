@@ -70,6 +70,9 @@
     let extent = null;
     let extentKey = null;
     let extentAt = 0;
+    // Picking the period from the day headings: the start once the first
+    // heading is clicked, waiting for the end.
+    let pickStart = null;
 
     let schedule = null;
     let vehicles = [];
@@ -175,10 +178,7 @@
 
       return `
         <div class="cal-day${today ? ' is-today' : ''}">
-          <div class="cal-day-head">
-            <span class="cal-day-name">${escape(day.toLocaleDateString([], { weekday: 'short' }))}</span>
-            <span class="cal-day-date">${escape(day.toLocaleDateString([], { day: '2-digit', month: 'short' }))}</span>
-          </div>
+          ${dayHead(day)}
           <div class="cal-day-body">
             ${HOUR_LABELS.slice(1, -1).map((hour) => `<div class="cal-gridline" style="top:${pct(hour / 24)}"></div>`).join('')}
             ${lanes || '<p class="cal-no-vehicles">No vehicles shown</p>'}
@@ -186,6 +186,19 @@
             ${nowLine}
           </div>
         </div>`;
+    }
+
+    // A day's heading. Where this calendar picks the period, it is a button:
+    // click one day's heading for the start and another's for the end.
+    function dayHead(day) {
+      const label = `
+            <span class="cal-day-name">${escape(day.toLocaleDateString([], { weekday: 'short' }))}</span>
+            <span class="cal-day-date">${escape(day.toLocaleDateString([], { day: '2-digit', month: 'short' }))}</span>`;
+      if (!range) return `<div class="cal-day-head">${label}</div>`;
+      const date = isoDate(day);
+      const future = date > range.max();
+      return `<button type="button" class="cal-day-head is-pickable" data-cal-pick="${date}"${future ? ' aria-disabled="true"' : ''}
+                title="${future ? 'Not yet available' : 'Pick this day as the start or end of the period'}">${label}</button>`;
     }
 
     function rangeLabel() {
@@ -260,7 +273,8 @@
             <span class="cal-key"><span class="cal-swatch is-now"></span>Now</span>
             ${range ? `
             <span class="cal-key"><span class="cal-swatch is-outside-period"></span>Outside selected period</span>
-            <span class="cal-key"><span class="cal-measure-dot"></span>First / last measurement</span>` : ''}
+            <span class="cal-key"><span class="cal-measure-dot"></span>First / last measurement</span>
+            <span class="cal-pick-hint" aria-live="polite"></span>` : ''}
           </div>
           <div class="cal-grid">
             <div class="cal-hours">
@@ -351,7 +365,47 @@
       const win = range.window();
       tools.update(win, extent);
       paintSelection(win);
+      paintHeads();
       loadExtent();
+    }
+
+    // The day headings: the chosen days tinted, a half made pick's start
+    // marked, and the hint saying what the next click does.
+    function paintHeads() {
+      const { start, end } = range.get() ?? {};
+      container.querySelectorAll('[data-cal-pick]').forEach((head) => {
+        const date = head.dataset.calPick;
+        head.classList.toggle('is-in-period', !pickStart && Boolean(start) && date >= start && date <= end);
+        head.classList.toggle('is-pick-start', date === pickStart);
+        head.setAttribute('aria-pressed', String(date === pickStart));
+      });
+      const hint = container.querySelector('.cal-pick-hint');
+      if (hint) {
+        hint.textContent = pickStart
+          ? `From ${new Date(`${pickStart}T00:00`).toLocaleDateString([], { day: 'numeric', month: 'short' })}: now click an end day's heading. Esc cancels.`
+          : "Click a day's heading for the start of the period, then another for the end.";
+      }
+    }
+
+    // A heading clicked: the first is the start, the second the end, in
+    // either order; the same day twice is that one day.
+    function pickDay(date) {
+      if (pickStart === null) {
+        pickStart = date;
+        paintHeads();
+        return;
+      }
+      const [start, end] = [pickStart, date].sort();
+      pickStart = null;
+      range.select(start, end);
+      paintHeads();
+    }
+
+    function cancelPick() {
+      if (pickStart === null) return false;
+      pickStart = null;
+      paintHeads();
+      return true;
     }
 
     // Bring a newly picked span into view: its first day starts the week, or
@@ -366,6 +420,12 @@
       const vehicle = event.target.closest('[data-cal-vehicle]');
       const step = event.target.closest('[data-cal-step]');
       const view = event.target.closest('[data-cal-span]');
+      const heading = event.target.closest('[data-cal-pick]');
+
+      if (heading) {
+        if (heading.getAttribute('aria-disabled') !== 'true') pickDay(heading.dataset.calPick);
+        return;
+      }
 
       if (vehicle && shown) {
         const id = vehicle.dataset.calVehicle;
@@ -402,6 +462,7 @@
     return {
       refresh,
       paintRange,
+      cancelPick,
       // Open on a particular day, for the mini calendar handing one over.
       goTo(date) {
         anchor = startOfDay(date);
@@ -447,7 +508,6 @@
           <span class="cal-range-chevron" aria-hidden="true">&#9662;</span>
         </button>
         <div class="cal-range-pop" role="dialog" aria-label="Choose the period" hidden>
-          <p class="cal-range-hint">Drag across days to choose the period.</p>
           <div class="cal-range-mini"></div>
         </div>
       </div>
@@ -638,20 +698,28 @@
   // It says nothing about which vehicle: at this size a mark per bus would be
   // unreadable, and the full view is one click away for that.
   //
-  // Given `options.range`, it is also the dashboard's date picker: pressing a
-  // day and dragging across others selects them, and the full calendar moves
-  // to an expand button in the head, since a day press no longer opens it.
+  // Given `options.range`, it is also the dashboard's date picker: click a
+  // start date, then an end date (hovering in between previews the range), or
+  // drag across the days as a shortcut. The full calendar moves to an expand
+  // button in the head, since a day press no longer opens it.
   // The range itself is owned by the caller (js/timeline.js on the dashboard):
   //   range.get()          -> { start, end } as local "YYYY-MM-DD"
   //   range.select(a, b)   <- the days the operator let go on, a <= b
   //   range.max()          -> the last selectable day; later ones are shown
   //                           but cannot be picked
+  //
+  // Given `options.headHost`, the month bar is drawn there instead, e.g. in
+  // the page header, and `container` holds only the month itself. Folding
+  // then shows and hides the month as an overlay under the bar: `onFold`
+  // is told each time, for the page to show or hide whatever holds it.
 
   const isoDate = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
   function createMini(container, options = {}) {
     const onOpen = options.onOpen ?? (() => {});
     const range = options.range ?? null;
+    const headHost = options.headHost ?? null;
+    const onFold = options.onFold ?? (() => {});
     // Collapsed shows the month bar alone, which is the whole dock on a small
     // screen where a full month would bury what is behind it.
     let collapsed = Boolean(options.collapsed);
@@ -661,8 +729,13 @@
     let schedule = null;
     let downtime = [];
     let error = null;
-    // A drag in progress: the day it started on and the day under the pointer.
+    // A press in progress: the day it started on, the day under the pointer,
+    // and whether it has moved to another day, which makes it a drag.
     let drag = null;
+    // Picking by clicks: the start date once the first click has landed, and
+    // the day under the pointer, to preview the range before the second.
+    let pending = null;
+    let hover = null;
 
     // Six weeks from the Monday on or before the 1st, so the grid never jumps
     // height between months.
@@ -699,7 +772,34 @@
       return downtime.some((record) => new Date(record.start) < next && new Date(record.end) > day);
     };
 
+    // The month bar: an expand button, the month arrows, and the month name,
+    // which folds the month away and back. Needs no data, so a bar in the
+    // header is drawn at once, before the month has loaded.
+    function headHtml() {
+      // In the header there is no dock left to click for the full calendar,
+      // so the bar always gets the expand button there.
+      const expand = (range && options.expand !== false) || headHost
+        ? '<button type="button" class="mini-step mini-expand" data-mini-expand aria-label="Open the full calendar" title="Open the full calendar">&#10530;</button>'
+        : '';
+      return `
+        <div class="mini-head">
+          ${expand}
+          <button type="button" class="mini-step" data-mini-month="-1" aria-label="Previous month">&#8249;</button>
+          <button type="button" class="mini-month" data-mini-toggle aria-expanded="${!collapsed}"
+                  title="${collapsed ? 'Show the month' : 'Hide the month'}">
+            <span>${escape(month.toLocaleDateString([], { month: 'long', year: 'numeric' }))}</span>
+            <span class="mini-chevron" aria-hidden="true">${collapsed ? '&#9656;' : '&#9662;'}</span>
+          </button>
+          <button type="button" class="mini-step" data-mini-month="1" aria-label="Next month">&#8250;</button>
+        </div>`;
+    }
+
     function render() {
+      const ranged = range ? ' is-ranged' : '';
+      if (headHost) {
+        headHost.innerHTML = `<div class="mini is-bar${ranged}">${headHtml()}</div>`;
+        onFold(collapsed);
+      }
       if (error) {
         container.innerHTML = `<p class="cal-error">${escape(error)}</p>`;
         return;
@@ -734,24 +834,12 @@
         .join('');
 
       // No title: the dock is unlabelled by design, the overlay names itself.
-      // The month name toggles the grid rather than opening the calendar, so
-      // the dock can be folded down to a bar and back.
-      const expand = range && options.expand !== false
-        ? '<button type="button" class="mini-step mini-expand" data-mini-expand aria-label="Open the full calendar" title="Open the full calendar">&#10530;</button>'
-        : '';
-      const head = `
-        <div class="mini-head">
-          ${expand}
-          <button type="button" class="mini-step" data-mini-month="-1" aria-label="Previous month">&#8249;</button>
-          <button type="button" class="mini-month" data-mini-toggle aria-expanded="${!collapsed}"
-                  title="${collapsed ? 'Show the month' : 'Hide the month'}">
-            <span>${escape(month.toLocaleDateString([], { month: 'long', year: 'numeric' }))}</span>
-            <span class="mini-chevron" aria-hidden="true">${collapsed ? '&#9656;' : '&#9662;'}</span>
-          </button>
-          <button type="button" class="mini-step" data-mini-month="1" aria-label="Next month">&#8250;</button>
-        </div>`;
-
-      const ranged = range ? ' is-ranged' : '';
+      // With the bar in the header, the month is drawn here only while open.
+      const head = headHost ? '' : headHtml();
+      if (headHost && collapsed) {
+        container.innerHTML = '';
+        return;
+      }
       container.innerHTML = collapsed
         ? `<div class="mini is-collapsed${ranged}">${head}</div>`
         : `
@@ -759,6 +847,7 @@
           ${head}
           <div class="mini-dows">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d) => `<span>${d}</span>`).join('')}</div>
           <div class="mini-grid">${grid}</div>
+          ${range ? '<p class="mini-hint" aria-live="polite"></p>' : ''}
           <div class="mini-legend">
             <span><span class="mini-mark is-service"></span>Service</span>
             <span><span class="mini-mark is-downtime"></span>Downtime</span>
@@ -773,8 +862,13 @@
       if (!range) return;
       let start;
       let end;
-      if (drag) {
+      // What to show, most immediate first: a drag under way, then a pick
+      // half made (previewed to the day under the pointer), then the range.
+      const previewing = Boolean(drag?.moved || pending);
+      if (drag?.moved) {
         [start, end] = [drag.from, drag.over].sort();
+      } else if (pending) {
+        [start, end] = [pending, hover ?? pending].sort();
       } else {
         ({ start, end } = range.get() ?? {});
       }
@@ -784,8 +878,44 @@
         cell.classList.toggle('is-in-range', inside);
         cell.classList.toggle('is-range-start', inside && date === start);
         cell.classList.toggle('is-range-end', inside && date === end);
+        cell.classList.toggle('is-preview', inside && previewing);
+        cell.classList.toggle('is-pending', date === pending);
         cell.setAttribute('aria-pressed', String(inside));
       });
+
+      const hint = container.querySelector('.mini-hint');
+      if (hint) {
+        hint.textContent = pending
+          ? `From ${shortDate(pending)}: now pick an end date. Esc cancels.`
+          : 'Pick a start date, then an end date.';
+      }
+    }
+
+    const shortDate = (iso) => new Date(`${iso}T00:00`).toLocaleDateString([], { day: 'numeric', month: 'short' });
+
+    // A day chosen by click, tap or keyboard: the first is the start, the
+    // second the end, in either order. The same day twice is that one day.
+    function pick(date) {
+      if (pending === null) {
+        pending = date;
+        hover = date;
+        paint();
+        return;
+      }
+      const [start, end] = [pending, date].sort();
+      pending = null;
+      hover = null;
+      range.select(start, end);
+      paint();
+    }
+
+    // Drop a half made pick, e.g. on Escape or when the month is folded away.
+    function cancelPick() {
+      if (pending === null) return false;
+      pending = null;
+      hover = null;
+      paint();
+      return true;
     }
 
     // Days under the pointer, clamped to the last selectable one so a drag
@@ -803,32 +933,55 @@
         if (!cell || event.button !== 0 || cell.getAttribute('aria-disabled') === 'true') return;
         // Keeps the press from selecting text or scrolling while dragging.
         event.preventDefault();
-        drag = { from: cell.dataset.miniDate, over: cell.dataset.miniDate };
+        drag = { from: cell.dataset.miniDate, over: cell.dataset.miniDate, moved: false };
         container.setPointerCapture(event.pointerId);
-        paint();
       });
       container.addEventListener('pointermove', (event) => {
-        if (!drag) return;
         const date = dateAt(event.clientX, event.clientY);
-        if (date && date !== drag.over) {
-          drag.over = date;
+        if (drag) {
+          if (date && date !== drag.over) {
+            drag.over = date;
+            drag.moved = drag.over !== drag.from;
+            paint();
+          }
+        } else if (pending && date !== hover) {
+          // Between the two clicks, preview the range to the day pointed at.
+          hover = date ?? pending;
+          paint();
+        }
+      });
+      container.addEventListener('pointerleave', () => {
+        if (!drag && pending && hover !== pending) {
+          hover = pending;
           paint();
         }
       });
       container.addEventListener('pointerup', () => {
         if (!drag) return;
-        const [start, end] = [drag.from, drag.over].sort();
+        const { from, over, moved } = drag;
         drag = null;
-        range.select(start, end);
-        paint();
+        if (moved) {
+          // A drag across days picks them in one go, and drops any half pick.
+          pending = null;
+          hover = null;
+          const [start, end] = [from, over].sort();
+          range.select(start, end);
+          paint();
+        } else {
+          // Pressed and let go on one day: a click.
+          pick(from);
+        }
       });
       container.addEventListener('pointercancel', () => {
         drag = null;
         paint();
       });
+      container.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && cancelPick()) event.stopPropagation();
+      });
     }
 
-    container.addEventListener('click', (event) => {
+    function onClick(event) {
       const toggle = event.target.closest('[data-mini-toggle]');
       const step = event.target.closest('[data-mini-month]');
       const day = event.target.closest('[data-mini-day]');
@@ -838,6 +991,7 @@
       // before the click can fall through to opening the full calendar.
       if (toggle) {
         collapsed = !collapsed;
+        if (collapsed) cancelPick();
         render();
         return;
       }
@@ -852,21 +1006,36 @@
         return;
       }
       if (range) {
-        // A mouse or touch press was handled as a drag. A keyboard press
-        // (detail 0) picks the one day, so the grid still works without one.
+        // A mouse or touch press was handled on pointer up. A keyboard press
+        // (detail 0) picks the same way, start then end, so the grid works
+        // without a pointer.
         if (day && event.detail === 0 && day.getAttribute('aria-disabled') !== 'true') {
-          range.select(day.dataset.miniDate, day.dataset.miniDate);
-          paint();
+          pick(day.dataset.miniDate);
         }
         return;
       }
       if (day) onOpen(new Date(day.dataset.miniDay));
-    });
+    }
+    // The bar may be drawn somewhere else (headHost); its buttons work the same.
+    container.addEventListener('click', onClick);
+    headHost?.addEventListener('click', onClick);
 
+    if (headHost) render(); // the bar, before the month's data arrives
     refresh();
     return {
       refresh,
       paint,
+      isCollapsed: () => collapsed,
+      // Fold or unfold from outside, e.g. a click elsewhere on the page.
+      setCollapsed(next) {
+        if (next === collapsed) return;
+        collapsed = next;
+        if (collapsed) cancelPick();
+        render();
+      },
+      // Whether a start date is picked and waiting for its end; Escape then
+      // cancels the pick before it closes anything.
+      cancelPick,
       // Page to the month holding `date`.
       show(date) {
         const next = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -886,10 +1055,14 @@
   // calendar is built only when someone first opens it.
 
   function mount(elements, options = {}) {
-    const { mini: miniElement, overlay, body, close } = elements;
+    // `head` and `panel` are optional: given, the month bar sits in `head`
+    // (the page header) and the month opens in `panel` as an overlay below it.
+    const { mini: miniElement, overlay, body, close, head = null, panel = null } = elements;
     let full = null;
 
     function open(day) {
+      // The full calendar replaces the month overlay rather than sitting on it.
+      if (panel) mini.setCollapsed(true);
       overlay.hidden = false;
       document.body.classList.add('is-overlaid');
 
@@ -907,13 +1080,45 @@
       document.body.classList.remove('is-overlaid');
     }
 
-    const mini = createMini(miniElement, { onOpen: open, collapsed: options.collapsed, range: options.range });
+    const mini = createMini(miniElement, {
+      onOpen: open,
+      collapsed: options.collapsed,
+      range: options.range,
+      headHost: head,
+      onFold: (collapsed) => {
+        if (panel) panel.hidden = collapsed;
+      },
+    });
+
+    if (head && panel) {
+      // On a phone the overlay spans the screen just under the header
+      // (css/calendar.css). The header wraps at narrow widths, so its bottom
+      // edge is measured rather than assumed.
+      const header = head.closest('header');
+      if (header) {
+        const markHeader = () => {
+          document.documentElement.style.setProperty('--app-header-bottom', `${header.getBoundingClientRect().bottom}px`);
+        };
+        markHeader();
+        window.addEventListener('resize', markHeader);
+      }
+
+      // An open month overlay closes on a press anywhere else on the page,
+      // except in the full calendar, which may have been opened from it.
+      document.addEventListener('pointerdown', (event) => {
+        if (mini.isCollapsed()) return;
+        if (head.contains(event.target) || panel.contains(event.target) || overlay.contains(event.target)) return;
+        mini.setCollapsed(true);
+      });
+    }
 
     // A click anywhere on the dock that is not a day or a month arrow still
     // does the obvious thing. Not when picking a range, where a stray click
     // at the end of a drag would open the overlay over the selection.
     miniElement.addEventListener('click', (event) => {
-      if (options.range) return;
+      // Nor in a header bar's overlay: there the expand button and the days
+      // open it, and a stray click on the overlay should not.
+      if (options.range || panel) return;
       if (!event.target.closest('[data-mini-day], [data-mini-month], [data-mini-toggle]')) open();
     });
     miniElement.addEventListener('keydown', (event) => {
@@ -932,7 +1137,17 @@
       if (event.target === overlay) shut();
     });
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && !overlay.hidden) shut();
+      if (event.key !== 'Escape') return;
+      // The full calendar first, if it is open; then a half made date pick;
+      // then the month overlay.
+      if (!overlay.hidden) {
+        if (!full?.cancelPick()) shut();
+      } else if (mini.cancelPick()) {
+        // Cancelled the pick; the month stays open to start again.
+      } else if (panel && !mini.isCollapsed()) {
+        mini.setCollapsed(true);
+        head.querySelector('[data-mini-toggle]')?.focus();
+      }
     });
 
     return {

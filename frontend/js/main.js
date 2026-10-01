@@ -104,13 +104,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // dates, and the timeline's changes are painted back onto the days.
   const calendar = ServiceCalendar.mount({
     mini: document.getElementById('dashboard-mini'),
+    head: document.getElementById('dashboard-mini-head'),
+    panel: document.getElementById('period-panel'),
     overlay: document.getElementById('cal-overlay'),
     body: document.getElementById('cal-overlay-body'),
     close: document.getElementById('cal-overlay-close'),
   }, {
-    // Folded to start on a narrow screen, where a month would cover the map.
-    // The month name unfolds it; the sliders stay out either way.
-    collapsed: window.innerWidth < 760,
+    // The month bar sits in the header and opens the month and the sliders
+    // as an overlay, so it starts closed: nothing covers the map until asked.
+    collapsed: true,
     range: {
       get: () => timelineControl?.getDates(),
       select: (start, end) => timelineControl?.setDates(start, end),

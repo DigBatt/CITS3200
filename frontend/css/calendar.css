@@ -174,6 +174,37 @@
 .cal-day.is-today .cal-day-name { font-weight: 700; }
 .cal-day.is-today .cal-day-head { border-bottom-color: var(--cal-now); }
 
+/* Where the calendar picks the period, each heading is a button: click one
+   day for the start and another for the end (js/calendar.js, pickDay). It
+   keeps the heading's look, with the period's days tinted and a half made
+   pick's start marked. */
+button.cal-day-head {
+  width: 100%;
+  font: inherit;
+  font-size: 0.7rem;
+  color: inherit;
+  text-align: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--cal-line);
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+}
+
+button.cal-day-head:hover { background: rgba(47, 125, 143, 0.12); }
+button.cal-day-head:focus-visible { outline: 2px solid #2f7d8f; outline-offset: 1px; }
+button.cal-day-head.is-in-period { background: rgba(47, 125, 143, 0.14); }
+button.cal-day-head.is-pick-start { background: rgba(47, 125, 143, 0.36); font-weight: 600; }
+button.cal-day-head[aria-disabled='true'] { cursor: not-allowed; opacity: 0.45; }
+button.cal-day-head[aria-disabled='true']:hover { background: transparent; }
+
+/* What the next heading click does, at the end of the legend. */
+.cal-pick-hint {
+  margin-left: auto;
+  font-style: italic;
+  opacity: 0.85;
+}
+
 /* Nothing drawn on a column is scheduled, so the bare column IS non-scheduled */
 .cal-day-body {
   position: relative;
@@ -442,6 +473,22 @@
   font-weight: 600;
 }
 
+/* Picking: the range so far is shown dashed until the end date is picked,
+   and the start date stands out while it waits for one. */
+.mini-day.is-preview { background: rgba(47, 125, 143, 0.1); box-shadow: inset 0 0 0 1px rgba(47, 125, 143, 0.35); }
+.mini-day.is-preview.is-range-start,
+.mini-day.is-preview.is-range-end { background: rgba(47, 125, 143, 0.22); }
+.mini-day.is-pending { background: #2f7d8f; color: #fff; }
+.mini-day.is-pending .mini-num { color: #fff; }
+
+/* What the next click does. */
+.mini-hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.66rem;
+  line-height: 1.35;
+  opacity: 0.75;
+}
+
 /* Nothing has happened there yet, so it cannot be picked. */
 .mini-day.is-future {
   opacity: 0.3;
@@ -562,12 +609,6 @@ body.is-overlaid { overflow: hidden; }
 }
 
 .cal-range-pop[hidden] { display: none; }
-
-.cal-range-hint {
-  margin: 0 0 0.4rem;
-  font-size: 0.68rem;
-  opacity: 0.7;
-}
 
 .cal-slider {
   display: flex;
@@ -710,4 +751,71 @@ body.is-overlaid { overflow: hidden; }
   font-size: 0.64rem;
   opacity: 0.7;
   white-space: nowrap;
+}
+
+/* ---- The month bar in a page header, and the overlay it opens ----
+   js/calendar.js's mount() with `head` and `panel`: the bar lives in the
+   header, so no docked calendar covers the page; the month (and, on the
+   dashboard, the time sliders) opens below it as an overlay.
+
+   Layering: above Leaflet's panes and controls (up to 1000) and the map's
+   2D / 3D toggle (1100), below the full calendar overlay (2000). */
+
+.period-picker {
+  position: relative;
+  flex: none;
+}
+
+.period-bar .mini-head {
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(28, 25, 23, 0.14);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.period-bar .mini-step {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.2rem 0.45rem;
+}
+
+.period-bar .mini-step:hover,
+.period-bar .mini-month:hover { background: rgba(28, 25, 23, 0.07); }
+
+.period-bar .mini-month {
+  min-width: 9.5rem;
+  font-size: 0.78rem;
+  border-radius: 999px;
+}
+
+.period-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 1500;
+  width: 17rem;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(28, 25, 23, 0.2);
+}
+
+.period-panel[hidden] { display: none; }
+
+/* A phone: the overlay spans the screen under the header, which
+   js/calendar.js measures since the header wraps, and scrolls if it must. */
+@media (max-width: 600px) {
+  .period-panel {
+    position: fixed;
+    top: calc(var(--app-header-bottom, 64px) + 6px);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: calc(100vh - var(--app-header-bottom, 64px) - 14px);
+    overflow-y: auto;
+  }
+
+  .period-bar .mini-month { min-width: 0; }
 }

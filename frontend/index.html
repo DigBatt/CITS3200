@@ -31,6 +31,18 @@
         <button type="button" class="app-tab" data-view="utilisation">Utilisation</button>
       </nav>
       <div class="app-header-spacer"></div>
+      <!-- The period: the calendar's month bar, here in the header, and the
+           month and time sliders it opens as an overlay below. Drag across
+           days to choose the dates; the expand button opens the full calendar.
+           Closed, nothing covers the map. Driven by js/calendar.js, mounted in
+           js/main.js. AUTH (S13): view only, and the reads behind it stay public. -->
+      <div class="period-picker">
+        <div class="period-bar" id="dashboard-mini-head"></div>
+        <div class="period-panel" id="period-panel" hidden>
+          <div id="dashboard-mini" aria-label="Service calendar, drag across days to choose the period"></div>
+          <div id="timeline-container"></div>
+        </div>
+      </div>
       <!-- STUB: wire to a real liveness/heartbeat signal -->
       <div class="app-live-indicator" data-stub="connection-status">
         <span class="app-live-dot"></span>
@@ -41,16 +53,6 @@
       <a href="/admin" class="admin-link">Admin</a>
       <div class="app-avatar" data-stub="current-user">JD</div>
     </header>
-
-    <!-- Mini month, docked top right under the header, and the period
-         control under it. Drag across days to choose the dates; the Live
-         button and the start/end sliders under it set the times. The expand
-         button in the month bar opens the full calendar.
-         AUTH (S13): view only, and the reads behind it stay public. -->
-    <aside class="mini-cal-dock is-ranged" id="mini-cal-dock">
-      <div id="dashboard-mini" aria-label="Service calendar, drag across days to choose the period"></div>
-      <div id="timeline-container"></div>
-    </aside>
 
     <!-- ============ Vehicle filter chips, rendered by js/vehicles.js ============ -->
     <div class="filter-bar">
