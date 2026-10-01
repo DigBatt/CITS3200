@@ -180,6 +180,21 @@ function formatInstant(ms) {
  * @param {number} [options.livePollMs] - How often to re-fire onChange
  *   while live, so the caller can refetch. Defaults to 15s, matching
  *   config/app.yaml's refresh_interval_seconds.
+ * @returns {{
+ *   getRange: () => {from: string|null, to: string|null, live: boolean},
+ *   getDates: () => {start: string, end: string, live: boolean},
+ *   getWindow: () => Object,
+ *   setDates: (start: string, end: string) => void,
+ *   setLive: (on: boolean) => void,
+ *   scrub: (ends: {startMs?: number, endMs?: number}) => void,
+ *   release: () => void,
+ *   reset: () => void,
+ *   getFieldState: () => Object,
+ *   setFieldState: (state: Object) => void,
+ *   setLiveToday: () => void,
+ *   showNoData: () => void,
+ *   clearStatus: () => void
+ * }}
  */
 function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_POLL_MS } = {}) {
   const todayOnLoad = getPerthDateString();
@@ -385,6 +400,31 @@ function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_
       state.spanStart = DEV_DEFAULT_START_DATE;
       state.startMs = perthDayStartMs(DEV_DEFAULT_START_DATE) + toMinutes(DEV_DEFAULT_START_TIME) * MINUTE_MS;
       setLive(true);
+    },
+    // S11: the whole selection as it stands (an opaque snapshot, not the
+    // resolved UTC range getRange() returns), so the Rider tab's forced
+    // "today, live" can be undone back to exactly what was selected before,
+    // not just some equivalent range.
+    getFieldState: () => ({ ...state }),
+    setFieldState: (saved) => {
+      Object.assign(state, saved);
+      syncPolling();
+      emit();
+    },
+    // S11: riders always see from midnight today to now, regardless of
+    // whatever period an operator had selected -- getFieldState()/
+    // setFieldState() above are what let the caller put that back afterwards.
+    // Recomputes today's date rather than reusing the page-load date, in case
+    // the tab has been open since before midnight.
+    setLiveToday: () => {
+      const todayStr = today();
+      state.spanStart = todayStr;
+      state.spanEnd = todayStr;
+      state.startMs = perthDayStartMs(todayStr);
+      state.live = true;
+      state.endMs = nowMs();
+      syncPolling();
+      emit();
     },
     // Called by main.js when a fetch for the selected range comes back
     // empty, so "no data" is stated rather than an unexplained blank map

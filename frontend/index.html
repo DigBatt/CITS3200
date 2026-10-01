@@ -14,6 +14,23 @@
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/calendar.css">
   <link rel="stylesheet" href="css/dashboard.css">
+  <!-- For the map's 3D views (js/campus3d.js, js/earth3d.js), which are only
+       loaded when someone switches to them. three.js is pinned to the version
+       the bus model's own viewer was built with. 3d-tiles-renderer is mapped
+       to its source files, for the Earth view: its bundled plugins entry
+       would also pull in vector-tile libraries that view never uses. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "3d-tiles-renderer/src/": "https://cdn.jsdelivr.net/npm/3d-tiles-renderer@0.4.28/src/",
+      "3d-tiles-renderer/core": "https://cdn.jsdelivr.net/npm/3d-tiles-renderer@0.4.28/src/core/renderer/index.js",
+      "3d-tiles-renderer/core/plugins": "https://cdn.jsdelivr.net/npm/3d-tiles-renderer@0.4.28/src/core/plugins/index.js",
+      "3d-tiles-renderer/three": "https://cdn.jsdelivr.net/npm/3d-tiles-renderer@0.4.28/src/three/renderer/index.js"
+    }
+  }
+  </script>
 </head>
 <body>
   <div class="app-shell">
@@ -55,8 +72,10 @@
     </header>
 
     <!-- ============ Vehicle filter chips, rendered by js/vehicles.js ============ -->
-    <div class="filter-bar">
-      <span class="filter-bar-label">VEHICLE</span>
+    <!-- The label is a button: js/panels.js makes it fold the chip row away,
+         remembered per browser, for a less cluttered dashboard or larger map. -->
+    <div class="filter-bar" id="vehicle-filter">
+      <button type="button" class="filter-bar-label" aria-expanded="true" aria-controls="vehicle-filter-chips">VEHICLE</button>
       <div class="chip-row" id="vehicle-filter-chips">
         <button type="button" class="chip is-active" data-vehicle="all">All vehicles</button>
       </div>
@@ -64,7 +83,7 @@
 
     <!-- ============ Route filter chips, rendered by js/stops.js ============ -->
     <div class="filter-bar" id="route-filter" hidden>
-      <span class="filter-bar-label">ROUTE</span>
+      <button type="button" class="filter-bar-label" aria-expanded="true" aria-controls="route-filter-chips">ROUTE</button>
       <div class="chip-row" id="route-filter-chips"></div>
     </div>
 
@@ -194,6 +213,55 @@
         <div class="map-pane">
           <div id="map"></div>
 
+          <!-- 3D view: one bus at a time on a 3D campus, the camera circling
+               it. Drawn by js/campus3d.js, driven by js/view3d.js. -->
+          <section class="campus3d" id="campus3d" tabindex="-1" aria-label="3D view of a bus on campus" hidden>
+            <div class="campus3d-map" id="campus3d-map"></div>
+            <!-- Earth: Google's photorealistic tiles, drawn by js/earth3d.js. -->
+            <div class="campus3d-map" id="earth3d-map" hidden></div>
+            <div class="campus3d-bar">
+              <button type="button" class="campus3d-step" data-campus3d-step="-1" aria-label="Previous bus" title="Previous bus">&#8249;</button>
+              <div class="campus3d-who" aria-live="polite">
+                <span class="campus3d-name"><span class="campus3d-dot" id="campus3d-dot"></span><span id="campus3d-name">Loading&hellip;</span></span>
+                <span class="campus3d-meta" id="campus3d-meta"></span>
+              </div>
+              <button type="button" class="campus3d-step" data-campus3d-step="1" aria-label="Next bus" title="Next bus">&#8250;</button>
+            </div>
+            <!-- Options for the 3D view, under the 2D / 3D toggle. -->
+            <div class="campus3d-options">
+              <label class="campus3d-option" for="campus3d-spin" title="Circle the camera slowly around the bus">
+                <span class="toggle-switch">
+                  <input type="checkbox" id="campus3d-spin" role="switch">
+                  <span class="toggle-track"></span>
+                  <span class="toggle-knob"></span>
+                </span>
+                Spin
+              </label>
+              <label class="campus3d-option" for="campus3d-earth" id="campus3d-earth-label"
+                     title="Real-life buildings, from Google's photorealistic 3D tiles">
+                <span class="toggle-switch">
+                  <input type="checkbox" id="campus3d-earth" role="switch" disabled>
+                  <span class="toggle-track"></span>
+                  <span class="toggle-knob"></span>
+                </span>
+                Earth
+              </label>
+            </div>
+            <p class="campus3d-status" id="campus3d-status" role="status" hidden></p>
+            <p class="campus3d-hint">Drag to look around &middot; scroll to zoom &middot; &larr; &rarr; for the next bus</p>
+          </section>
+
+          <!-- 2D / 3D toggle, the same switch as the map layer toggles. -->
+          <label class="map-mode" for="map-3d-toggle" title="Switch between the 2D map and the 3D view">
+            <span class="map-mode-side is-2d">2D</span>
+            <span class="toggle-switch">
+              <input type="checkbox" id="map-3d-toggle" role="switch" aria-label="3D view">
+              <span class="toggle-track"></span>
+              <span class="toggle-knob"></span>
+            </span>
+            <span class="map-mode-side is-3d">3D</span>
+          </label>
+
           <div class="map-legend" id="map-legend" hidden></div>
 
           <p id="status" class="map-status" role="status"></p>
@@ -260,6 +328,7 @@
   <script src="js/tum.js"></script>
   <script src="js/utilisation.js"></script>
   <script src="js/calendar.js"></script>
+  <script src="js/view3d.js"></script>
   <script src="js/main.js"></script>
   <script src="js/panels.js"></script>
   <script src="js/rider.js"></script>

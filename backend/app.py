@@ -8,6 +8,7 @@ from datetime import timedelta
 from pathlib import Path
 from flask import Flask, jsonify, redirect, send_from_directory
 from backend.api.downtime import bp as downtime_bp
+from backend.api.earth import bp as earth_bp, load_google_maps_key
 from backend.api.metrics import bp as metrics_bp
 from backend.api.pickup_requests import bp as pickup_requests_bp
 from backend.api.schedule import bp as schedule_bp
@@ -17,8 +18,9 @@ from backend.api.vehicles import bp as vehicles_bp
 from backend.auth import admin_required, load_secrets, signed_in
 from backend.auth import bp as auth_bp
 from backend.config import DEFAULT_CONFIG_DIR, ConfigError, load_config
+from backend.downtime import DowntimeStore
 from backend.pickup_requests import PickupRequestStore
-from backend.repository import CsvRepository, DowntimeStore
+from backend.repository import CsvRepository
 from backend.repository.base import RepositoryError
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
@@ -61,8 +63,11 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
     app.config["NUWAY_CONFIG_DIR"] = config_dir
     app.config["NUWAY_CONFIG_PATH"] = config_dir / "app.yaml"
     app.config["REPOSITORY"] = CsvRepository.from_config(config)
-    app.config["DOWNTIME_STORE"] = DowntimeStore.from_config(config)
     app.config["PICKUP_REQUEST_STORE"] = PickupRequestStore()
+    # if storage is unset /api/downtime then answers 500.
+    app.config["DOWNTIME_STORE"] = (
+        DowntimeStore(config.storage_directory / "downtime.json") if config.storage_directory else None
+    )
 
     secrets = load_secrets(config_dir)
     if secrets is None:
@@ -70,6 +75,8 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
     else:
         app.secret_key = secrets.secret_key
     app.config["ADMIN_ACCOUNT"] = secrets.admin if secrets else None
+    # Optional: only the dashboard's Earth view needs it (backend/api/earth.py).
+    app.config["GOOGLE_MAPS_API_KEY"] = load_google_maps_key(config_dir)
     session_hours = (config.admin or {}).get("session_hours", DEFAULT_SESSION_HOURS)
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=session_hours)
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -78,10 +85,11 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
     app.register_blueprint(positions_bp)
     app.register_blueprint(vehicles_bp)
     app.register_blueprint(metrics_bp)
-    app.register_blueprint(downtime_bp)
     app.register_blueprint(schedule_bp)
     app.register_blueprint(stops_bp)
     app.register_blueprint(pickup_requests_bp)
+    app.register_blueprint(earth_bp)
+    app.register_blueprint(downtime_bp)
 
     @app.get("/")
     def index():

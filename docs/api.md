@@ -17,13 +17,9 @@ Always shaped:
 
 Codes: `bad_timestamp`, `bad_range` (from > to), `unknown_vehicle`,
 `unknown_stop`, `unknown_route`, `unknown_request`, `not_your_request`,
-`request_not_open`, `data_unavailable`, `bad_request` (malformed body),
-`invalid_record` (a field the store refuses), `invalid_schedule`, `not_found`,
-`not_signed_in`, `bad_credentials`, `admin_not_configured`.
-
-`not_found` is the one exception to "empty is not an error": it answers a
-write aimed at a record id that does not exist, which is not a query that
-matched nothing.
+`request_not_open`, `data_unavailable`, `not_signed_in`, `bad_credentials`,
+`admin_not_configured`, `missing_field`, `overlap`, `unknown_downtime`,
+`invalid_schedule`.
 
 **Signing in.** Endpoints marked *Admin only* answer `401` `not_signed_in`
 until the browser has signed in through `POST /api/admin/login` (see
@@ -231,94 +227,85 @@ stop at now.
 
 ---
 
-## `GET /api/downtime`
+## Downtime
 
-The downtime log for a selection and, optionally, a period. Serves S18-S20.
+S18-S20. *Admin only.* When a shuttle was out of service.
 
-Operator reported out of service periods. Downtime is the one bucket of the
-time usage model the telemetry cannot supply (see `docs/GMG Time Utilisation
-Model.md`), so these are entered by hand on the admin page.
+Records are kept in `downtime.json` under `storage.directory` in
+`config/app.yaml` (`data/admin` by default). The
+file is read on every request and replaced in one step on every change. Run a
+single server process: two saves at the same instant from two processes
+could lose one of them. If `storage.directory` is unset, or the file cannot
+be read, every endpoint answers `500` `data_unavailable`.
 
-Unlike the other read endpoints, `from` and `to` are **not** defaulted to
-today: the admin page lists the whole log. Omit them for everything. When
-given, a record is returned if it *overlaps* the window, so one that began
-before `from` and was still open at `from` is included.
-
-```json
-{
-  "from": null,
-  "to": null,
-  "records": [
-    {
-      "id": "ffaf720d7ac7456fa369593ad7969b91",
-      "vehicle_id": "1",
-      "start": "2026-09-17T01:00:00.000000Z",
-      "end": "2026-09-17T03:00:00.000000Z",
-      "reason": "Brake fault",
-      "created_at": "2026-09-17T04:12:09.114000Z",
-      "updated_at": "2026-09-17T04:12:09.114000Z"
-    }
-  ]
-}
-```
-
-Records are ascending by `start`. Times are stored and returned in UTC; the
-admin page converts to and from local time at the form.
-
-> **Not yet protected.** Admin sign-in (S13) exists, but these three writes
-> are not behind it yet, so anyone who can reach the server can edit the log.
-> They must be marked *Admin only* before this is exposed beyond a local run.
-
----
-
-## `POST /api/downtime`
-
-Stores a new record. All four fields are required.
-
-```json
-{ "vehicle_id": "1", "start": "2026-09-17T01:00:00Z", "end": "2026-09-17T03:00:00Z", "reason": "Brake fault" }
-```
-
-`201` with the stored record and any periods it clashes with:
+A record:
 
 ```json
 {
-  "record": {
-    "id": "ffaf720d7ac7456fa369593ad7969b91",
-    "vehicle_id": "1",
-    "start": "2026-09-17T01:00:00.000000Z",
-    "end": "2026-09-17T03:00:00.000000Z",
-    "reason": "Brake fault",
-    "created_at": "2026-09-17T04:12:09.114000Z",
-    "updated_at": "2026-09-17T04:12:09.114000Z"
-  },
-  "overlaps": []
+  "id": "07ab4afdd1f84414b3616752b1d936e7",
+  "vehicle_id": "1",
+  "start": "2026-10-01T01:00:00.000000Z",
+  "end": "2026-10-01T03:00:00.000000Z",
+  "reason": "Scheduled maintenance",
+  "created_at": "2026-10-01T04:12:09.512330Z",
+  "updated_at": "2026-10-01T04:12:09.512330Z"
 }
 ```
 
-**Overlaps warn, they do not reject.** A non empty `overlaps` means the record
-was stored *and* intersects the ones listed. A vehicle can genuinely have two
-faults logged over one period, so the admin page shows a warning rather than
-refusing the save. Periods are half open, so two that merely touch do not
-overlap.
+### `GET /api/downtime`
 
-`400` for a missing field, an unparseable time, an `end` at or before `start`
-(`bad_range`), an empty reason (`invalid_record`), or an unknown vehicle.
+Records ascending by `start`.
 
----
+| Parameter | Required | Notes |
+|---|---|---|
+| `vehicles` | no | As for `/api/positions`. Default: every record, including any for a vehicle no longer configured. |
+| `from`, `to` | no | As for `/api/positions`. Only records overlapping the window. Default: unbounded. |
 
-## `PATCH /api/downtime/<id>`
+```json
+{ "records": [ { "...": "a record" } ] }
+```
 
-Changes a stored record. Send only the fields that change; the rest are left
-as they are. Answers `200` in the same shape as `POST`, or `404` with
-`not_found`.
+### `POST /api/downtime`
 
----
+```json
+{
+  "vehicle_id": "1",
+  "start": "2026-10-01T09:00:00+08:00",
+  "end": "2026-10-01T11:00:00+08:00",
+  "reason": "Scheduled maintenance",
+  "confirm": false
+}
+```
 
-## `DELETE /api/downtime/<id>`
+`start` and `end` must carry a timezone (`Z` or an offset), and are stored
+in UTC. `201` `{ "record": { ... } }`.
 
-Removes a record. `204` with no body, or `404` with `not_found`. Deleting
-twice is a `404`, so the page can tell a stale row from a removed one.
+`400`: `missing_field` (vehicle, start, end or a non-blank reason),
+`unknown_vehicle`, `bad_timestamp`, or `bad_range` if `end` is not after
+`start` (S18.3).
+
+`409` `overlap` if the period overlaps one of this vehicle's existing records.
+ Nothing is stored. The clashing records
+come back beside the error; resend with `"confirm": true` to store it anyway.
+Periods that only touch, one ending as the next starts, do not overlap.
+
+```json
+{
+  "error": { "code": "overlap", "message": "This period overlaps 1 existing downtime record for vehicle 1. ..." },
+  "overlaps": [ { "...": "a record" } ]
+}
+```
+
+### `PATCH /api/downtime/<id>`
+
+S20. Body as for `POST`; fields left out keep their current values. `200`
+`{ "record": { ... } }`, `404` `unknown_downtime`, and the same `400` and
+`409` as `POST`. The record does not clash with itself, and an edit that
+leaves the vehicle and times unchanged is not checked for overlap again.
+
+### `DELETE /api/downtime/<id>`
+
+S20. `204`, or `404` `unknown_downtime`.
 
 ---
 
@@ -432,8 +419,8 @@ A period crossing midnight cannot be expressed and is rejected; it needs a row
 on each day.
 
 > **Not yet protected.** Editing the roster is an operator and administrator
-> action. Admin sign-in (S13) exists but does not guard this `PUT` yet, so it
-> is open like the `/api/downtime` writes. The guard belongs on `replace_schedule` in
+> action. Admin sign-in (S13) exists but does not guard this `PUT` yet, unlike
+> `/api/downtime`, which is admin only. The guard belongs on `replace_schedule` in
 > `backend/api/schedule.py`, which is the only write in that module. `GET`
 > stays open.
 
@@ -697,7 +684,8 @@ session cookie (`HttpOnly`, `SameSite=Lax`), which lasts
 `admin.session_hours` in `config/app.yaml`.
 
 Admin only: the `/admin` page, `GET /api/pickup-requests`,
-`GET /api/routes/<id>/waiting` and `POST /api/stops/<id>/collect`. A
+`GET /api/routes/<id>/waiting`, `POST /api/stops/<id>/collect` and every
+`/api/downtime` endpoint. A
 signed-out request for `/admin` is redirected to
 `/admin-login?next=<the page asked for>`, which returns there after signing in.
 

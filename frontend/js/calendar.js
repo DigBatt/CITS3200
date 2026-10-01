@@ -55,6 +55,19 @@
     return hours * 60 + minutes;
   }
 
+  // Downtime records for a window, or none if they cannot be read. Reading
+  // them is admin only (/api/downtime, S13), so on the public dashboard a
+  // signed out visitor gets a 401: the calendar then shows the roster without
+  // downtime rather than failing to draw at all.
+  async function loadDowntimeRecords(from, to) {
+    try {
+      const data = await getDowntime({ from: from.toISOString(), to: to.toISOString() });
+      return data.records ?? [];
+    } catch {
+      return [];
+    }
+  }
+
   function create(container, options = {}) {
     // The dashboard is fixed at a week; the admin page can switch.
     const fixedSpan = options.fixedDays ?? null;
@@ -102,15 +115,15 @@
 
       loading = true;
       try {
-        const [scheduleData, vehicleData, downtimeData] = await Promise.all([
+        const [scheduleData, vehicleData, downtimeRecords] = await Promise.all([
           getSchedule(),
           getVehicles(),
-          getDowntime({ from: from.toISOString(), to: to.toISOString() }),
+          loadDowntimeRecords(from, to),
         ]);
 
         schedule = scheduleData;
         vehicles = vehicleData.vehicles ?? [];
-        downtime = downtimeData.records ?? [];
+        downtime = downtimeRecords;
         if (shown === null) shown = new Set(vehicles.map((vehicle) => vehicle.id));
         error = null;
       } catch (exc) {
@@ -779,15 +792,12 @@
     async function refresh() {
       const window = cells();
       try {
-        const [scheduleData, downtimeData] = await Promise.all([
+        const [scheduleData, downtimeRecords] = await Promise.all([
           getSchedule(),
-          getDowntime({
-            from: window[0].toISOString(),
-            to: new Date(window[41].getTime() + DAY_MS).toISOString(),
-          }),
+          loadDowntimeRecords(window[0], new Date(window[41].getTime() + DAY_MS)),
         ]);
         schedule = scheduleData;
-        downtime = downtimeData.records ?? [];
+        downtime = downtimeRecords;
         error = null;
       } catch (exc) {
         error = exc.message;

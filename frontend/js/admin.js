@@ -1,10 +1,12 @@
-// Admin page logic: auth guard, tab switching, and downtime records.
+// Admin page logic: auth guard, tab switching, downtime records and the
+// service schedule.
 //
-// Downtime is stored by the backend (S18). Every change goes to /api/downtime
-// and the table is redrawn from the response, so nothing is held only here.
+// Downtime is stored by the backend (S18, backend/downtime.py). Every change
+// goes to /api/downtime and the table is redrawn from the response, so
+// nothing is held only here. An overlapping period is refused with a 409
+// until the operator presses "Save anyway", which resends it with confirm.
 //
 // The datetime-local inputs are wall clock with no zone; the API speaks UTC.
-// toIso and toInput below are the only places that conversion happens.
 
 function redirectToSignIn() {
   const here = window.location.pathname + window.location.search;
@@ -67,42 +69,39 @@ async function loadVehicles() {
 }
 loadVehicles();
 
-// ---- Downtime records ----
+// ---- Downtime records stored by /api/downtime ----
 let downtimeRecords = [];
 let editingId = null;
+// Set once the server has warned of an overlap; the next save confirms it.
+let confirmOverlap = false;
 
-// The API's error shape is { error: { code, message } }.
-async function api(path, options) {
-  const response = await fetch(path, options);
-  if (response.status === 204) return null;
+const OVERLAP_WARNING_DEFAULT = document.getElementById('downtime-overlap-warning').textContent;
 
-  const body = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
+// Resolves to { ok, status, data }. A lapsed session goes back to sign-in.
+async function downtimeRequest(method, path, body) {
+  const response = await fetch(path, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
+  });
+  if (response.status === 401) {
+    redirectToSignIn();
+    throw new Error('Signed out');
   }
-  return body;
-}
-
-// A local wall time from the form, as the UTC instant the API stores.
-function toIso(value) {
-  return new Date(value).toISOString();
-}
-
-// A stored UTC instant, as the local wall time the form shows.
-function toInput(iso) {
-  const d = new Date(iso);
-  const pad = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const data = response.status === 204 ? null : await response.json().catch(() => null);
+  return { ok: response.ok, status: response.status, data };
 }
 
 async function loadDowntime() {
   const tbody = document.getElementById('downtime-tbody');
   try {
-    downtimeRecords = (await api('/api/downtime')).records;
+    const { ok, status, data } = await downtimeRequest('GET', '/api/downtime');
+    if (!ok) throw new Error(data?.error?.message ?? `Could not load downtime records (${status}).`);
+    downtimeRecords = data.records;
     renderDowntime();
   } catch (err) {
-    tbody.innerHTML =
-      `<tr><td colspan="5"><p class="empty-state">Could not load downtime records: ${escHtml(err.message)}</p></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5"><p class="empty-state">${escHtml(err.message)}</p></td></tr>`;
   }
 }
 
@@ -134,53 +133,93 @@ function fmtLocal(iso) {
   return d.toLocaleString('en-AU', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+// A UTC timestamp from the API as a datetime local input value.
+function toLocalInput(iso) {
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function escHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
+// the server refused an overlapping period; show what it clashes with
+// and let the next save store it anyway.
+function showOverlap(overlaps) {
+  const list = overlaps
+    .map(r => `${fmtLocal(r.start)} – ${fmtLocal(r.end)} (${r.reason})`)
+    .join('; ');
+  document.getElementById('downtime-overlap-warning').textContent =
+    `⚠ This period overlaps existing downtime for this vehicle: ${list}. Press "Save anyway" to store it, or change the times.`;
+  document.getElementById('downtime-overlap-warning').classList.add('visible');
+  document.getElementById('btn-downtime-save').textContent = 'Save anyway';
+  confirmOverlap = true;
+}
+
+function resetOverlap() {
+  confirmOverlap = false;
+  const warning = document.getElementById('downtime-overlap-warning');
+  warning.classList.remove('visible');
+  warning.textContent = OVERLAP_WARNING_DEFAULT;
+  document.getElementById('btn-downtime-save').textContent = 'Save record';
+}
+
+['dt-vehicle', 'dt-start', 'dt-end'].forEach(id =>
+  document.getElementById(id).addEventListener('input', resetOverlap));
 
 document.getElementById('btn-downtime-save').addEventListener('click', async () => {
   const vehicle = document.getElementById('dt-vehicle').value;
   const start   = document.getElementById('dt-start').value;
   const end     = document.getElementById('dt-end').value;
   const reason  = document.getElementById('dt-reason').value.trim();
-  const warning = document.getElementById('downtime-overlap-warning');
-  const button  = document.getElementById('btn-downtime-save');
 
   if (!vehicle || !start || !end || !reason) {
     alert('Please fill in all fields.');
     return;
   }
 
-  // S18: an end earlier than its start is rejected rather than stored. The
-  // server enforces this too; checking here saves a round trip.
-  if (new Date(end) <= new Date(start)) {
+  // datetime local values are the browser's local time; send them as UTC.
+  const startDate = new Date(start);
+  const endDate   = new Date(end);
+
+  // an end earlier than its start is rejected rather than stored.
+  if (endDate <= startDate) {
     alert('End time must be after start time.');
     return;
   }
 
-  const body = JSON.stringify({ vehicle_id: vehicle, start: toIso(start), end: toIso(end), reason });
-  const request = {
-    method: editingId ? 'PATCH' : 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
+  const body = {
+    vehicle_id: vehicle,
+    start: startDate.toISOString(),
+    end: endDate.toISOString(),
+    reason,
   };
+  if (confirmOverlap) body.confirm = true;
 
-  button.disabled = true;
+  let result;
   try {
-    const path = editingId ? `/api/downtime/${editingId}` : '/api/downtime';
-    const saved = await api(path, request);
-
-    // S18: an overlapping period warns, but the record is already stored.
-    warning.classList.toggle('visible', saved.overlaps.length > 0);
-
-    editingId = null;
-    clearDowntimeForm(saved.overlaps.length > 0);
-    await loadDowntime();
+    result = editingId
+      ? await downtimeRequest('PATCH', `/api/downtime/${editingId}`, body)
+      : await downtimeRequest('POST', '/api/downtime', body);
   } catch (err) {
-    alert(`Could not save the record: ${err.message}`);
-  } finally {
-    button.disabled = false;
+    if (err.message !== 'Signed out') alert('Could not reach the server. The record was not saved.');
+    return;
   }
+
+  const { ok, status, data } = result;
+  if (status === 409 && data?.overlaps) {
+    showOverlap(data.overlaps);
+    return;
+  }
+  if (!ok) {
+    alert(data?.error?.message ?? `Could not save the record (${status}).`);
+    return;
+  }
+
+  editingId = null;
+  clearDowntimeForm();
+  await loadDowntime();
 });
 
 document.getElementById('btn-downtime-cancel').addEventListener('click', () => {
@@ -188,24 +227,23 @@ document.getElementById('btn-downtime-cancel').addEventListener('click', () => {
   clearDowntimeForm();
 });
 
-function clearDowntimeForm(keepWarning = false) {
+function clearDowntimeForm() {
   document.getElementById('dt-start').value = '';
   document.getElementById('dt-end').value = '';
   document.getElementById('dt-reason').value = '';
   document.getElementById('downtime-form-title').textContent = 'ADD DOWNTIME RECORD';
   document.getElementById('btn-downtime-cancel').hidden = true;
-  if (!keepWarning) {
-    document.getElementById('downtime-overlap-warning').classList.remove('visible');
-  }
+  resetOverlap();
 }
 
 function startEdit(id) {
   const rec = downtimeRecords.find(r => r.id === id);
   if (!rec) return;
   editingId = id;
+  resetOverlap();
   document.getElementById('dt-vehicle').value = rec.vehicle_id;
-  document.getElementById('dt-start').value = toInput(rec.start);
-  document.getElementById('dt-end').value = toInput(rec.end);
+  document.getElementById('dt-start').value = toLocalInput(rec.start);
+  document.getElementById('dt-end').value = toLocalInput(rec.end);
   document.getElementById('dt-reason').value = rec.reason;
   document.getElementById('downtime-form-title').textContent = 'EDIT DOWNTIME RECORD';
   document.getElementById('btn-downtime-cancel').hidden = false;
@@ -214,19 +252,40 @@ function startEdit(id) {
 
 async function deleteRecord(id) {
   if (!confirm('Delete this downtime record?')) return;
+  let result;
   try {
-    await api(`/api/downtime/${id}`, { method: 'DELETE' });
-    if (editingId === id) {
-      editingId = null;
-      clearDowntimeForm();
-    }
-    await loadDowntime();
+    result = await downtimeRequest('DELETE', `/api/downtime/${id}`);
   } catch (err) {
-    alert(`Could not delete the record: ${err.message}`);
+    if (err.message !== 'Signed out') alert('Could not reach the server. The record was not deleted.');
+    return;
   }
+  if (!result.ok) {
+    alert(result.data?.error?.message ?? `Could not delete the record (${result.status}).`);
+    return;
+  }
+  if (editingId === id) {
+    editingId = null;
+    clearDowntimeForm();
+  }
+  await loadDowntime();
 }
 
 loadDowntime();
+
+// ---- Requests for the service schedule ----
+//
+// Resolves to the parsed body, or throws with the API's error message.
+
+async function api(path, options) {
+  const response = await fetch(path, options);
+  if (response.status === 204) return null;
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
+  }
+  return body;
+}
 
 // ---- Service schedule (S21) ----
 //

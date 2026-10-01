@@ -14,9 +14,11 @@ data/*.sqlite3-shm
 node_modules/
 .expo/
 expo-env.d.ts
-mobile
+mobile/
+# Downtime records, snapshot settings and daily snapshots (storage.directory).
+data/admin/
 
-# Operator reported downtime (config/app.yaml data.downtime_file): local data, not code.
+# Where downtime used to be kept before it moved under storage.directory.
 data/downtime.json
 data/.downtime.json.*.tmp
 

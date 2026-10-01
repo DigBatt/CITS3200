@@ -60,6 +60,7 @@ async function load() {
   latestDrawn = request;
 
   if (positions.status === 'fulfilled') {
+    View3D.update(positions.value.vehicles);
     const selection = JSON.stringify(query);
     // A slider being dragged, or a live poll, redraws in place: refitting
     // would move the map out from under the operator mid scrub.
@@ -78,6 +79,7 @@ async function load() {
     // A failed request means there's no valid current selection -- the map
     // shouldn't keep showing whatever trail was drawn before this attempt.
     drawTracks([]);
+    View3D.update([]);
     setStatus(humanizeError(positions.reason.message));
   }
 

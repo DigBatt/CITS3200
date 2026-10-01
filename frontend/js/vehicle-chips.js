@@ -87,6 +87,10 @@
       only(id) {
         change([id]);
       },
+      /** Select these vehicles ([] for the whole fleet), announcing it. */
+      choose(ids) {
+        change(ids);
+      },
       nameOf,
     };
   }

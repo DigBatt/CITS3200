@@ -158,11 +158,59 @@ empty until the API has events and stops. Layout only. The period control's
   align-items: center;
 }
 
+.filter-bar[hidden] {
+  display: none;
+}
+
+/* Forced hidden for the current view (js/panels.js:updateChromeVisibility) --
+   the Rider tab has no use for any of these, and Utilisation none for route. */
+.is-chrome-hidden {
+  display: none;
+}
+
+/* A real <button> (js/panels.js makes it fold the chip row away), reset back
+   to reading like the plain label it was. */
 .filter-bar-label {
   flex: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: none;
+  background: none;
   font: 500 10px Sora, sans-serif;
   letter-spacing: 0.05em;
   color: rgba(28, 25, 23, 0.45);
+  cursor: pointer;
+}
+
+.filter-bar-label:hover {
+  color: rgba(28, 25, 23, 0.75);
+}
+
+.filter-bar-label:focus-visible {
+  outline: 2px solid oklch(0.62 0.17 300);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* Disclosure chevron, pointing down expanded and sideways collapsed. */
+.filter-bar-label::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.filter-bar.is-collapsed .filter-bar-label::after {
+  transform: rotate(-45deg);
+}
+
+.filter-bar.is-collapsed .chip-row {
+  display: none;
 }
 
 /* ---- Main content: fleet/operator/rider view vs. utilisation view ---- */
@@ -1321,3 +1369,233 @@ empty until the API has events and stops. Layout only. The period control's
   color: #1c1917;
 }
 
+/* ---- Map pane: 2D / 3D toggle and the 3D view (js/view3d.js) ----
+   The 3D view covers the Leaflet map rather than replacing it, so switching
+   back is instant. Above Leaflet's panes and controls (up to 1000). */
+
+.map-mode {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* The side the toggle is on reads dark, the other faint. */
+.map-mode-side {
+  font: 600 12px Sora, system-ui, sans-serif;
+  color: rgba(28, 25, 23, 0.35);
+  transition: color 0.15s ease;
+}
+
+.map-mode:not(.is-on) .map-mode-side.is-2d,
+.map-mode.is-on .map-mode-side.is-3d { color: #1c1917; }
+
+.map-mode .toggle-switch input:focus-visible + .toggle-track {
+  outline: 2px solid #2f7d8f;
+  outline-offset: 2px;
+}
+
+.campus3d {
+  position: absolute;
+  inset: 0;
+  z-index: 1050;
+  background: #e7e4dd; /* the map style's ground, until the tiles arrive */
+  outline: none;
+}
+
+.campus3d[hidden] { display: none; }
+
+/* Two classes deep so it outranks maplibre-gl.css, which is loaded after
+   this sheet and sets the container to position: relative. */
+.campus3d .campus3d-map {
+  position: absolute;
+  inset: 0;
+}
+
+/* The bus on screen, with the arrows either side. Top centre, clear of the
+   2D / 3D switch on the right. */
+.campus3d-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 150px);
+  padding: 5px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.campus3d-step {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(28, 25, 23, 0.14);
+  border-radius: 8px;
+  font: 400 20px/1 Sora, system-ui, sans-serif;
+  background: #fff;
+  color: #1c1917;
+  cursor: pointer;
+}
+
+.campus3d-step:hover:not(:disabled) { border-color: rgba(28, 25, 23, 0.4); }
+.campus3d-step:disabled { opacity: 0.35; cursor: default; }
+.campus3d-step:focus-visible { outline: 2px solid #2f7d8f; outline-offset: 2px; }
+
+.campus3d-who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 11rem;
+  padding: 0 8px;
+  text-align: center;
+}
+
+.campus3d-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: 600 14px Sora, system-ui, sans-serif;
+  color: #1c1917;
+}
+
+.campus3d-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(28, 25, 23, 0.15);
+}
+
+.campus3d-meta {
+  margin-top: 2px;
+  font: 400 11px 'IBM Plex Mono', ui-monospace, monospace;
+  color: rgba(28, 25, 23, 0.6);
+}
+
+/* Only one view's host shows at a time: the campus map or Earth. */
+.campus3d .campus3d-map[hidden] { display: none; }
+
+/* Google's attribution for its tiles, which must stay on screen while they
+   are shown (js/earth3d.js). Bottom right, where MapLibre puts its own. */
+.earth3d-attribution {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 1;
+  max-width: 60%;
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font: 500 10.5px Sora, system-ui, sans-serif;
+  color: #1c1917;
+  background: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+
+.campus3d-options {
+  position: absolute;
+  top: 56px; /* under the 2D / 3D toggle */
+  right: 12px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.campus3d-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  font: 600 12px Sora, system-ui, sans-serif;
+  color: #1c1917;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Earth without a key: shown, so it can be found, but plainly off. The
+   title says what it needs. */
+.campus3d-option.is-unavailable {
+  color: rgba(28, 25, 23, 0.4);
+  cursor: help;
+}
+
+.campus3d-option.is-unavailable .toggle-switch input { cursor: help; }
+
+.campus3d-option .toggle-switch input:focus-visible + .toggle-track {
+  outline: 2px solid #2f7d8f;
+  outline-offset: 2px;
+}
+
+.campus3d-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  margin: 0;
+  max-width: 80%;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  font: 500 13px Sora, system-ui, sans-serif;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.campus3d-status[hidden] { display: none; }
+
+.campus3d-hint {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 2;
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font: 400 11px Sora, system-ui, sans-serif;
+  color: rgba(28, 25, 23, 0.7);
+  background: rgba(255, 255, 255, 0.8);
+  pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  .campus3d-bar { top: 56px; max-width: calc(100% - 24px); }
+  .campus3d-who { min-width: 0; }
+  .campus3d-hint { display: none; }
+
+  .stop-picker {
+    padding-left: 0;
+    padding-right: 0;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+
+  .stop-select {
+    padding: 14px 12px;
+    font-size: 17px;
+  }
+
+  .stop-select option {
+    font-size: 17px;
+  }
+}

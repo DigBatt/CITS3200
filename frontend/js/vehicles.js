@@ -25,9 +25,15 @@
     return fleet.find((vehicle) => vehicle.id === id)?.name ?? `Vehicle ${id}`;
   }
 
-  // Scope to just this vehicle, as a row of the utilisation table does.
-  function select(id) {
-    chips.only(id);
+  // Set the selection from outside, announcing it as a click would:
+  //   select('2')     just that vehicle, as a row of the utilisation table;
+  //   select('1,2')   several, as getSelection() returned them, so a saved
+  //                   selection can be put back (the Rider tab, js/panels.js);
+  //   select(null)    the whole fleet.
+  function select(selection) {
+    const ids = selection ? String(selection).split(',').filter(Boolean) : [];
+    if (ids.length === 1) chips.only(ids[0]);
+    else chips.choose(ids);
   }
 
   // Refetch liveness. Called on every load, so it keeps pace with live polling.
