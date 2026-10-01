@@ -60,6 +60,12 @@
       </div>
     </div>
 
+    <!-- ============ Route filter chips, rendered by js/stops.js ============ -->
+    <div class="filter-bar" id="route-filter" hidden>
+      <span class="filter-bar-label">ROUTE</span>
+      <div class="chip-row" id="route-filter-chips"></div>
+    </div>
+
     <main>
       <!-- ============ Fleet / Operator / Rider share the map ============ -->
       <div class="dashboard-view" id="view-map">
@@ -74,7 +80,8 @@
 
             <div class="vehicle-list" id="vehicle-list"></div>
 
-            <!-- STUB: layer toggles are visual only -- not yet wired to map.js layers -->
+            <!-- STUB: the toggles are visual only, apart from Stops, which
+                 js/stops.js wires to the map's stop layer. -->
             <div class="layer-toggles" data-stub="map-layer-toggles">
               <span class="layer-toggles-label">MAP LAYERS</span>
               <label class="layer-toggle-row">
@@ -96,7 +103,7 @@
               <label class="layer-toggle-row">
                 <span>Stops</span>
                 <span class="toggle-switch">
-                  <input type="checkbox" checked>
+                  <input type="checkbox" id="layer-toggle-stops" checked>
                   <span class="toggle-track"></span>
                   <span class="toggle-knob"></span>
                 </span>
@@ -129,13 +136,56 @@
             </div>
           </div>
 
-          <!-- ---- Rider panel: empty until stops and stop requests exist ---- -->
+          <!-- ---- Rider panel: stop picker and pickup request (S08, S15) ---- -->
           <div class="panel panel-rider" id="panel-rider" hidden>
             <div class="rider-intro">
               <span class="rider-title">nuway shuttle</span>
               <span class="rider-sub">Let the shuttle know you're waiting</span>
             </div>
-            <p class="empty-state">Stops, arrivals and stop requests are not available yet.</p>
+
+            <!-- ---- Picker: shown while the rider has no active request ---- -->
+            <div class="rider-picker" id="rider-picker">
+              <!-- Options come from /api/stops, so a stop added to the config
+                   appears here with no code change. Shown by id (S15), to
+                   match the map labels and the operator view. -->
+              <div class="stop-picker">
+                <label class="stop-picker-label" for="rider-stop-select">
+                  <span class="stop-picker-dot"></span>
+                  YOUR STOP
+                </label>
+                <select class="stop-select" id="rider-stop-select" disabled>
+                  <option value="">Loading stops&hellip;</option>
+                </select>
+              </div>
+
+              <button type="button" class="request-button" id="rider-request-button" disabled>
+                <span class="request-button-title">Request pickup</span>
+                <span class="request-button-sub" id="rider-request-sub">Choose a stop first</span>
+              </button>
+            </div>
+
+            <!-- ---- Waiting: shown once the rider has an open request (S15) ---- -->
+            <div class="rider-waiting" id="rider-waiting" hidden>
+              <p class="rider-waiting-title">Waiting for the shuttle at</p>
+              <p class="rider-waiting-stop" id="rider-waiting-stop"></p>
+              <p class="rider-waiting-note">The operator can see your request.</p>
+              <button type="button" class="btn-outline" id="rider-cancel-button">Cancel request</button>
+            </div>
+
+            <!-- ---- Collected: shown once the operator marks the stop
+                 picked up (S15). Clicking the review button is a stub: there
+                 is no review feature yet, it only confirms the trigger and
+                 returns the rider to the picker. ---- -->
+            <div class="rider-collected" id="rider-collected" hidden>
+              <p class="rider-collected-title">You're on board!</p>
+              <button type="button" class="request-button" id="rider-review-button" data-stub="rider-review">
+                <span class="request-button-title">Leave a review</span>
+              </button>
+            </div>
+
+            <p class="rider-status" id="rider-status" role="status" hidden></p>
+
+            <p class="rider-note">Arrival times are not available yet.</p>
           </div>
         </aside>
 
@@ -200,12 +250,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="js/api.js"></script>
   <script src="js/map.js"></script>
+  <script src="js/stops.js"></script>
   <script src="js/timeline.js"></script>
   <script src="js/format.js"></script>
   <script src="js/vehicles.js"></script>
+  <script src="js/tum.js"></script>
   <script src="js/utilisation.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/main.js"></script>
   <script src="js/panels.js"></script>
+  <script src="js/rider.js"></script>
 </body>
 </html>

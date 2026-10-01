@@ -311,6 +311,284 @@
   white-space: nowrap;
 }
 
+/* Operator view (S09) */
+.route-select-row { flex-wrap: wrap; }
+
+.operator-vehicle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(28, 25, 23, 0.04);
+  font: 400 12.5px Sora, sans-serif;
+}
+
+.operator-vehicle[hidden] { display: none; }
+
+.operator-vehicle-name { font-weight: 600; }
+
+.operator-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font: 600 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  background: rgba(28, 25, 23, 0.08);
+  color: rgba(28, 25, 23, 0.6);
+}
+
+.operator-badge.is-live {
+  background: oklch(0.72 0.14 150 / 18%);
+  color: oklch(0.42 0.12 150);
+}
+
+.operator-vehicle-detail { color: rgba(28, 25, 23, 0.55); }
+
+.operator-stops-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.operator-updated {
+  font: 400 11px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+.operator-empty,
+.operator-error {
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  font: 500 12.5px Sora, sans-serif;
+}
+
+.operator-empty {
+  background: rgba(28, 25, 23, 0.04);
+  color: rgba(28, 25, 23, 0.6);
+}
+
+.operator-error {
+  background: oklch(0.75 0.1 25 / 10%);
+  border: 1px solid oklch(0.75 0.1 25 / 40%);
+  color: oklch(0.42 0.13 25);
+}
+
+.operator-stops {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.operator-stop {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(28, 25, 23, 0.07);
+}
+
+.operator-stop:last-child { border-bottom: none; }
+
+.operator-stop-index {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.4);
+  text-align: right;
+}
+
+.operator-stop-name { font: 600 13px Sora, sans-serif; }
+
+.operator-stop-here {
+  margin-left: 8px;
+  font: 600 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  color: #2f7d8f;
+}
+
+.operator-stop-count {
+  text-align: right;
+  font: 400 12px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.4);
+}
+
+.operator-stop.has-waiting .operator-stop-count { color: #1c1917; }
+
+.operator-stop-count strong { font: 700 16px Sora, sans-serif; }
+
+.operator-stop-age {
+  display: block;
+  font: 400 11px 'IBM Plex Mono', monospace;
+  color: oklch(0.5 0.14 60);
+}
+
+/* sized to hit reliably on a tablet in a moving vehicle (S12). */
+.operator-collect {
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  font: 600 12px Sora, sans-serif;
+  border: 1px solid #2f7d8f;
+  background: #2f7d8f;
+  color: #fff;
+}
+
+.operator-collect:hover { background: #276a79; }
+
+.operator-collect:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Figures view (#70, #71) */
+.figures-period {
+  display: flex;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+.figures-error { margin: 14px 0 0; }
+
+.figures-period > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.figures-label {
+  font: 600 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+.figures-period-value {
+  font: 500 12px 'IBM Plex Mono', monospace;
+  color: #1c1917;
+}
+
+.figures-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+  gap: 12px;
+}
+
+.figures-grid.is-loading { opacity: 0.5; }
+
+.figure-card {
+  padding: 16px;
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-radius: 8px;
+  background: rgba(28, 25, 23, 0.02);
+}
+
+.figure-name {
+  margin: 0 0 10px;
+  font: 600 12px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.7);
+}
+
+.figure-value {
+  margin: 0 0 10px;
+  font: 600 22px 'IBM Plex Mono', monospace;
+  color: #1c1917;
+}
+
+.figure-definition {
+  margin: 0;
+  font: 400 11.5px Sora, sans-serif;
+  line-height: 1.5;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+/* The formula or category code, beside a figure's name. */
+.figure-formula {
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(28, 25, 23, 0.05);
+  font: 500 10.5px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.55);
+  white-space: nowrap;
+}
+
+/* On a card the formula takes its own line, so every card lines up whatever
+   the length of its name. */
+.figure-name .figure-formula {
+  display: table;
+  margin: 4px 0 0;
+}
+
+/* A figure the data cannot support (#71): plainly not a number, so it cannot
+   be read as zero, with the reason right under it. */
+.figure-card.is-unavailable {
+  border-style: dashed;
+  background: transparent;
+}
+
+.figure-unavailable {
+  display: block;
+  font: 600 14px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+.figure-reason {
+  display: block;
+  margin-top: 4px;
+  font: 400 11.5px Sora, sans-serif;
+  line-height: 1.45;
+  color: oklch(0.42 0.12 60);
+}
+
+/* Time categories, indented to show how each nests under calendar time. */
+.figures-time {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 12.5px Sora, sans-serif;
+}
+
+.figures-time th {
+  text-align: left;
+  padding: 10px 12px;
+  font: 600 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  color: rgba(28, 25, 23, 0.5);
+  border-bottom: 1px solid rgba(28, 25, 23, 0.1);
+}
+
+.figures-time td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(28, 25, 23, 0.07);
+  vertical-align: top;
+}
+
+.figures-time tr:last-child td { border-bottom: none; }
+
+.figures-time td.figures-time-category { padding-left: calc(12px + var(--depth, 0) * 14px); }
+
+.figures-time-name {
+  display: block;
+  font-weight: 600;
+  color: #1c1917;
+}
+
+.figures-time-definition {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+.figures-time .figure-unavailable { font-size: 12.5px; }
+
+@media (max-width: 700px) {
+  .figures-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Stops list — used by S06 once stops are configured */
 .stops-list {
   display: flex;

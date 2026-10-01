@@ -46,3 +46,47 @@ function getSchedule() {
 function getDowntime(query) {
   return request('/api/downtime', query);
 }
+
+function getRoutes() {
+  return request('/api/routes');
+}
+
+function getStops() {
+  return request('/api/stops');
+}
+
+// POST /api/pickup-requests. Resolves to { request, created }: `created` is
+// false when the rider already had an open request at that stop, which the
+// API answers with 200 rather than 201 (docs/api.md, S08).
+async function createPickupRequest(stopId) {
+  const response = await fetch('/api/pickup-requests', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stop_id: stopId }),
+  });
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
+  }
+  return { request: body.request, created: response.status === 201 };
+}
+
+// GET /api/pickup-requests/mine. No auth: identified by the rider_token
+// cookie (S08.2, S15). Resolves to { request: null } if this rider has no
+// cookie yet, or has never made a request — the normal state, not an error.
+function getMyPickupRequest() {
+  return request('/api/pickup-requests/mine');
+}
+
+// POST /api/pickup-requests/<id>/cancel (S15). Resolves to the cancelled
+// request, or throws with the API's message (e.g. it was already collected).
+async function cancelPickupRequest(requestId) {
+  const response = await fetch(`/api/pickup-requests/${encodeURIComponent(requestId)}/cancel`, { method: 'POST' });
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
+  }
+  return body.request;
+}

@@ -1,0 +1,84 @@
+# docs/stops-and-routes.md.
+
+stops:
+  - id: reid-library
+    name: Reid Library ground floor entrance
+    latitude: -31.97901221771226
+    longitude: 115.8183554056777
+
+  - id: civ-mech
+    name: Outside Civil and Mechanical Engineering
+    latitude: -31.980743857374474
+    longitude: 115.81720535774184
+
+  - id: business-school   # this is the actual business school car park and not the location on the current gps track the buses follow.
+    name: Business School carpark on Underwood Parade
+    latitude: -31.9848813
+    longitude: 115.8201024
+
+  - id: guild-village
+    name: Intersection of Saw Promenade and Graduates walk
+    latitude: -31.9806087
+    longitude: 115.8187129
+
+  - id: barry-marshall
+    name: Barry J Marshall Library entrance
+    latitude: -31.9830579
+    longitude: 115.8187461
+
+  - id: ezone-central
+    name: Path to E-zone from James oval
+    latitude: -31.9797545
+    longitude: 115.8171536
+
+  - id: bilya-marlee
+    name: Underwood parade outside Bilya Marlee
+    latitude: -31.9828347
+    longitude: 115.8201390
+  
+  - id: sports-science
+    name: Saw promenade at Human movement lab/ UWA aquatic center 
+    latitude: -31.9848357
+    longitude: 115.8187636
+
+  - id: marine-research
+    name: Between IOMRC and Civ & Mechanical Engineering 
+    latitude: -31.9813149
+    longitude: 115.8165538
+
+  - id: law-library
+    name: North side of Law library 
+    latitude: -31.9793561
+    longitude: 115.8194325
+
+
+routes:
+  - id: full-campus-loop
+    name: Campus loop
+    colour: "#D4741F"
+    loop: true
+    stops: [reid-library, ezone-central, civ-mech, guild-village, barry-marshall, sports-science, business-school, bilya-marlee, marine-research]
+
+  - id: eng-business-loop
+    name: Engineering to Business School loop
+    colour: "#1F7FD4"
+    loop: true
+    stops: [civ-mech, guild-village, barry-marshall, sports-science, business-school, bilya-marlee]
+    
+  - id: nth-south
+    name: Full length of campus North - South and back
+    colour: "#2E7D32"
+    loop: false
+    stops: [reid-library, guild-village, sports-science, barry-marshall]
+  
+  - id: james-oval-loop
+    name: Loop around James oval
+    colour: "#C2185B"
+    loop: true
+    stops: [civ-mech, ezone-central, reid-library, guild-village]
+
+  - id: library-service
+    name: Direct service to 3 highest use libraries
+    colour: "#6A1B9A"
+    loop: true
+    stops: [reid-library, law-library, guild-village, barry-marshall]

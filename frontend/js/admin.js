@@ -6,21 +6,30 @@
 // The datetime-local inputs are wall clock with no zone; the API speaks UTC.
 // toIso and toInput below are the only places that conversion happens.
 
-// ---- Auth guard ----
-// Redirect to the sign-in page if there is no admin session.
-// Disabled until S13 (auth backend) provides /api/admin/me.
-// function checkAuth() {
-//   const loggedIn = sessionStorage.getItem('admin_session');
-//   if (!loggedIn) {
-//     window.location.href = '/admin-login';
-//   }
-// }
-// checkAuth();
+function redirectToSignIn() {
+  const here = window.location.pathname + window.location.search;
+  window.location.href = `/admin-login?${new URLSearchParams({ next: here })}`;
+}
 
-document.getElementById('btn-signout').addEventListener('click', () => {
-  // STUB: call POST /api/admin/logout once S13 exists.
-  sessionStorage.removeItem('admin_session');
-  window.location.href = '/';
+async function checkSignedIn() {
+  try {
+    const { signed_in: signedIn } = await fetch('/api/admin/me', { cache: 'no-store' }).then((r) => r.json());
+    if (!signedIn) redirectToSignIn();
+  } catch {
+    // Server unreachable: the admin endpoints will fail on their own.
+  }
+}
+checkSignedIn();
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) checkSignedIn();
+});
+
+document.getElementById('btn-signout').addEventListener('click', async () => {
+  try {
+    await fetch('/api/admin/logout', { method: 'POST' });
+  } finally {
+    window.location.href = '/';
+  }
 });
 
 // ---- Tab switching ----

@@ -16,12 +16,19 @@ Always shaped:
 ```
 
 Codes: `bad_timestamp`, `bad_range` (from > to), `unknown_vehicle`,
-`data_unavailable`, `bad_request` (malformed body), `invalid_record`
-(a field the store refuses), `invalid_schedule`, `not_found`.
+`unknown_stop`, `unknown_route`, `unknown_request`, `not_your_request`,
+`request_not_open`, `data_unavailable`, `bad_request` (malformed body),
+`invalid_record` (a field the store refuses), `invalid_schedule`, `not_found`,
+`not_signed_in`, `bad_credentials`, `admin_not_configured`.
 
 `not_found` is the one exception to "empty is not an error": it answers a
 write aimed at a record id that does not exist, which is not a query that
 matched nothing.
+
+**Signing in.** Endpoints marked *Admin only* answer `401` `not_signed_in`
+until the browser has signed in through `POST /api/admin/login` (see
+[Administrator sign-in](#administrator-sign-in)). Everything else, including
+everything the rider view uses, needs no sign-in.
 
 ---
 
@@ -147,7 +154,82 @@ I dont know the format of the data we get here yet, so this is mostly a placehol
 
 ## `GET /api/metrics`
 
-This will be for utilisation figures. Not implemented yet.
+Utilisation figures from the GMG time usage model
+([GMG Time Utilisation Model.md](GMG%20Time%20Utilisation%20Model.md)), per
+vehicle over a period. Same `vehicles`, `from` and `to` parameters, defaults
+and errors as `/api/positions`. Thresholds come from the `utilisation` block of
+`config/app.yaml`.
+
+```json
+{
+  "from": "2025-09-03T16:00:00.000000Z",
+  "to": "2025-09-04T15:59:59.999999Z",
+  "vehicles": [
+    {
+      "vehicle_id": "1",
+      "from": "2025-09-03T16:00:00.000000Z",
+      "to": "2025-09-04T15:59:59.999999Z",
+      "buckets": {
+        "calendar_seconds": 86399.999999,
+        "scheduled_seconds": 32400.0,
+        "unscheduled_seconds": 53999.999999,
+        "operating_seconds": 2247.01,
+        "working_seconds": 2164.54,
+        "scheduled_working_seconds": 2164.54,
+        "operating_delay_seconds": 82.47,
+        "standby_seconds": 0.0,
+        "not_reporting_seconds": 84152.99,
+        "downtime_seconds": null,
+        "available_seconds": null,
+        "productive_seconds": null
+      },
+      "kpis": {
+        "asset_utilisation": 0.026,
+        "effective_utilisation": 0.0668,
+        "operating_efficiency": 0.9633,
+        "uptime": null,
+        "mechanical_availability": null,
+        "physical_availability": null,
+        "use_of_availability": null,
+        "production_effectiveness": null
+      },
+      "unavailable": {
+        "uptime": "needs downtime; no fault or maintenance log in the data",
+        "...": "one entry per figure above that cannot be given"
+      }
+    }
+  ]
+}
+```
+
+Times are seconds and KPIs are fractions (`0.026` is 2.6%).
+
+**Unavailable is not zero.** A bucket or KPI the data cannot support is
+`null`, and `unavailable` gives the reason under the same key. Every `null`
+has a reason (`tests/test_metrics_unavailable.py`), and a figure with a reason
+is not to be shown as a number even if it has one: with no depot configured,
+`standby_seconds` is `0` but has a reason, since stopped time is then counted
+as operating delay. What stays unavailable, and why:
+
+| Figure | Unavailable when |
+|---|---|
+| `downtime_seconds`, `available_seconds`, `uptime`, `mechanical_availability`, `physical_availability`, `use_of_availability` | Always: needs a fault or maintenance log. |
+| `productive_seconds`, `production_effectiveness` | Always: needs passenger counts. |
+| `scheduled_seconds`, `unscheduled_seconds`, `scheduled_working_seconds`, `effective_utilisation` | No `display.timezone` configured, so the roster cannot be placed on a clock. |
+| `effective_utilisation` | Nothing rostered for the vehicle (see **Empty schedules**), or no scheduled time in the period, e.g. a weekend. |
+| `operating_efficiency` | No operating time in the period. |
+| `standby_seconds` | No `utilisation.depot` configured. |
+
+**Notes are not reasons.** Alongside `unavailable`, each vehicle has `notes`:
+a figure that *is* given but needs explaining, such as a scheduled time of `0`
+because nothing is rostered (see **Empty schedules** under `PUT /api/schedule`).
+A note never stands in for a value; it is said beside it.
+
+`calendar_seconds` covers the whole period, including any part still to come
+if `to` is in the future, where it counts as not reporting; leave `to` out to
+stop at now.
+
+---
 
 ## `GET /api/downtime`
 
@@ -183,10 +265,9 @@ before `from` and was still open at `from` is included.
 Records are ascending by `start`. Times are stored and returned in UTC; the
 admin page converts to and from local time at the form.
 
-> **Not yet protected.** The three writes below are the first write endpoints
-> in the app and admin auth (S13) does not exist, so anyone who can reach the
-> server can edit the log. S13 must guard them before this is exposed beyond
-> a local run.
+> **Not yet protected.** Admin sign-in (S13) exists, but these three writes
+> are not behind it yet, so anyone who can reach the server can edit the log.
+> They must be marked *Admin only* before this is exposed beyond a local run.
 
 ---
 
@@ -351,8 +432,8 @@ A period crossing midnight cannot be expressed and is rejected; it needs a row
 on each day.
 
 > **Not yet protected.** Editing the roster is an operator and administrator
-> action, but admin auth (S13) does not exist, so this `PUT` is open like the
-> `/api/downtime` writes. The guard belongs on `replace_schedule` in
+> action. Admin sign-in (S13) exists but does not guard this `PUT` yet, so it
+> is open like the `/api/downtime` writes. The guard belongs on `replace_schedule` in
 > `backend/api/schedule.py`, which is the only write in that module. `GET`
 > stays open.
 
@@ -382,6 +463,267 @@ the note as the caption on the scheduled row.
 A timezone is still required. Without `display.timezone` a local roster cannot
 be placed on a clock, so `scheduled_seconds` is `null` with an `unavailable`
 reason, which is a broken config rather than an empty schedule.
+
+---
+
+## Stops and routes
+
+From `config/stops.yaml` ([stops-and-routes.md](stops-and-routes.md)).
+
+A stop or route id in the path that is not configured is `404`, codes
+`unknown_stop` and `unknown_route`. The no-`404` rule above is about queries
+that match no data, not about naming something that does not exist.
+
+### `GET /api/stops`
+
+Every stop, in file order, each with the ids of the routes it is on.
+
+```json
+{
+  "stops": [
+    {
+      "id": "reid-library",
+      "name": "Reid Library",
+      "latitude": -31.97901221771226,
+      "longitude": 115.8183554056777,
+      "routes": ["campus-loop"]
+    }
+  ]
+}
+```
+
+`routes` is in file order and is `[]` for a stop on no route.
+
+### `GET /api/stops/<id>`
+
+One stop, the same shape as an entry above.
+
+### `GET /api/routes`
+
+Every route, in file order, with its stop ids in service order.
+
+```json
+{
+  "routes": [
+    {
+      "id": "campus-loop",
+      "name": "Campus loop",
+      "colour": "#d4741f",
+      "loop": true,
+      "stop_ids": ["reid-library", "civ-mech", "business-school"]
+    }
+  ]
+}
+```
+
+`colour` is `null` when the config does not set one.
+
+### `GET /api/routes/<id>`
+
+One route, with its stops in full and in service order.
+
+```json
+{
+  "id": "campus-loop",
+  "name": "Campus loop",
+  "colour": "#d4741f",
+  "loop": true,
+  "stops": [
+    { "id": "reid-library", "name": "Reid Library", "latitude": -31.97901221771226, "longitude": 115.8183554056777, "routes": ["campus-loop"] }
+  ]
+}
+```
+
+---
+
+## Pickup requests
+
+S08. A rider asks to be collected at a stop, no account needed.
+
+**Identifying a rider (S08.2).** No login exists, the server
+generates a random `rider_token` and sets it as an http only cookie
+(`SameSite=Lax`, ~1 year) the first time a browser posts a request; every
+later request from that browser carries it automatically. It never appears in
+a JSON body, and the operator view never sees another rider's token.
+
+### `POST /api/pickup-requests`
+
+```json
+{ "stop_id": "reid-library" }
+```
+
+`400` `unknown_stop` if the stop is not configured — this is a bad request
+body, not a path lookup, so it does not follow the `404` convention `/api/stops/<id>`
+uses.
+
+If the rider (by cookie) already has an open request at that stop, that same
+request is returned unchanged with `200` instead of opening a second one. A
+genuinely new request is `201`.
+
+```json
+{
+  "request": {
+    "id": "3f1c2b7a9e4d4f0b8c6a1d2e3f4a5b6c",
+    "stop_id": "reid-library",
+    "status": "open",
+    "created_at": "2025-09-04T08:58:37.495682Z",
+    "cleared_at": null
+  }
+}
+```
+
+### `GET /api/pickup-requests`
+
+*Admin only.*
+
+Every pickup request, ascending by `created_at`. For the operator view to
+poll so a bus doesn't skip a stop with a rider waiting.
+
+| Parameter | Required | Notes |
+|---|---|---|
+| `status` | no | One of `open`, `collected`, `expired`. Default: all. |
+
+```json
+{ "requests": [ { "...": "as in POST above" } ] }
+```
+
+A request leaves `open` once: `collected` when the operator clears its
+stop, `expired` when it has been open longer than
+`pickup_requests.expire_after_seconds` in `config/app.yaml`, or `cancelled`
+when the rider withdraws it themselves (`POST /api/pickup-requests/<id>/cancel`
+below). Either way the record is kept with `cleared_at` set, so
+`?status=collected` and `?status=expired` are the admin's record of the day.
+Expiry is applied when requests are read or opened, not by a background job.
+
+The store is in memory, so a restart clears every request, open or closed.
+
+### `GET /api/pickup-requests/mine`
+
+S15. The calling rider's own most recent request, any status, identified by
+the `rider_token` cookie — not admin-only, since it only ever answers with
+the caller's own request. Backs the rider view polling to notice its own
+request going `collected` (to show a "leave a review" prompt) or `expired`.
+
+```json
+{ "request": { "...": "as in POST above" } }
+```
+
+`{"request": null}` if this rider has no `rider_token` cookie yet, or has
+never made a request — not an error, since that is the normal state before a
+rider's first request.
+
+### `POST /api/pickup-requests/<id>/cancel`
+
+S15. The rider withdraws their own request. No body. Ownership is the same
+`rider_token` cookie POST /api/pickup-requests uses, so no sign-in is needed,
+but a rider cannot cancel someone else's request.
+
+`404` `unknown_request` if the id is not on record. `403` `not_your_request`
+if the caller's cookie does not match the request's rider. `409`
+`request_not_open` if it has already been collected, expired, or cancelled.
+Otherwise `200`:
+
+```json
+{ "request": { "...": "as in POST above, with status cancelled and cleared_at set" } }
+```
+
+A rider who asks again at the same stop afterwards opens a new request, the
+same as after being collected.
+
+### `GET /api/routes/<id>/waiting`
+
+*Admin only.*
+
+S09.2. The riders waiting along one route, for the operator view to poll
+(`/admin`, Operator view tab, every 10 s). `404` `unknown_route` if the route
+is not configured.
+
+The route's stops in service order, each with the number of `open` requests
+and the age of the oldest. Stops with nobody waiting have `waiting: 0` and
+nulls. Requests at stops not on the route are left out, and do not count
+toward `total_waiting`.
+
+```json
+{
+  "generated_at": "2025-09-04T09:00:00.000000Z",
+  "route": { "id": "campus-loop", "name": "Campus loop", "colour": "#d4741f", "loop": true },
+  "total_waiting": 2,
+  "stops": [
+    {
+      "id": "reid-library", "name": "Reid Library", "latitude": -31.979, "longitude": 115.818,
+      "waiting": 2,
+      "oldest_requested_at": "2025-09-04T08:53:12.000000Z",
+      "oldest_wait_seconds": 408.0
+    },
+    {
+      "id": "civ-mech", "name": "Outside Civil and Mechanical Engineering", "latitude": -31.981, "longitude": 115.817,
+      "waiting": 0, "oldest_requested_at": null, "oldest_wait_seconds": null
+    }
+  ]
+}
+```
+
+**Which route a vehicle is on (S09.1).** The operator picks their vehicle and
+route when the page loads. The choice lives in the page URL
+(`/admin?vehicle=1&route=campus-loop`) and the browser's local storage; the
+server holds no assignment. The vehicle's position comes from
+`GET /api/vehicles`: live when the logger is feeding it, otherwise the latest
+recorded position, labelled with its age.
+
+### `POST /api/stops/<id>/collect`
+
+*Admin only.*
+
+The operator has picked up the riders at a stop. Every `open` request at
+the stop becomes `collected`, whichever route the rider was waiting for, since
+requests belong to a stop and not a route. No body. `404` `unknown_stop` if the
+stop is not configured.
+
+Returns the requests closed, empty if nobody was waiting:
+
+```json
+{ "collected": [ { "...": "as in POST /api/pickup-requests, with status collected and cleared_at set" } ] }
+```
+
+A rider who asks again at the same stop afterwards opens a new request.
+
+---
+
+## Administrator sign-in
+
+S13. One shared account, set in a `config/secrets.yaml` (copy
+`config/secrets.example.yaml`). Signing in sets a flag in Flask's signed
+session cookie (`HttpOnly`, `SameSite=Lax`), which lasts
+`admin.session_hours` in `config/app.yaml`.
+
+Admin only: the `/admin` page, `GET /api/pickup-requests`,
+`GET /api/routes/<id>/waiting` and `POST /api/stops/<id>/collect`. A
+signed-out request for `/admin` is redirected to
+`/admin-login?next=<the page asked for>`, which returns there after signing in.
+
+**Limits.** One account shared by every operator and administrator, so anyone
+who can use the operator view can also change downtime and snapshot settings.
+There is no lockout after repeated wrong passwords, and the site must be
+served over HTTPS for the cookie and password to be safe in transit.
+
+### `POST /api/admin/login`
+
+```json
+{ "username": "admin", "password": "..." }
+```
+
+`200` `{ "signed_in": true }` and the session cookie. `401` `bad_credentials`
+for a wrong or missing username or password. `503` `admin_not_configured` if
+there is no `config/secrets.yaml`.
+
+### `POST /api/admin/logout`
+
+Ends the session. Always `200` `{ "signed_in": false }`.
+
+### `GET /api/admin/me`
+
+`200` `{ "signed_in": true | false }`. Never `401`, so the admin page can check
+without tripping its own signed-out handling.
 
 ---
 

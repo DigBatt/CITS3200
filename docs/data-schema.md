@@ -17,6 +17,7 @@ modelled as external.
 | Vehicle | `config/vehicles.yaml` | Not a table. S02 requires the identity scheme to be held as configuration rather than in code, and FR-12 requires a new shuttle to need no code change. |
 | Position | `positions` | One telemetry sample for one vehicle at one instant. |
 | Event | `events` | An engage or disengage. **Schema not yet specified** |
+| Stop, Route | `config/stops.yaml` | Not tables. Stops to be added or moved without a code change. Format: [stops-and-routes.md](stops-and-routes.md). |
 
 ---
 

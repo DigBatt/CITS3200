@@ -206,14 +206,13 @@ def test_to_dict_uses_the_canonical_timestamp_form(tmp_path):
 
 
 def test_from_config_needs_the_database_path(tmp_path):
-    from backend.config import Config
+    from dataclasses import replace
 
-    blank = Config(
-        vehicles=[], data_directory=None, live_directory=None, downtime_file=None,
-        inactivity_threshold_seconds=None, expected_poll_interval_seconds=None, timezone=None,
-        utc_offset_hours=None, map_centre=None, map_zoom=None, refresh_interval_seconds=None,
-        utilisation=None, logger=None,
-    )
+    from backend.config import load_config
+
+    # The real config with only the downtime file left unset, so this does not
+    # need updating each time Config gains a field.
+    blank = replace(load_config(), downtime_file=None)
     with pytest.raises(RepositoryError):
         DowntimeStore.from_config(blank)
 

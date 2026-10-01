@@ -90,6 +90,7 @@ async function load() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
+  Stops.init();
   Vehicles.init({
     onChange: () => {
       // A new vehicle is a new selection to frame, even straight after a scrub.

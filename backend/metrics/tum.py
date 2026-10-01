@@ -423,6 +423,7 @@ def summarise(
         )
         result.unavailable["scheduled_seconds"] = result.unavailable["effective_utilisation"]
         result.unavailable["scheduled_working_seconds"] = result.unavailable["effective_utilisation"]
+        result.unavailable["unscheduled_seconds"] = result.unavailable["effective_utilisation"]
     elif settings.schedule is None or settings.schedule.is_empty_for(vehicle_id):
         # S21: nothing rostered is a real figure, not a missing one. Scheduled
         # time is zero and the window is unscheduled; the note says why, so
@@ -440,6 +441,10 @@ def summarise(
         result.unavailable["effective_utilisation"] = (
             "needs scheduled time; no service schedule is in the system"
         )
+    elif not scheduled:
+        # Scheduled time is known and is zero, e.g. a weekend: the ratio has
+        # nothing to divide by, which is not the same as 0%.
+        result.unavailable["effective_utilisation"] = "no scheduled service time in this window"
     if not operating:
         result.unavailable["operating_efficiency"] = "no operating time in this window"
     if not settings.has_depot:

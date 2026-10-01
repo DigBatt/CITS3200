@@ -62,6 +62,13 @@ utilisation:
     friday:
       - hours: ["08:00", "17:00"]
 
+admin:
+  # S13: how long a sign in session lasts. 
+  session_hours: 12
+
+pickup_requests:
+  expire_after_seconds: 1800
+
 logger:
   poll_interval_seconds: 30
   timeout_seconds: 60

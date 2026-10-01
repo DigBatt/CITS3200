@@ -14,10 +14,14 @@ data/*.sqlite3-shm
 node_modules/
 .expo/
 expo-env.d.ts
+mobile
 
 # Operator reported downtime (config/app.yaml data.downtime_file): local data, not code.
 data/downtime.json
 data/.downtime.json.*.tmp
 
-# S13 admin credentials and keys: never commit
+# S13 admin credentials and keys; see config/secrets.example.yaml. Never commit.
 config/secrets.yaml
+
+# Log files, wherever a tool writes them (e.g. Expo's mobile/.expo/dev/logs/).
+*.log

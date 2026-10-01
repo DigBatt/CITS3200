@@ -23,6 +23,16 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.entries(panels).forEach(([name, panel]) => {
       panel.hidden = name !== view;
     });
+
+    // The rider's stop picker hides every other stop to cut clutter (S15),
+    // js/map.js:isolateStop(). That is Rider-only, so leaving the tab
+    // restores every stop for Fleet and Operator; returning to it re-applies
+    // whatever the picker still has chosen or waiting.
+    if (view === 'rider') {
+      window.Rider?.syncMapIsolation();
+    } else {
+      isolateStop(null);
+    }
   }
 
   tabs.forEach((tab) => tab.addEventListener('click', () => setView(tab.dataset.view)));
