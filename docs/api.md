@@ -113,16 +113,72 @@ array.
 
 ---
 
-## `GET /api/events`
-
-Engage/disengage events, not implemented yet.
-I dont know the format of the data we get here yet, so this is mostly a placeholder/idea for now.
-
----
-
 ## `GET /api/metrics`
 
-This will be for utilisation figures. Not implemented yet.
+Utilisation figures from the GMG time utilisation model
+([GMG Time Utilisation Model.md](GMG%20Time%20Utilisation%20Model.md)), per
+vehicle over a window. Backs the Utilisation view.
+
+| Parameter | Required | Notes |
+|---|---|---|
+| `vehicles` | no | As for `/api/positions`. Default: all. |
+| `from` | no | As for `/api/positions`. Default: start of today, Perth time. |
+| `to` | no | As for `/api/positions`. Default: now. |
+
+One entry per selected vehicle, in config order. Every `buckets` value is in
+seconds, every `kpis` value a fraction from 0 to 1.
+
+```json
+{
+  "from": "2025-09-03T16:00:00.000000Z",
+  "to": "2025-09-04T15:59:59.999999Z",
+  "vehicles": [
+    {
+      "vehicle_id": "1",
+      "from": "2025-09-03T16:00:00.000000Z",
+      "to": "2025-09-04T15:59:59.999999Z",
+      "buckets": {
+        "calendar_seconds": 86399.999999,
+        "working_seconds": 2164.54,
+        "operating_delay_seconds": 82.47,
+        "standby_seconds": 0.0,
+        "not_reporting_seconds": 84152.99,
+        "operating_seconds": 2247.01,
+        "scheduled_seconds": 32400.0,
+        "scheduled_working_seconds": 2164.54,
+        "unscheduled_seconds": 54000.0,
+        "downtime_seconds": null,
+        "available_seconds": null,
+        "productive_seconds": null
+      },
+      "kpis": {
+        "asset_utilisation": 0.026,
+        "operating_efficiency": 0.963,
+        "effective_utilisation": 0.067,
+        "uptime": null,
+        "mechanical_availability": null,
+        "physical_availability": null,
+        "use_of_availability": null,
+        "production_effectiveness": null
+      },
+      "unavailable": {
+        "uptime": "needs downtime; no fault or maintenance log in the data",
+        "...": "one entry per null above, saying why"
+      }
+    }
+  ]
+}
+```
+
+A bucket or KPI the data cannot support is `null`, and `unavailable` names it
+with the reason. `operating_efficiency` is `null` for a window with no
+operating time. `effective_utilisation` and the `scheduled_*` buckets need
+`utilisation.service_hours`, and `standby_seconds` needs `utilisation.depot`,
+both in `config/app.yaml`; without a depot, stopped time counts as operating
+delay.
+
+`400` as for `/api/positions`. `500` `data_unavailable` if a required
+`utilisation` threshold is unset in `config/app.yaml`.
 
 ---
 

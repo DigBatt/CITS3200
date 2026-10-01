@@ -34,7 +34,7 @@
 <body>
   <div class="app-shell">
 
-    <!-- ============ Header: brand, view tabs, live clock ============ -->
+    <!-- ============ Header: brand, view tabs, admin link ============ -->
     <header class="app-header">
       <div class="app-header-brand">
         <span class="app-header-brand-name">nuway</span>
@@ -42,20 +42,11 @@
       </div>
       <nav class="app-tabs" id="app-tabs" aria-label="Dashboard view">
         <button type="button" class="app-tab is-active" data-view="fleet">Fleet</button>
-        <button type="button" class="app-tab" data-view="operator">Operator</button>
         <button type="button" class="app-tab" data-view="rider">Rider</button>
         <button type="button" class="app-tab" data-view="utilisation">Utilisation</button>
       </nav>
       <div class="app-header-spacer"></div>
-      <!-- STUB: wire to a real liveness/heartbeat signal -->
-      <div class="app-live-indicator" data-stub="connection-status">
-        <span class="app-live-dot"></span>
-        <span>Live</span>
-        <span class="app-live-clock" id="app-clock"></span>
-      </div>
-      <!-- STUB: wire to signed-in operator -->
       <a href="/admin" class="admin-link">Admin</a>
-      <div class="app-avatar" data-stub="current-user">JD</div>
     </header>
 
     <!-- ============ Date/time range control ============ -->
@@ -91,26 +82,9 @@
 
             <div class="vehicle-list" id="vehicle-list"></div>
 
-            <!-- STUB: the toggles are visual only, apart from Stops, which
-                 js/stops.js wires to the map's stop layer. -->
-            <div class="layer-toggles" data-stub="map-layer-toggles">
+            <!-- js/stops.js wires the Stops toggle to the map's stop layer. -->
+            <div class="layer-toggles">
               <span class="layer-toggles-label">MAP LAYERS</span>
-              <label class="layer-toggle-row">
-                <span>Live positions</span>
-                <span class="toggle-switch">
-                  <input type="checkbox" checked>
-                  <span class="toggle-track"></span>
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
-              <label class="layer-toggle-row">
-                <span>Engage / disengage</span>
-                <span class="toggle-switch">
-                  <input type="checkbox" checked>
-                  <span class="toggle-track"></span>
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
               <label class="layer-toggle-row">
                 <span>Stops</span>
                 <span class="toggle-switch">
@@ -119,32 +93,9 @@
                   <span class="toggle-knob"></span>
                 </span>
               </label>
-              <label class="layer-toggle-row">
-                <span>Today's trail</span>
-                <span class="toggle-switch">
-                  <input type="checkbox">
-                  <span class="toggle-track"></span>
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
             </div>
 
             <div class="kpi-mini-grid" id="fleet-kpis"></div>
-          </div>
-
-          <!-- ---- Operator panel: empty until /api/events exists ---- -->
-          <div class="panel" id="panel-operator" hidden>
-            <div class="panel-header">
-              <span class="panel-title">Operator</span>
-            </div>
-            <p class="empty-state">Engage/disengage state and the autonomy timeline need vehicle events, which the API does not provide yet.</p>
-
-            <div class="event-log">
-              <div class="event-log-header">
-                <span class="panel-title">Event log</span>
-              </div>
-              <p class="empty-state">No events to show.</p>
-            </div>
           </div>
 
           <!-- ---- Rider panel: stop picker and pickup request (S08, S15) ---- -->
