@@ -5,6 +5,10 @@ data:
   # Where the live logger appends. Set `directory` to this to view live data.
   live_directory: data/live
 
+storage:
+  # Downtime records, snapshot settings and daily snapshots.
+  directory: data/admin
+
 liveness:
   inactivity_threshold_seconds: 300 # when data is to be rendered as grey.
   expected_poll_interval_seconds: 6

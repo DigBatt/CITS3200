@@ -38,6 +38,7 @@ class Config:
     pickup_requests: Optional[dict[str, Any]]
     admin: Optional[dict[str, Any]]
     stops: StopNetwork
+    storage_directory: Optional[Path] = None
 
     def vehicle(self, vehicle_id: str) -> Optional[Vehicle]:
         return next((v for v in self.vehicles if v.id == vehicle_id), None)
@@ -68,6 +69,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
 
         directory = data.get("directory")
         live_directory = data.get("live_directory")
+        storage_directory = (app.get("storage") or {}).get("directory")
 
         vehicles = [
             Vehicle(
@@ -99,6 +101,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
             pickup_requests=app.get("pickup_requests"),
             admin=app.get("admin"),
             stops=_parse_stops(stops_raw, stops_path, bounds),
+            storage_directory=PROJECT_ROOT / storage_directory if storage_directory else None,
         )
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
         raise ConfigError(f"Could not read the config in {config_dir}: {exc}") from exc

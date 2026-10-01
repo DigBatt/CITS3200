@@ -59,9 +59,41 @@ async function loadVehicles() {
 }
 loadVehicles();
 
-// ---- Downtime records ----
+// ---- Downtime records stored by /api/downtime ----
 let downtimeRecords = [];
 let editingId = null;
+// Set once the server has warned of an overlap; the next save confirms it.
+let confirmOverlap = false;
+
+const OVERLAP_WARNING_DEFAULT = document.getElementById('downtime-overlap-warning').textContent;
+
+// Resolves to { ok, status, data }. A lapsed session goes back to sign-in.
+async function downtimeRequest(method, path, body) {
+  const response = await fetch(path, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
+  });
+  if (response.status === 401) {
+    redirectToSignIn();
+    throw new Error('Signed out');
+  }
+  const data = response.status === 204 ? null : await response.json().catch(() => null);
+  return { ok: response.ok, status: response.status, data };
+}
+
+async function loadDowntime() {
+  const tbody = document.getElementById('downtime-tbody');
+  try {
+    const { ok, status, data } = await downtimeRequest('GET', '/api/downtime');
+    if (!ok) throw new Error(data?.error?.message ?? `Could not load downtime records (${status}).`);
+    downtimeRecords = data.records;
+    renderDowntime();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5"><p class="empty-state">${escHtml(err.message)}</p></td></tr>`;
+  }
+}
 
 function renderDowntime() {
   const tbody = document.getElementById('downtime-tbody');
@@ -72,7 +104,7 @@ function renderDowntime() {
   }
   tbody.innerHTML = downtimeRecords.map(r => `
     <tr data-id="${r.id}">
-      <td class="mono">${r.vehicle}</td>
+      <td class="mono">${escHtml(r.vehicle_id)}</td>
       <td class="mono">${fmtLocal(r.start)}</td>
       <td class="mono">${fmtLocal(r.end)}</td>
       <td>${escHtml(r.reason)}</td>
@@ -91,67 +123,93 @@ function fmtLocal(iso) {
   return d.toLocaleString('en-AU', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+// A UTC timestamp from the API as a datetime local input value.
+function toLocalInput(iso) {
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function escHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function genId() {
-  return Math.random().toString(36).slice(2, 10);
+// the server refused an overlapping period; show what it clashes with
+// and let the next save store it anyway.
+function showOverlap(overlaps) {
+  const list = overlaps
+    .map(r => `${fmtLocal(r.start)} – ${fmtLocal(r.end)} (${r.reason})`)
+    .join('; ');
+  document.getElementById('downtime-overlap-warning').textContent =
+    `⚠ This period overlaps existing downtime for this vehicle: ${list}. Press "Save anyway" to store it, or change the times.`;
+  document.getElementById('downtime-overlap-warning').classList.add('visible');
+  document.getElementById('btn-downtime-save').textContent = 'Save anyway';
+  confirmOverlap = true;
 }
 
-// S18: two periods overlap when each starts before the other ends.
-function hasOverlap(vehicleId, start, end, excludeId = null) {
-  return downtimeRecords.some(r => {
-    if (r.id === excludeId || r.vehicle !== vehicleId) return false;
-    return start < new Date(r.end) && end > new Date(r.start);
-  });
+function resetOverlap() {
+  confirmOverlap = false;
+  const warning = document.getElementById('downtime-overlap-warning');
+  warning.classList.remove('visible');
+  warning.textContent = OVERLAP_WARNING_DEFAULT;
+  document.getElementById('btn-downtime-save').textContent = 'Save record';
 }
 
-document.getElementById('btn-downtime-save').addEventListener('click', () => {
+['dt-vehicle', 'dt-start', 'dt-end'].forEach(id =>
+  document.getElementById(id).addEventListener('input', resetOverlap));
+
+document.getElementById('btn-downtime-save').addEventListener('click', async () => {
   const vehicle = document.getElementById('dt-vehicle').value;
   const start   = document.getElementById('dt-start').value;
   const end     = document.getElementById('dt-end').value;
   const reason  = document.getElementById('dt-reason').value.trim();
-  const warning = document.getElementById('downtime-overlap-warning');
 
   if (!vehicle || !start || !end || !reason) {
     alert('Please fill in all fields.');
     return;
   }
 
+  // datetime local values are the browser's local time; send them as UTC.
   const startDate = new Date(start);
   const endDate   = new Date(end);
 
-  // S18: an end earlier than its start is rejected rather than stored.
+  // an end earlier than its start is rejected rather than stored.
   if (endDate <= startDate) {
     alert('End time must be after start time.');
     return;
   }
 
-  // S18: an overlapping period warns before it is stored.
-  if (hasOverlap(vehicle, startDate, endDate, editingId)) {
-    warning.classList.add('visible');
-  } else {
-    warning.classList.remove('visible');
+  const body = {
+    vehicle_id: vehicle,
+    start: startDate.toISOString(),
+    end: endDate.toISOString(),
+    reason,
+  };
+  if (confirmOverlap) body.confirm = true;
+
+  let result;
+  try {
+    result = editingId
+      ? await downtimeRequest('PATCH', `/api/downtime/${editingId}`, body)
+      : await downtimeRequest('POST', '/api/downtime', body);
+  } catch (err) {
+    if (err.message !== 'Signed out') alert('Could not reach the server. The record was not saved.');
+    return;
   }
 
-  if (editingId) {
-    const rec = downtimeRecords.find(r => r.id === editingId);
-    if (rec) {
-      rec.vehicle = vehicle;
-      rec.start = start;
-      rec.end = end;
-      rec.reason = reason;
-    }
-    editingId = null;
-  } else {
-    downtimeRecords.push({ id: genId(), vehicle, start, end, reason });
+  const { ok, status, data } = result;
+  if (status === 409 && data?.overlaps) {
+    showOverlap(data.overlaps);
+    return;
+  }
+  if (!ok) {
+    alert(data?.error?.message ?? `Could not save the record (${status}).`);
+    return;
   }
 
+  editingId = null;
   clearDowntimeForm();
-  renderDowntime();
-
-  // TODO: POST /api/downtime (new) or PATCH /api/downtime/:id (edit) once S18 lands.
+  await loadDowntime();
 });
 
 document.getElementById('btn-downtime-cancel').addEventListener('click', () => {
@@ -165,28 +223,41 @@ function clearDowntimeForm() {
   document.getElementById('dt-reason').value = '';
   document.getElementById('downtime-form-title').textContent = 'ADD DOWNTIME RECORD';
   document.getElementById('btn-downtime-cancel').hidden = true;
-  document.getElementById('downtime-overlap-warning').classList.remove('visible');
+  resetOverlap();
 }
 
 function startEdit(id) {
   const rec = downtimeRecords.find(r => r.id === id);
   if (!rec) return;
   editingId = id;
-  document.getElementById('dt-vehicle').value = rec.vehicle;
-  document.getElementById('dt-start').value = rec.start;
-  document.getElementById('dt-end').value = rec.end;
+  resetOverlap();
+  document.getElementById('dt-vehicle').value = rec.vehicle_id;
+  document.getElementById('dt-start').value = toLocalInput(rec.start);
+  document.getElementById('dt-end').value = toLocalInput(rec.end);
   document.getElementById('dt-reason').value = rec.reason;
   document.getElementById('downtime-form-title').textContent = 'EDIT DOWNTIME RECORD';
   document.getElementById('btn-downtime-cancel').hidden = false;
   document.getElementById('tab-downtime').scrollIntoView({ behavior: 'smooth' });
 }
 
-function deleteRecord(id) {
+async function deleteRecord(id) {
   if (!confirm('Delete this downtime record?')) return;
-  downtimeRecords = downtimeRecords.filter(r => r.id !== id);
-  renderDowntime();
-
-  // TODO: DELETE /api/downtime/:id once S18 lands.
+  let result;
+  try {
+    result = await downtimeRequest('DELETE', `/api/downtime/${id}`);
+  } catch (err) {
+    if (err.message !== 'Signed out') alert('Could not reach the server. The record was not deleted.');
+    return;
+  }
+  if (!result.ok) {
+    alert(result.data?.error?.message ?? `Could not delete the record (${result.status}).`);
+    return;
+  }
+  if (editingId === id) {
+    editingId = null;
+    clearDowntimeForm();
+  }
+  await loadDowntime();
 }
 
-renderDowntime();
+loadDowntime();

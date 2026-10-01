@@ -8,6 +8,7 @@ __pycache__/
 .env
 claude.md
 data/live/
+data/admin/
 mobile/
 
 # S13 admin credentials and session key; see config/secrets.example.yaml
