@@ -27,7 +27,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const hideTimeline = view === 'rider';
     document.getElementById('vehicle-filter')?.classList.toggle('is-chrome-hidden', hideVehicle);
     document.getElementById('route-filter')?.classList.toggle('is-chrome-hidden', hideRoute);
-    document.getElementById('timeline-container')?.classList.toggle('is-chrome-hidden', hideTimeline);
+    // The date-range picker is the header calendar, with the period control
+    // inside its overlay, so the whole of it is hidden, bar and all.
+    document.querySelector('.app-header .period-picker')?.classList.toggle('is-chrome-hidden', hideTimeline);
   }
 
   function enterRiderDefaults() {
@@ -97,6 +99,8 @@ document.addEventListener('DOMContentLoaded', () => {
       utilTumCard.hidden = !isTum;
     });
   });
+
+  // The calendar's month bar and its overlay are placed by js/calendar.js.
 
   // Collapsible vehicle/route filter bars: click the "VEHICLE" or "ROUTE"
   // label to fold away its chip row, for a less cluttered or larger map on

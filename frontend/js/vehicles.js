@@ -9,12 +9,14 @@
 //
 // Clearing the filter restores the whole fleet.
 //
-// The selection is one vehicle or the whole fleet. A chip or a fleet row
-// selects that vehicle; "All vehicles", or the selected row again, clears it.
+// The selection is one or more vehicles, or the whole fleet. A chip or a
+// fleet row turns its vehicle on or off; "All vehicles" clears back to the
+// whole fleet. The chips are js/vehicle-chips.js, shared with the admin
+// Figures tab.
 
 (function () {
   let fleet = [];
-  let selected = null; // null means the whole fleet
+  let chips = null;
   let onChange = null;
   let latestRefresh = 0;
   let refreshError = null;
@@ -23,11 +25,15 @@
     return fleet.find((vehicle) => vehicle.id === id)?.name ?? `Vehicle ${id}`;
   }
 
-  function select(id) {
-    if (id === selected) return;
-    selected = id;
-    render();
-    onChange?.(selected);
+  // Set the selection from outside, announcing it as a click would:
+  //   select('2')     just that vehicle, as a row of the utilisation table;
+  //   select('1,2')   several, as getSelection() returned them, so a saved
+  //                   selection can be put back (the Rider tab, js/panels.js);
+  //   select(null)    the whole fleet.
+  function select(selection) {
+    const ids = selection ? String(selection).split(',').filter(Boolean) : [];
+    if (ids.length === 1) chips.only(ids[0]);
+    else chips.choose(ids);
   }
 
   // Refetch liveness. Called on every load, so it keeps pace with live polling.
@@ -70,7 +76,8 @@
 
   function rowHtml(vehicle) {
     const active = vehicle.status === 'active';
-    const classes = ['vehicle-row', active ? '' : 'is-offline', vehicle.id === selected ? 'is-selected' : '']
+    const picked = chips.get().includes(vehicle.id);
+    const classes = ['vehicle-row', active ? '' : 'is-offline', picked ? 'is-selected' : '']
       .filter(Boolean)
       .join(' ');
     return `
@@ -95,12 +102,7 @@
       ? 'Vehicles unavailable'
       : `${active} of ${fleet.length} active`;
 
-    const chip = (id, label, isActive) =>
-      `<button type="button" class="chip${isActive ? ' is-active' : ''}" data-vehicle="${escapeHtml(id)}">${escapeHtml(label)}</button>`;
-    document.getElementById('vehicle-filter-chips').innerHTML = [
-      chip('all', 'All vehicles', selected === null),
-      ...fleet.map((vehicle) => chip(vehicle.id, nameOf(vehicle.id), vehicle.id === selected)),
-    ].join('');
+    chips.setFleet(fleet);
 
     document.getElementById('vehicle-list').innerHTML = fleet.length
       ? fleet.map(rowHtml).join('')
@@ -119,16 +121,26 @@
   function init(options = {}) {
     onChange = options.onChange ?? null;
 
-    document.getElementById('vehicle-filter-chips').addEventListener('click', (event) => {
-      const chip = event.target.closest('.chip');
-      if (chip) select(chip.dataset.vehicle === 'all' ? null : chip.dataset.vehicle);
+    chips = VehicleChips.create(document.getElementById('vehicle-filter-chips'), {
+      onChange: () => {
+        render();
+        onChange?.(chips.query());
+      },
     });
 
+    // A fleet row works like its chip: on, or off again.
     document.getElementById('vehicle-list').addEventListener('click', (event) => {
       const row = event.target.closest('.vehicle-row');
-      if (row) select(row.dataset.vehicleRow === selected ? null : row.dataset.vehicleRow);
+      if (row) chips.toggle(row.dataset.vehicleRow);
     });
   }
 
-  window.Vehicles = { init, refresh, select, nameOf, getSelection: () => selected };
+  window.Vehicles = {
+    init,
+    refresh,
+    select,
+    nameOf,
+    // As the API's `vehicles` parameter: "1,2", or null for the whole fleet.
+    getSelection: () => chips.query(),
+  };
 })();
