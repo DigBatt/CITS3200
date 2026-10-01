@@ -10,6 +10,7 @@ from flask import Flask, jsonify, redirect, send_from_directory
 from backend.api.downtime import bp as downtime_bp
 from backend.api.earth import bp as earth_bp, load_google_maps_key
 from backend.api.metrics import bp as metrics_bp
+from backend.api.operating import bp as operating_bp
 from backend.api.pickup_requests import bp as pickup_requests_bp
 from backend.api.schedule import bp as schedule_bp
 from backend.api.positions import bp as positions_bp
@@ -85,6 +86,7 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
     app.register_blueprint(positions_bp)
     app.register_blueprint(vehicles_bp)
     app.register_blueprint(metrics_bp)
+    app.register_blueprint(operating_bp)
     app.register_blueprint(schedule_bp)
     app.register_blueprint(stops_bp)
     app.register_blueprint(pickup_requests_bp)

@@ -227,6 +227,38 @@ stop at now.
 
 ---
 
+## `GET /api/operating`
+
+When each vehicle was operating, split by whether that fell inside or outside
+its rostered service time. For the service calendar, which marks both on the
+mini month and draws them in each vehicle's lane. Same `vehicles`, `from` and
+`to` parameters, defaults and errors as `/api/metrics`.
+
+```json
+{
+  "from": "2025-09-03T16:00:00.000000Z",
+  "to": "2025-09-04T15:59:59.999999Z",
+  "vehicles": [
+    {
+      "vehicle_id": "1",
+      "intervals": [
+        { "start": "2025-09-04T08:21:10.484987Z", "end": "2025-09-04T08:58:37.495682Z", "in_schedule": true }
+      ]
+    }
+  ]
+}
+```
+
+Operating time is the time usage model's, working plus operating delay, so the
+intervals add up to the `operating_seconds` `/api/metrics` reports for the same
+window. Scheduled time is the vehicle's own roster (see `GET /api/schedule`), so
+an interval is cut wherever its service period opens or closes. With nothing
+rostered, everything is `in_schedule: false`; `in_schedule` is `null` only when
+no `display.timezone` is configured, since the roster cannot then be placed on
+a clock.
+
+---
+
 ## Downtime
 
 S18-S20. *Admin only.* When a shuttle was out of service.

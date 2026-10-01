@@ -26,6 +26,12 @@ function getPositionsExtent(query) {
   return request('/api/positions/extent', query);
 }
 
+// When each vehicle was operating, split by inside or outside its roster
+// (/api/operating), for the service calendar.
+function getOperating(query) {
+  return request('/api/operating', query);
+}
+
 function getMetrics(query) {
   return request('/api/metrics', query);
 }

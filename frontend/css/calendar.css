@@ -6,6 +6,11 @@
    not mistaken for the red now line and today marker. */
 :root {
   --cal-downtime: #f97316;
+  /* Operating time (/api/operating): green inside the roster, pink outside
+     it. Apart from the blue roster, orange downtime, red now line and every
+     vehicle colour. */
+  --cal-op-in: #059669;
+  --cal-op-out: #db2777;
 }
 
 .cal {
@@ -88,6 +93,8 @@
   opacity: 0.8;
 }
 .cal-swatch.is-now { background: var(--cal-now); border-color: var(--cal-now); }
+.cal-swatch.is-op-in { background: var(--cal-op-in); border-color: var(--cal-op-in); }
+.cal-swatch.is-op-out { background: var(--cal-op-out); border-color: var(--cal-op-out); }
 
 /* Navigation: step by a day in the 3 day view, by a week in the 7 day one */
 .cal-controls {
@@ -437,10 +444,13 @@ button.cal-day-head[aria-disabled='true']:hover { background: transparent; }
 
 .mini-mark.is-service { background: rgba(56, 189, 248, 0.9); }
 .mini-mark.is-downtime { background: var(--cal-downtime); }
+.mini-mark.is-op-in { background: var(--cal-op-in); }
+.mini-mark.is-op-out { background: var(--cal-op-out); }
 
 .mini-legend {
   display: flex;
-  gap: 0.6rem;
+  flex-wrap: wrap; /* four keys now: service, downtime, and operating in and outside schedule */
+  gap: 0.25rem 0.6rem;
   font-size: 0.6rem;
   opacity: 0.7;
 }
@@ -974,4 +984,26 @@ body.is-overlaid { overflow: hidden; }
 
 .timeline-status:empty {
   display: none;
+}
+
+/* Operating time in a vehicle's lane: a bar down its middle, over the
+   roster band, so whether it falls inside scheduled time is plain to see. */
+.cal-operating {
+  position: absolute;
+  left: 35%;
+  right: 35%;
+  min-height: 2px;
+  border-radius: 2px;
+}
+
+.cal-operating.is-in { background: var(--cal-op-in); }
+.cal-operating.is-out { background: var(--cal-op-out); }
+.cal-operating.is-unknown { background: rgba(28, 25, 23, 0.45); }
+.cal-operating.is-linked { cursor: pointer; }
+
+.cal-operating.is-linked:hover,
+.cal-operating.is-linked:focus-visible {
+  outline: 2px solid var(--cal-vehicle, #2f7d8f);
+  outline-offset: 1px;
+  z-index: 3;
 }

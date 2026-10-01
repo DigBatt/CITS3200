@@ -68,6 +68,30 @@
     }
   }
 
+  // Operating time from /api/operating, flattened to one list:
+  // [{ vehicle, start, end, inSchedule }], with Dates. It is drawn over the
+  // roster and downtime rather than needed by them, so a failure here leaves
+  // the list empty and the rest of the calendar as it was.
+  async function loadOperating(from, to) {
+    try {
+      const data = await getOperating({ from: from.toISOString(), to: to.toISOString() });
+      return (data.vehicles ?? []).flatMap((vehicle) =>
+        vehicle.intervals.map((interval) => ({
+          vehicle: vehicle.vehicle_id,
+          start: new Date(interval.start),
+          end: new Date(interval.end),
+          inSchedule: interval.in_schedule,
+        })));
+    } catch {
+      return [];
+    }
+  }
+
+  // The words for an interval's state, for titles and the legends.
+  const operatingLabel = (inSchedule) =>
+    inSchedule === true ? 'operating in schedule' : inSchedule === false ? 'operating outside schedule' : 'operating';
+  const operatingClass = (inSchedule) => (inSchedule === true ? 'is-in' : inSchedule === false ? 'is-out' : 'is-unknown');
+
   function create(container, options = {}) {
     // The dashboard is fixed at a week; the admin page can switch.
     const fixedSpan = options.fixedDays ?? null;
@@ -90,6 +114,7 @@
     let schedule = null;
     let vehicles = [];
     let downtime = [];
+    let operating = [];
     let shown = null;
     let error = null;
     let loading = false;
@@ -115,15 +140,17 @@
 
       loading = true;
       try {
-        const [scheduleData, vehicleData, downtimeRecords] = await Promise.all([
+        const [scheduleData, vehicleData, downtimeRecords, operatingData] = await Promise.all([
           getSchedule(),
           getVehicles(),
           loadDowntimeRecords(from, to),
+          loadOperating(from, to),
         ]);
 
         schedule = scheduleData;
         vehicles = vehicleData.vehicles ?? [];
         downtime = downtimeRecords;
+        operating = operatingData;
         if (shown === null) shown = new Set(vehicles.map((vehicle) => vehicle.id));
         error = null;
       } catch (exc) {
@@ -143,6 +170,22 @@
           from: clockMinutes(period.start),
           to: clockMinutes(period.end),
           label: `${period.start}–${period.end}`,
+        }));
+    }
+
+    // This vehicle's operating time on one day, clipped to it, each piece
+    // keeping its whole interval for opening in Figures.
+    function operatingFor(day, vehicleId) {
+      const next = new Date(day.getTime() + DAY_MS);
+      return operating
+        .filter((interval) => interval.vehicle === vehicleId && interval.start < next && interval.end > day)
+        .map((interval) => ({
+          from: Math.max(0, minutesInto(day, interval.start)),
+          to: Math.min(DAY_MINUTES, minutesInto(day, interval.end)),
+          inSchedule: interval.inSchedule,
+          label: `${hhmm(interval.start)}–${hhmm(interval.end)}`,
+          startIso: interval.start.toISOString(),
+          endIso: interval.end.toISOString(),
         }));
     }
 
@@ -197,7 +240,16 @@
                 { vehicle: vehicle.id, from: block.startIso, to: block.endIso }),
             )
             .join('');
-          return `<div class="cal-lane" style="left:${pct((index * width) / 100)};width:${pct(width / 100)};--cal-vehicle:${escape(vehicle.colour ?? 'currentColor')}" title="${escape(vehicle.name ?? vehicle.id)}">${scheduled}${down}</div>`;
+          // Operating time: a bar down the middle of the lane, over the roster,
+          // so whether it falls inside a scheduled band is plain to see.
+          const ops = operatingFor(day, vehicle.id)
+            .map((block) =>
+              band(block.from, block.to, `cal-operating ${operatingClass(block.inSchedule)}`,
+                `${vehicle.name ?? vehicle.id} ${operatingLabel(block.inSchedule)} ${block.label}`, '',
+                { vehicle: vehicle.id, from: block.startIso, to: block.endIso }),
+            )
+            .join('');
+          return `<div class="cal-lane" style="left:${pct((index * width) / 100)};width:${pct(width / 100)};--cal-vehicle:${escape(vehicle.colour ?? 'currentColor')}" title="${escape(vehicle.name ?? vehicle.id)}">${scheduled}${down}${ops}</div>`;
         })
         .join('');
 
@@ -299,6 +351,8 @@
             <span class="cal-key"><span class="cal-swatch is-scheduled"></span>Scheduled</span>
             <span class="cal-key"><span class="cal-swatch is-unscheduled"></span>Non-scheduled</span>
             <span class="cal-key"><span class="cal-swatch is-downtime"></span>Downtime</span>
+            <span class="cal-key"><span class="cal-swatch is-op-in"></span>Operating in schedule</span>
+            <span class="cal-key"><span class="cal-swatch is-op-out"></span>Operating outside schedule</span>
             <span class="cal-key"><span class="cal-swatch is-now"></span>Now</span>
             ${range ? `
             <span class="cal-key"><span class="cal-swatch is-outside-period"></span>Outside selected period</span>
@@ -771,6 +825,7 @@
 
     let schedule = null;
     let downtime = [];
+    let operating = [];
     let error = null;
     // A press in progress: the day it started on, the day under the pointer,
     // and whether it has moved to another day, which makes it a drag.
@@ -792,12 +847,16 @@
     async function refresh() {
       const window = cells();
       try {
-        const [scheduleData, downtimeRecords] = await Promise.all([
+        const from = window[0];
+        const to = new Date(window[41].getTime() + DAY_MS);
+        const [scheduleData, downtimeRecords, operatingData] = await Promise.all([
           getSchedule(),
-          loadDowntimeRecords(window[0], new Date(window[41].getTime() + DAY_MS)),
+          loadDowntimeRecords(from, to),
+          loadOperating(from, to),
         ]);
         schedule = scheduleData;
         downtime = downtimeRecords;
+        operating = operatingData;
         error = null;
       } catch (exc) {
         error = exc.message;
@@ -810,6 +869,13 @@
     const hasDowntime = (day) => {
       const next = new Date(day.getTime() + DAY_MS);
       return downtime.some((record) => new Date(record.start) < next && new Date(record.end) > day);
+    };
+
+    // Whether any vehicle operated that day in schedule (true) or outside it
+    // (false); the month is fleet wide, like its other marks.
+    const hasOperating = (day, inSchedule) => {
+      const next = new Date(day.getTime() + DAY_MS);
+      return operating.some((interval) => interval.inSchedule === inSchedule && interval.start < next && interval.end > day);
     };
 
     // The month bar: an expand button, the month arrows, and the month name,
@@ -856,6 +922,8 @@
           const marks = [
             hasService(day) ? '<span class="mini-mark is-service"></span>' : '',
             hasDowntime(day) ? '<span class="mini-mark is-downtime"></span>' : '',
+            hasOperating(day, true) ? '<span class="mini-mark is-op-in"></span>' : '',
+            hasOperating(day, false) ? '<span class="mini-mark is-op-out"></span>' : '',
           ].join('');
           const future = Boolean(max) && isoDate(day) > max;
           const classes = [
@@ -891,6 +959,8 @@
           <div class="mini-legend">
             <span><span class="mini-mark is-service"></span>Service</span>
             <span><span class="mini-mark is-downtime"></span>Downtime</span>
+            <span title="Operating within its rostered service time"><span class="mini-mark is-op-in"></span>Ran in schedule</span>
+            <span title="Operating outside its rostered service time"><span class="mini-mark is-op-out"></span>Ran outside</span>
           </div>
         </div>`;
       paint();
