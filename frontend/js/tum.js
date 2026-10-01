@@ -11,7 +11,8 @@
 
 (function () {
   // Headline KPIs, in the order the Figures tab lists them: the three the
-  // telemetry supports first, then the five that need data it does not have.
+  // telemetry supports first, then the four that need the downtime log
+  // (S19), then the one that needs passenger counts.
   const KPIS = [
     {
       key: 'asset_utilisation',
@@ -90,8 +91,8 @@
 
   /**
    * One vehicle's figures, or a selection's pooled into one: times summed as
-   * vehicle-hours, and the three supported KPIs worked out again from those
-   * sums rather than averaged. A reason holds for the pool only if it holds
+   * vehicle-hours, and the KPIs worked out again from those sums rather than
+   * averaged. A reason holds for the pool only if it holds
    * for every vehicle; otherwise the pooled figure stands on the vehicles
    * that do have it. Notes are pooled the same way.
    */
@@ -107,15 +108,31 @@
 
     const kpis = {};
     for (const key of keysOf(entries, 'kpis')) kpis[key] = null;
+    // S19: the availability KPIs, from the downtime log. Null for the pool
+    // when any vehicle's downtime is unknown, since the sums above are.
+    const operating = buckets.scheduled_operating_seconds;
+    const downtime = buckets.downtime_seconds;
     Object.assign(kpis, {
       asset_utilisation: ratio(buckets.operating_seconds, buckets.calendar_seconds),
       effective_utilisation: ratio(buckets.scheduled_working_seconds, buckets.scheduled_seconds),
       operating_efficiency: ratio(buckets.working_seconds, buckets.operating_seconds),
+      uptime: ratio(buckets.available_seconds, buckets.calendar_seconds),
+      mechanical_availability: operating != null && downtime != null ? ratio(operating, operating + downtime) : null,
+      physical_availability: ratio(buckets.available_seconds, buckets.scheduled_seconds),
+      use_of_availability: ratio(operating, buckets.available_seconds),
     });
 
     const unavailable = {};
     for (const key of keysOf(entries, 'unavailable')) {
       if (entries.every((entry) => entry.unavailable[key])) unavailable[key] = entries[0].unavailable[key];
+    }
+    // A pooled KPI can still come out null when only some vehicles lack it,
+    // e.g. one bus with no available time; borrow that vehicle's reason
+    // rather than fall back to the generic one.
+    for (const key of Object.keys(kpis)) {
+      if (kpis[key] != null || unavailable[key]) continue;
+      const reason = entries.find((entry) => entry.unavailable[key])?.unavailable[key];
+      if (reason) unavailable[key] = reason;
     }
 
     // Notes (e.g. "no service schedule is in the system") follow the same
@@ -124,6 +141,9 @@
     for (const key of keysOf(entries, 'notes')) {
       if (entries.every((entry) => entry.notes?.[key])) notes[key] = entries[0].notes[key];
     }
+    // Except the downtime summary, whose figures are one bus's own: the
+    // Figures tab lists each vehicle's instead (js/figures.js).
+    delete notes.downtime_seconds;
 
     return { buckets, kpis, unavailable, notes };
   }

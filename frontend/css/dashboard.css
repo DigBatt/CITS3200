@@ -245,6 +245,7 @@ empty until the API has events and stops. Layout only. The period control's
   --util-wt: oklch(0.44 0.16 300);
   --util-od: oklch(0.66 0.15 55);
   --util-sb: oklch(0.56 0.08 200);
+  --util-dt: oklch(0.55 0.17 25);
   --util-nr: oklch(0.6 0.01 60);
   --util-st: oklch(0.52 0.1 245);
   --util-ut: oklch(0.68 0.02 245);

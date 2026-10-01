@@ -581,6 +581,16 @@
   color: rgba(28, 25, 23, 0.5);
 }
 
+/* A real figure that needs explaining, e.g. how downtime was applied (S19) */
+.figures-time-note {
+  display: block;
+  max-width: 60ch;
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: oklch(0.45 0.1 245);
+}
+
 .figures-time .figure-unavailable { font-size: 12.5px; }
 
 @media (max-width: 700px) {
