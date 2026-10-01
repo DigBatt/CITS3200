@@ -16,7 +16,7 @@ END = "2026-09-17T03:00:00Z"
 
 @pytest.fixture
 def client(tmp_path):
-    config = replace(load_config(), downtime_database=tmp_path / "downtime.sqlite3")
+    config = replace(load_config(), downtime_file=tmp_path / "downtime.json")
     app = create_app(config)
     app.config.update(TESTING=True)
     with app.test_client() as test_client:
@@ -48,7 +48,7 @@ def test_a_stored_record_survives_a_new_request(client):
 
 def test_records_persist_across_app_instances(client, tmp_path):
     post(client)
-    config = replace(load_config(), downtime_database=tmp_path / "downtime.sqlite3")
+    config = replace(load_config(), downtime_file=tmp_path / "downtime.json")
     with create_app(config).test_client() as second:
         assert len(second.get("/api/downtime").get_json()["records"]) == 1
 

@@ -1,29 +1,50 @@
 """
-Operator reported downtime, stored in SQLite.
+Operator reported downtime, stored in a JSON file.
 
 Downtime is the one bucket of the time usage model the telemetry cannot
 answer (backend/metrics/tum.py), so operators report it themselves on the
 admin page. This module is only the store; the endpoints over it are S18.
 
-SQLite rather than a CSV because these records are edited and deleted, while
-CsvRepository is append only: its incremental reader assumes a file it has
-already read only ever grows. sqlite3 is in the standard library, so this
-adds no dependency.
+A JSON file rather than a CSV because these records are edited and deleted,
+while CsvRepository is append only: its incremental reader assumes a file it
+has already read only ever grows. JSON rather than a database because there
+are few of them, written by hand, and a plain file can be read, diffed and
+fixed without any tool. json is in the standard library, so this adds no
+dependency.
 
-Times are stored in the canonical UTC form of backend.models.format_timestamp,
-which is fixed width and so compares and sorts correctly as text. Bounds are
-half open, `start` inclusive to `end` exclusive, so two records that merely
-touch do not overlap. That is the rule the admin page already applies before
-it saves.
+The file is a version number and the records, in the order `list` returns
+them:
+
+    {
+      "version": 1,
+      "records": [
+        {"id": "...", "vehicle_id": "1",
+         "start": "2026-09-17T01:00:00.123456Z", "end": "...",
+         "reason": "Brake fault", "created_at": "...", "updated_at": "..."}
+      ]
+    }
+
+Every write replaces the whole file: it is written beside the old one and then
+renamed over it, which is atomic, so a reader, or a crash mid write, never sees
+half a file. Before each operation the store checks whether the file changed
+under it, as when a second server process wrote, and reads it again if so.
+
+Times are stored in the canonical UTC form of backend.models.format_timestamp.
+Bounds are half open, `start` inclusive to `end` exclusive, so two records that
+merely touch do not overlap. That is the rule the admin page already applies
+before it saves.
 """
 
 from __future__ import annotations
+import json
 import logging
-import sqlite3
+import os
+import tempfile
 import threading
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
+from typing import Optional, Sequence
 from uuid import uuid4
 
 from backend.models import Downtime, Vehicle, format_timestamp, parse_timestamp
@@ -31,40 +52,33 @@ from backend.repository.base import RepositoryError
 
 log = logging.getLogger(__name__)
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS downtime (
-    id          TEXT PRIMARY KEY,
-    vehicle_id  TEXT NOT NULL,
-    start_time  TEXT NOT NULL,
-    end_time    TEXT NOT NULL,
-    reason      TEXT NOT NULL,
-    created_at  TEXT NOT NULL,
-    updated_at  TEXT NOT NULL,
-    CHECK (end_time > start_time),
-    CHECK (reason <> '')
-);
-CREATE INDEX IF NOT EXISTS downtime_vehicle_start ON downtime (vehicle_id, start_time);
-"""
-
-_COLUMNS = "id, vehicle_id, start_time, end_time, reason, created_at, updated_at"
+FORMAT_VERSION = 1
 
 #: Messages of the two ValueErrors a write raises, so a caller can tell them
 #: apart without matching on prose.
 END_BEFORE_START = "A downtime record must end after it starts"
 EMPTY_REASON = "A downtime record needs a reason"
 
+_FIELDS = ("id", "vehicle_id", "start", "end", "reason", "created_at", "updated_at")
+
 
 class DowntimeStore:
     """
-    Downtime records in a SQLite file.
+    Downtime records in a JSON file.
 
     Parameters
     ----------
-    database_path : Path or str
-        The SQLite file. Created, with its parent directory, if missing.
+    path : Path or str
+        The JSON file. Created, with its parent directory, if missing.
     vehicles : sequence of Vehicle, optional
         The configured fleet. Writes naming an id outside it are refused. None
         skips that check, for a caller that has already validated the id.
+
+    Raises
+    ------
+    RepositoryError
+        If the file exists but cannot be read as downtime records. It is never
+        overwritten in that case, so nothing in it is lost.
 
     Notes
     -----
@@ -72,11 +86,14 @@ class DowntimeStore:
     vehicle since retired still comes back. Only writes are checked.
     """
 
-    def __init__(self, database_path: Path | str, vehicles: Optional[Sequence[Vehicle]] = None):
-        self.database_path = Path(database_path)
+    def __init__(self, path: Path | str, vehicles: Optional[Sequence[Vehicle]] = None):
+        self.path = Path(path)
         self._known_ids = None if vehicles is None else {v.id for v in vehicles}
         self._lock = threading.Lock()
-        self._connection = self._connect()
+        self._records: list[Downtime] = []
+        self._signature = None  # (mtime_ns, size) of the file as last read
+        with self._lock:
+            self._open()
 
     @classmethod
     def from_config(cls, config) -> "DowntimeStore":
@@ -94,39 +111,14 @@ class DowntimeStore:
         Raises
         ------
         RepositoryError
-            If `data.downtime_database` is unset, since records would
-            otherwise be written to a path that was never configured.
+            If `data.downtime_file` is unset, since records would otherwise be
+            written to a path that was never configured.
         """
-        if config.downtime_database is None:
-            raise RepositoryError("config/app.yaml does not set data.downtime_database")
-        return cls(config.downtime_database, config.vehicles)
+        if config.downtime_file is None:
+            raise RepositoryError("config/app.yaml does not set data.downtime_file")
+        return cls(config.downtime_file, config.vehicles)
 
-    def _connect(self) -> sqlite3.Connection:
-        """
-        Open the file and apply the schema.
-
-        Returns
-        -------
-        sqlite3.Connection
-
-        Raises
-        ------
-        RepositoryError
-            If the file cannot be opened or the schema cannot be applied.
-        """
-        try:
-            self.database_path.parent.mkdir(parents=True, exist_ok=True)
-            # Flask serves requests on several threads; the lock below, not
-            # sqlite3's own check, is what keeps use of this handle serial.
-            connection = sqlite3.connect(self.database_path, check_same_thread=False)
-            connection.row_factory = sqlite3.Row
-            # WAL so the logger process can read while the admin page writes.
-            connection.execute("PRAGMA journal_mode=WAL")
-            connection.executescript(SCHEMA)
-            connection.commit()
-            return connection
-        except (OSError, sqlite3.Error) as exc:
-            raise RepositoryError(f"Could not open the downtime database at {self.database_path}: {exc}") from exc
+    # ---- Reading ----
 
     def list(
         self,
@@ -152,22 +144,18 @@ class DowntimeStore:
             One flat list, not grouped per vehicle: these are sparse, and
             callers want them in time order.
         """
-        clauses, parameters = [], []
-
-        requested = list(dict.fromkeys(vehicle_ids or []))
-        if requested:
-            clauses.append(f"vehicle_id IN ({','.join('?' * len(requested))})")
-            parameters.extend(requested)
-        if start is not None:
-            clauses.append("end_time > ?")
-            parameters.append(format_timestamp(start))
-        if end is not None:
-            clauses.append("start_time < ?")
-            parameters.append(format_timestamp(end))
-
-        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
-        rows = self._query(f"SELECT {_COLUMNS} FROM downtime{where} ORDER BY start_time, vehicle_id, id", parameters)
-        return [self._to_record(row) for row in rows]
+        wanted = set(vehicle_ids or [])
+        start = None if start is None else parse_timestamp(start)
+        end = None if end is None else parse_timestamp(end)
+        with self._lock:
+            self._refresh()
+            return [
+                record
+                for record in self._records
+                if (not wanted or record.vehicle_id in wanted)
+                and (start is None or record.end > start)
+                and (end is None or record.start < end)
+            ]
 
     def get(self, record_id: str) -> Optional[Downtime]:
         """
@@ -182,8 +170,45 @@ class DowntimeStore:
         Downtime or None
             None if no record has that id.
         """
-        rows = self._query(f"SELECT {_COLUMNS} FROM downtime WHERE id = ?", [str(record_id)])
-        return self._to_record(rows[0]) if rows else None
+        with self._lock:
+            self._refresh()
+            return self._find(str(record_id))
+
+    def overlapping(
+        self, vehicle_id: str, start: datetime, end: datetime, exclude_id: Optional[str] = None
+    ) -> list[Downtime]:
+        """
+        Records for one vehicle that clash with a period.
+
+        The rule the admin page applies before saving: two periods overlap
+        when each starts before the other ends.
+
+        Parameters
+        ----------
+        vehicle_id : str
+        start, end : datetime
+            The proposed UTC bounds.
+        exclude_id : str, optional
+            A record to ignore, so editing one does not clash with itself.
+
+        Returns
+        -------
+        list of Downtime
+            Empty when the period is clear.
+        """
+        start, end = parse_timestamp(start), parse_timestamp(end)
+        with self._lock:
+            self._refresh()
+            return [
+                record
+                for record in self._records
+                if record.vehicle_id == str(vehicle_id)
+                and record.start < end
+                and record.end > start
+                and (exclude_id is None or record.id != str(exclude_id))
+            ]
+
+    # ---- Writing ----
 
     def add(self, vehicle_id: str, start: datetime, end: datetime, reason: str) -> Downtime:
         """
@@ -214,15 +239,16 @@ class DowntimeStore:
             If the vehicle is not in the configured fleet, or the write fails.
         """
         vehicle_id, start, end, reason = self._validate(vehicle_id, start, end, reason)
-        now = format_timestamp(datetime.now(timezone.utc))
-        record_id = uuid4().hex
-
-        self._write(
-            f"INSERT INTO downtime ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [record_id, vehicle_id, format_timestamp(start), format_timestamp(end), reason, now, now],
+        now = _now()
+        record = Downtime(
+            id=uuid4().hex, vehicle_id=vehicle_id, start=start, end=end,
+            reason=reason, created_at=now, updated_at=now,
         )
-        log.info("stored downtime %s for %s", record_id, vehicle_id)
-        return self.get(record_id)
+        with self._lock:
+            self._refresh()
+            self._save([*self._records, record])
+        log.info("stored downtime %s for %s", record.id, vehicle_id)
+        return record
 
     def update(
         self,
@@ -254,28 +280,25 @@ class DowntimeStore:
         RepositoryError
             If the vehicle is not in the configured fleet, or the write fails.
         """
-        existing = self.get(record_id)
-        if existing is None:
-            return None
+        with self._lock:
+            self._refresh()
+            existing = self._find(str(record_id))
+            if existing is None:
+                return None
 
-        merged = self._validate(
-            existing.vehicle_id if vehicle_id is None else vehicle_id,
-            existing.start if start is None else start,
-            existing.end if end is None else end,
-            existing.reason if reason is None else reason,
-        )
-        self._write(
-            "UPDATE downtime SET vehicle_id = ?, start_time = ?, end_time = ?, reason = ?, updated_at = ? WHERE id = ?",
-            [
-                merged[0],
-                format_timestamp(merged[1]),
-                format_timestamp(merged[2]),
-                merged[3],
-                format_timestamp(datetime.now(timezone.utc)),
-                str(record_id),
-            ],
-        )
-        return self.get(record_id)
+            merged = self._validate(
+                existing.vehicle_id if vehicle_id is None else vehicle_id,
+                existing.start if start is None else start,
+                existing.end if end is None else end,
+                existing.reason if reason is None else reason,
+            )
+            updated = replace(
+                existing,
+                vehicle_id=merged[0], start=merged[1], end=merged[2], reason=merged[3],
+                updated_at=_now(),
+            )
+            self._save([updated if r.id == existing.id else r for r in self._records])
+            return updated
 
     def delete(self, record_id: str) -> bool:
         """
@@ -295,37 +318,114 @@ class DowntimeStore:
         RepositoryError
             If the write fails.
         """
-        return self._write("DELETE FROM downtime WHERE id = ?", [str(record_id)]) > 0
+        with self._lock:
+            self._refresh()
+            kept = [r for r in self._records if r.id != str(record_id)]
+            if len(kept) == len(self._records):
+                return False
+            self._save(kept)
+            return True
 
-    def overlapping(
-        self, vehicle_id: str, start: datetime, end: datetime, exclude_id: Optional[str] = None
-    ) -> list[Downtime]:
+    # ---- The file ----
+
+    def _open(self) -> None:
         """
-        Records for one vehicle that clash with a period.
-
-        The rule the admin page applies before saving: two periods overlap
-        when each starts before the other ends.
-
-        Parameters
-        ----------
-        vehicle_id : str
-        start, end : datetime
-            The proposed UTC bounds.
-        exclude_id : str, optional
-            A record to ignore, so editing one does not clash with itself.
-
-        Returns
-        -------
-        list of Downtime
-            Empty when the period is clear.
+        Read the file, or create it empty if it does not exist yet.
         """
-        query = f"SELECT {_COLUMNS} FROM downtime WHERE vehicle_id = ? AND start_time < ? AND end_time > ?"
-        parameters = [str(vehicle_id), format_timestamp(end), format_timestamp(start)]
-        if exclude_id is not None:
-            query += " AND id <> ?"
-            parameters.append(str(exclude_id))
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise RepositoryError(f"Could not create the folder for {self.path}: {exc}") from exc
+        if self.path.exists():
+            self._read()
+        else:
+            self._save([])
 
-        return [self._to_record(row) for row in self._query(f"{query} ORDER BY start_time, id", parameters)]
+    def _refresh(self) -> None:
+        """
+        Read the file again if it changed since it was last read or written,
+        as when another process wrote to it. Called under the lock.
+        """
+        try:
+            stat = self.path.stat()
+        except FileNotFoundError:
+            # Deleted from under the store: start again empty, as on a new
+            # install, rather than resurrecting what was in memory.
+            log.warning("%s disappeared; starting a new, empty downtime file", self.path)
+            self._save([])
+            return
+        except OSError as exc:
+            raise RepositoryError(f"Could not read {self.path}: {exc}") from exc
+        if (stat.st_mtime_ns, stat.st_size) != self._signature:
+            self._read()
+
+    def _read(self) -> None:
+        """
+        Load every record from the file. Called under the lock.
+
+        Raises
+        ------
+        RepositoryError
+            If the file is not valid JSON, is of an unknown version, or holds
+            a record that is incomplete or unreadable. The file is left as it
+            is, for someone to fix.
+        """
+        try:
+            stat = self.path.stat()
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RepositoryError(f"Could not read the downtime file {self.path}: {exc}") from exc
+
+        if not isinstance(data, dict) or data.get("version") != FORMAT_VERSION:
+            raise RepositoryError(f"{self.path} is not a version {FORMAT_VERSION} downtime file")
+
+        records = []
+        for index, raw in enumerate(data.get("records") or []):
+            try:
+                records.append(_from_json(raw))
+            except (KeyError, TypeError, ValueError, AttributeError) as exc:
+                raise RepositoryError(f"{self.path}: record {index} is unreadable: {exc}") from exc
+
+        self._records = _sorted(records)
+        self._signature = (stat.st_mtime_ns, stat.st_size)
+
+    def _save(self, records: list[Downtime]) -> None:
+        """
+        Replace the file with these records. Called under the lock.
+
+        Written to a temporary file in the same folder, flushed to disk, then
+        renamed over the real one, so the file on disk is always either the
+        old records or the new, never a mix.
+        """
+        records = _sorted(records)
+        payload = json.dumps(
+            {"version": FORMAT_VERSION, "records": [_to_json(r) for r in records]},
+            indent=2,
+            ensure_ascii=False,
+        )
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=self.path.parent, prefix=f".{self.path.name}.", suffix=".tmp", delete=False
+            ) as handle:
+                temporary = Path(handle.name)
+                handle.write(payload + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, self.path)
+            temporary = None
+            stat = self.path.stat()
+        except OSError as exc:
+            raise RepositoryError(f"Could not write the downtime file {self.path}: {exc}") from exc
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+
+        self._records = records
+        self._signature = (stat.st_mtime_ns, stat.st_size)
+
+    def _find(self, record_id: str) -> Optional[Downtime]:
+        return next((r for r in self._records if r.id == record_id), None)
 
     def _validate(
         self, vehicle_id: str, start: datetime, end: datetime, reason: str
@@ -359,56 +459,48 @@ class DowntimeStore:
 
         return vehicle_id, start, end, reason
 
-    def _query(self, statement: str, parameters: Sequence) -> list[sqlite3.Row]:
-        """
-        Run a read.
-        """
-        try:
-            with self._lock:
-                return self._connection.execute(statement, tuple(parameters)).fetchall()
-        except sqlite3.Error as exc:
-            raise RepositoryError(f"Could not read the downtime database: {exc}") from exc
-
-    def _write(self, statement: str, parameters: Sequence) -> int:
-        """
-        Run a write and commit it.
-
-        Returns
-        -------
-        int
-            Rows affected.
-        """
-        try:
-            with self._lock:
-                cursor = self._connection.execute(statement, tuple(parameters))
-                self._connection.commit()
-                return cursor.rowcount
-        except sqlite3.IntegrityError as exc:
-            raise RepositoryError(f"Rejected by the downtime database: {exc}") from exc
-        except sqlite3.Error as exc:
-            raise RepositoryError(f"Could not write to the downtime database: {exc}") from exc
-
-    @staticmethod
-    def _to_record(row: sqlite3.Row) -> Downtime:
-        """
-        One stored row as a Downtime.
-        """
-        return Downtime(
-            id=row["id"],
-            vehicle_id=row["vehicle_id"],
-            start=parse_timestamp(row["start_time"]),
-            end=parse_timestamp(row["end_time"]),
-            reason=row["reason"],
-            created_at=parse_timestamp(row["created_at"]),
-            updated_at=parse_timestamp(row["updated_at"]),
-        )
-
     def close(self) -> None:
         """
-        Release the handle.
+        Nothing to release: the file is only open while it is read or written.
+        Kept so callers that closed the SQLite store need not change.
         """
-        with self._lock:
-            self._connection.close()
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({str(self.database_path)!r})"
+        return f"{type(self).__name__}({str(self.path)!r})"
+
+
+def _now() -> datetime:
+    # Round-tripped through the stored form, so a record returned by a write
+    # equals the same record read back from the file.
+    return parse_timestamp(format_timestamp(datetime.now(timezone.utc)))
+
+
+def _sorted(records: list[Downtime]) -> list[Downtime]:
+    return sorted(records, key=lambda r: (r.start, r.vehicle_id, r.id))
+
+
+def _to_json(record: Downtime) -> dict:
+    return {
+        "id": record.id,
+        "vehicle_id": record.vehicle_id,
+        "start": format_timestamp(record.start),
+        "end": format_timestamp(record.end),
+        "reason": record.reason,
+        "created_at": format_timestamp(record.created_at),
+        "updated_at": format_timestamp(record.updated_at),
+    }
+
+
+def _from_json(raw: dict) -> Downtime:
+    missing = [field for field in _FIELDS if field not in raw]
+    if missing:
+        raise KeyError(", ".join(missing))
+    return Downtime(
+        id=str(raw["id"]),
+        vehicle_id=str(raw["vehicle_id"]),
+        start=parse_timestamp(raw["start"]),
+        end=parse_timestamp(raw["end"]),
+        reason=str(raw["reason"]),
+        created_at=parse_timestamp(raw["created_at"]),
+        updated_at=parse_timestamp(raw["updated_at"]),
+    )

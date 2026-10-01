@@ -15,7 +15,7 @@ T0 = datetime(2026, 9, 17, 1, 0, 0, 123456, tzinfo=timezone.utc)
 
 
 def make_store(tmp_path, ids=("1", "2")) -> DowntimeStore:
-    return DowntimeStore(tmp_path / "downtime.sqlite3", [Vehicle(id=i) for i in ids])
+    return DowntimeStore(tmp_path / "downtime.json", [Vehicle(id=i) for i in ids])
 
 
 def add(store, vehicle_id="1", start_h=0.0, hours=1.0, reason="Brake fault") -> Downtime:
@@ -41,9 +41,9 @@ def test_records_survive_reopening_the_file(tmp_path):
 
 
 def test_creates_missing_directory(tmp_path):
-    store = DowntimeStore(tmp_path / "live" / "downtime.sqlite3", [Vehicle(id="1")])
+    store = DowntimeStore(tmp_path / "live" / "downtime.json", [Vehicle(id="1")])
     add(store)
-    assert (tmp_path / "live" / "downtime.sqlite3").exists()
+    assert (tmp_path / "live" / "downtime.json").exists()
 
 
 def test_ids_are_assigned_and_unique(tmp_path):
@@ -161,12 +161,12 @@ def test_unknown_vehicle_rejected_before_any_write(tmp_path):
 
 
 def test_unknown_vehicle_allowed_when_no_fleet_given(tmp_path):
-    store = DowntimeStore(tmp_path / "downtime.sqlite3")
+    store = DowntimeStore(tmp_path / "downtime.json")
     assert add(store, "99").vehicle_id == "99"
 
 
 def test_reads_are_not_filtered_by_the_configured_fleet(tmp_path):
-    stored = add(DowntimeStore(tmp_path / "downtime.sqlite3"), "retired")
+    stored = add(DowntimeStore(tmp_path / "downtime.json"), "retired")
     assert make_store(tmp_path).get(stored.id) == stored
 
 
@@ -209,7 +209,7 @@ def test_from_config_needs_the_database_path(tmp_path):
     from backend.config import Config
 
     blank = Config(
-        vehicles=[], data_directory=None, live_directory=None, downtime_database=None,
+        vehicles=[], data_directory=None, live_directory=None, downtime_file=None,
         inactivity_threshold_seconds=None, expected_poll_interval_seconds=None, timezone=None,
         utc_offset_hours=None, map_centre=None, map_zoom=None, refresh_interval_seconds=None,
         utilisation=None, logger=None,
@@ -222,8 +222,74 @@ def test_from_config_builds_a_usable_store(tmp_path):
     from backend.config import load_config
 
     config = load_config()
-    assert config.downtime_database is not None
+    assert config.downtime_file is not None
 
-    store = DowntimeStore(tmp_path / "downtime.sqlite3", config.vehicles)
+    store = DowntimeStore(tmp_path / "downtime.json", config.vehicles)
     first = config.vehicles[0].id
     assert store.add(first, T0, T0 + timedelta(hours=1), "From config").vehicle_id == first
+
+
+# ---- The JSON file itself ----
+
+
+def test_the_file_is_readable_json_in_time_order(tmp_path):
+    import json
+
+    store = make_store(tmp_path)
+    later = add(store, start_h=5, reason="Later")
+    earlier = add(store, start_h=1, reason="Earlier")
+
+    data = json.loads((tmp_path / "downtime.json").read_text(encoding="utf-8"))
+    assert data["version"] == 1
+    assert [r["id"] for r in data["records"]] == [earlier.id, later.id]
+    assert data["records"][0]["start"] == "2026-09-17T02:00:00.123456Z"
+    assert set(data["records"][0]) == {"id", "vehicle_id", "start", "end", "reason", "created_at", "updated_at"}
+
+
+def test_a_new_store_starts_an_empty_file(tmp_path):
+    import json
+
+    make_store(tmp_path)
+    assert json.loads((tmp_path / "downtime.json").read_text()) == {"version": 1, "records": []}
+
+
+@pytest.mark.parametrize(
+    "content",
+    ["{not json", '{"version": 2, "records": []}', '[]', '{"version": 1, "records": [{"id": "x"}]}'],
+    ids=["not-json", "unknown-version", "not-an-object", "incomplete-record"],
+)
+def test_a_damaged_file_is_refused_and_left_alone(tmp_path, content):
+    path = tmp_path / "downtime.json"
+    path.write_text(content, encoding="utf-8")
+
+    with pytest.raises(RepositoryError):
+        DowntimeStore(path, [Vehicle(id="1")])
+    assert path.read_text(encoding="utf-8") == content
+
+
+def test_a_write_by_another_process_is_seen(tmp_path):
+    # Two stores on one file stand in for two server processes.
+    first, second = make_store(tmp_path), make_store(tmp_path)
+    stored = add(first, reason="From the other process")
+
+    assert second.get(stored.id) == stored
+    assert second.delete(stored.id)
+    assert first.get(stored.id) is None
+
+
+def test_writes_leave_no_temporary_files(tmp_path):
+    store = make_store(tmp_path)
+    record = add(store)
+    store.update(record.id, reason="Changed")
+    store.delete(record.id)
+
+    assert [p.name for p in tmp_path.iterdir()] == ["downtime.json"]
+
+
+def test_a_write_returns_what_a_read_gives_back(tmp_path):
+    store = make_store(tmp_path)
+    stored = add(store)
+    updated = store.update(stored.id, reason="Changed")
+
+    reopened = make_store(tmp_path)
+    assert reopened.get(stored.id) == updated

@@ -25,7 +25,7 @@ class Config:
     vehicles: list[Vehicle]
     data_directory: Optional[Path]
     live_directory: Optional[Path]
-    downtime_database: Optional[Path]
+    downtime_file: Optional[Path]
     inactivity_threshold_seconds: Optional[int]
     expected_poll_interval_seconds: Optional[int]
     timezone: Optional[str]
@@ -63,7 +63,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
 
         directory = data.get("directory")
         live_directory = data.get("live_directory")
-        downtime_database = data.get("downtime_database")
+        downtime_file = data.get("downtime_file")
 
         vehicles = [
             Vehicle(
@@ -80,7 +80,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
             vehicles=vehicles,
             data_directory=PROJECT_ROOT / directory if directory else None,
             live_directory=PROJECT_ROOT / live_directory if live_directory else None,
-            downtime_database=PROJECT_ROOT / downtime_database if downtime_database else None,
+            downtime_file=PROJECT_ROOT / downtime_file if downtime_file else None,
             inactivity_threshold_seconds=liveness.get("inactivity_threshold_seconds"),
             expected_poll_interval_seconds=liveness.get("expected_poll_interval_seconds"),
             timezone=display.get("timezone"),

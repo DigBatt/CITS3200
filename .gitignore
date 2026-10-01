@@ -14,3 +14,7 @@ data/*.sqlite3-shm
 node_modules/
 .expo/
 expo-env.d.ts
+
+# Operator reported downtime (config/app.yaml data.downtime_file): local data, not code.
+data/downtime.json
+data/.downtime.json.*.tmp
