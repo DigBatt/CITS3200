@@ -7,6 +7,7 @@ import logging
 from datetime import timedelta
 from pathlib import Path
 from flask import Flask, jsonify, redirect, send_from_directory
+from backend.api.downtime import bp as downtime_bp
 from backend.api.earth import bp as earth_bp, load_google_maps_key
 from backend.api.metrics import bp as metrics_bp
 from backend.api.pickup_requests import bp as pickup_requests_bp
@@ -16,6 +17,7 @@ from backend.api.vehicles import bp as vehicles_bp
 from backend.auth import admin_required, load_secrets, signed_in
 from backend.auth import bp as auth_bp
 from backend.config import DEFAULT_CONFIG_DIR, ConfigError, load_config
+from backend.downtime import DowntimeStore
 from backend.pickup_requests import PickupRequestStore
 from backend.repository import CsvRepository
 from backend.repository.base import RepositoryError
@@ -53,6 +55,10 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Flask:
     app.config["NUWAY_CONFIG"] = config
     app.config["REPOSITORY"] = CsvRepository.from_config(config)
     app.config["PICKUP_REQUEST_STORE"] = PickupRequestStore()
+    # if storage is unset /api/downtime then answers 500.
+    app.config["DOWNTIME_STORE"] = (
+        DowntimeStore(config.storage_directory / "downtime.json") if config.storage_directory else None
+    )
 
     secrets = load_secrets(config_dir)
     if secrets is None:
@@ -73,6 +79,7 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Flask:
     app.register_blueprint(stops_bp)
     app.register_blueprint(pickup_requests_bp)
     app.register_blueprint(earth_bp)
+    app.register_blueprint(downtime_bp)
 
     @app.get("/")
     def index():

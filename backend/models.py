@@ -157,6 +157,44 @@ class PickupRequest:
 
 
 @dataclass(frozen=True)
+class Downtime:
+    """
+    A period an administrator recorded a shuttle as out of service (S18).
+    """
+
+    id: str
+    vehicle_id: str
+    start: datetime
+    end: datetime
+    reason: str
+    created_at: datetime
+    updated_at: datetime
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "vehicle_id": self.vehicle_id,
+            "start": format_timestamp(self.start),
+            "end": format_timestamp(self.end),
+            "reason": self.reason,
+            "created_at": format_timestamp(self.created_at),
+            "updated_at": format_timestamp(self.updated_at),
+        }
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> "Downtime":
+        return cls(
+            id=str(raw["id"]),
+            vehicle_id=str(raw["vehicle_id"]),
+            start=parse_timestamp(raw["start"]),
+            end=parse_timestamp(raw["end"]),
+            reason=str(raw["reason"]),
+            created_at=parse_timestamp(raw["created_at"]),
+            updated_at=parse_timestamp(raw["updated_at"]),
+        )
+
+
+@dataclass(frozen=True)
 class Event:
     """
     An engage or disengage.

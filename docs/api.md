@@ -18,7 +18,7 @@ Always shaped:
 Codes: `bad_timestamp`, `bad_range` (from > to), `unknown_vehicle`,
 `unknown_stop`, `unknown_route`, `unknown_request`, `not_your_request`,
 `request_not_open`, `data_unavailable`, `not_signed_in`, `bad_credentials`,
-`admin_not_configured`.
+`admin_not_configured`, `missing_field`, `overlap`, `unknown_downtime`.
 
 **Signing in.** Endpoints marked *Admin only* answer `401` `not_signed_in`
 until the browser has signed in through `POST /api/admin/login` (see
@@ -349,6 +349,88 @@ A rider who asks again at the same stop afterwards opens a new request.
 
 ---
 
+## Downtime
+
+S18-S20. *Admin only.* When a shuttle was out of service.
+
+Records are kept in `downtime.json` under `storage.directory` in
+`config/app.yaml` (`data/admin` by default). The
+file is read on every request and replaced in one step on every change. Run a
+single server process: two saves at the same instant from two processes
+could lose one of them. If `storage.directory` is unset, or the file cannot
+be read, every endpoint answers `500` `data_unavailable`.
+
+A record:
+
+```json
+{
+  "id": "07ab4afdd1f84414b3616752b1d936e7",
+  "vehicle_id": "1",
+  "start": "2026-10-01T01:00:00.000000Z",
+  "end": "2026-10-01T03:00:00.000000Z",
+  "reason": "Scheduled maintenance",
+  "created_at": "2026-10-01T04:12:09.512330Z",
+  "updated_at": "2026-10-01T04:12:09.512330Z"
+}
+```
+
+### `GET /api/downtime`
+
+Records ascending by `start`.
+
+| Parameter | Required | Notes |
+|---|---|---|
+| `vehicles` | no | As for `/api/positions`. Default: every record, including any for a vehicle no longer configured. |
+| `from`, `to` | no | As for `/api/positions`. Only records overlapping the window. Default: unbounded. |
+
+```json
+{ "records": [ { "...": "a record" } ] }
+```
+
+### `POST /api/downtime`
+
+```json
+{
+  "vehicle_id": "1",
+  "start": "2026-10-01T09:00:00+08:00",
+  "end": "2026-10-01T11:00:00+08:00",
+  "reason": "Scheduled maintenance",
+  "confirm": false
+}
+```
+
+`start` and `end` must carry a timezone (`Z` or an offset), and are stored
+in UTC. `201` `{ "record": { ... } }`.
+
+`400`: `missing_field` (vehicle, start, end or a non-blank reason),
+`unknown_vehicle`, `bad_timestamp`, or `bad_range` if `end` is not after
+`start` (S18.3).
+
+`409` `overlap` if the period overlaps one of this vehicle's existing records.
+ Nothing is stored. The clashing records
+come back beside the error; resend with `"confirm": true` to store it anyway.
+Periods that only touch, one ending as the next starts, do not overlap.
+
+```json
+{
+  "error": { "code": "overlap", "message": "This period overlaps 1 existing downtime record for vehicle 1. ..." },
+  "overlaps": [ { "...": "a record" } ]
+}
+```
+
+### `PATCH /api/downtime/<id>`
+
+S20. Body as for `POST`; fields left out keep their current values. `200`
+`{ "record": { ... } }`, `404` `unknown_downtime`, and the same `400` and
+`409` as `POST`. The record does not clash with itself, and an edit that
+leaves the vehicle and times unchanged is not checked for overlap again.
+
+### `DELETE /api/downtime/<id>`
+
+S20. `204`, or `404` `unknown_downtime`.
+
+---
+
 ## Administrator sign-in
 
 S13. One shared account, set in a `config/secrets.yaml` (copy
@@ -357,7 +439,8 @@ session cookie (`HttpOnly`, `SameSite=Lax`), which lasts
 `admin.session_hours` in `config/app.yaml`.
 
 Admin only: the `/admin` page, `GET /api/pickup-requests`,
-`GET /api/routes/<id>/waiting` and `POST /api/stops/<id>/collect`. A
+`GET /api/routes/<id>/waiting`, `POST /api/stops/<id>/collect` and every
+`/api/downtime` endpoint. A
 signed-out request for `/admin` is redirected to
 `/admin-login?next=<the page asked for>`, which returns there after signing in.
 
