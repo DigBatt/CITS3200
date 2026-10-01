@@ -113,6 +113,9 @@ function formatDisplay(dateStr, timeStr) {
  * @returns {{
  *   getRange: () => {from: string|null, to: string|null, live: boolean},
  *   reset: () => void,
+ *   getFieldState: () => Object,
+ *   setFieldState: (state: Object) => void,
+ *   setLiveToday: () => void,
  *   showNoData: () => void,
  *   clearStatus: () => void
  * }}
@@ -235,6 +238,37 @@ function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_
       startTime.value = DEV_DEFAULT_START_TIME;
       endDate.value = todayStr;
       endTime.value = getPerthTimeString();
+      liveToggle.checked = true;
+      syncLiveState();
+      emit();
+    },
+    // S11: the raw field values (not the resolved UTC range getRange()
+    // returns), so the Rider tab's forced "today, live" can be undone back
+    // to exactly what was on screen before, not just some equivalent range.
+    getFieldState: () => ({
+      startDate: startDate.value,
+      startTime: startTime.value,
+      endDate: endDate.value,
+      endTime: endTime.value,
+      live: liveToggle.checked,
+    }),
+    setFieldState: (state) => {
+      startDate.value = state.startDate;
+      startTime.value = state.startTime;
+      endDate.value = state.endDate;
+      endTime.value = state.endTime;
+      liveToggle.checked = state.live;
+      syncLiveState();
+      emit();
+    },
+    // S11: riders always see from midnight today to now, regardless of
+    // whatever period an operator had selected -- getFieldState()/
+    // setFieldState() above are what let the caller put that back afterwards.
+    // Recomputes today's date rather than reusing the page-load `todayStr`,
+    // in case the tab has been open since before midnight.
+    setLiveToday: () => {
+      startDate.value = getPerthDateString();
+      startTime.value = '00:00';
       liveToggle.checked = true;
       syncLiveState();
       emit();

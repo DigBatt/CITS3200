@@ -62,8 +62,10 @@
     <div id="timeline-container"></div>
 
     <!-- ============ Vehicle filter chips, rendered by js/vehicles.js ============ -->
-    <div class="filter-bar">
-      <span class="filter-bar-label">VEHICLE</span>
+    <!-- The label is a button: js/panels.js makes it fold the chip row away,
+         remembered per browser, for a less cluttered dashboard or larger map. -->
+    <div class="filter-bar" id="vehicle-filter">
+      <button type="button" class="filter-bar-label" aria-expanded="true" aria-controls="vehicle-filter-chips">VEHICLE</button>
       <div class="chip-row" id="vehicle-filter-chips">
         <button type="button" class="chip is-active" data-vehicle="all">All vehicles</button>
       </div>
@@ -71,7 +73,7 @@
 
     <!-- ============ Route filter chips, rendered by js/stops.js ============ -->
     <div class="filter-bar" id="route-filter" hidden>
-      <span class="filter-bar-label">ROUTE</span>
+      <button type="button" class="filter-bar-label" aria-expanded="true" aria-controls="route-filter-chips">ROUTE</button>
       <div class="chip-row" id="route-filter-chips"></div>
     </div>
 
