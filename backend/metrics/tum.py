@@ -138,6 +138,9 @@ class Utilisation:
     #: Figures that are real but need explaining, unlike `unavailable` which
     #: explains a figure that is None. Keyed the same way.
     notes: dict[str, str] = field(default_factory=dict)
+    #: How the downtime log was applied (S19), see `downtime_treatment`.
+    #: None when there is no log.
+    downtime: Optional[dict[str, Any]] = None
 
     def check(self) -> None:
         """
@@ -170,6 +173,7 @@ class Utilisation:
             "kpis": self.kpis,
             "unavailable": self.unavailable,
             "notes": self.notes,
+            "downtime": self.downtime,
         }
 
 
@@ -436,6 +440,61 @@ def without(classified: Sequence[Span], cut: Sequence[tuple[datetime, datetime]]
     return kept
 
 
+def downtime_treatment(
+    recorded: float, counted: Optional[float], replaced: dict[State, float]
+) -> dict[str, Any]:
+    """
+    How much downtime was recorded and what was done with it, for the API.
+
+    Parameters
+    ----------
+    recorded : float
+        Downtime in the window, inside the roster or not.
+    counted : float or None
+        The part inside the roster, which became the downtime bucket. None
+        when the roster cannot be placed, so nothing was counted.
+    replaced : dict of {State: float}
+        Telemetry time the counted downtime took the place of, by state.
+
+    Returns
+    -------
+    dict
+        `recorded_seconds`, `counted_seconds`, `outside_roster_seconds`,
+        `replaced_seconds` keyed by bucket name, and `summary`, one sentence.
+    """
+    outside = None if counted is None else recorded - counted
+    replaced_seconds = {f"{state.value}_seconds": seconds for state, seconds in replaced.items() if seconds}
+
+    parts = []
+    if counted:
+        took = ", ".join(f"{_format_duration(s)} {state.value.replace('_', ' ')}" for state, s in replaced.items() if s)
+        parts.append(f"{_format_duration(counted)} in service hours counted as downtime, in place of {took}")
+    if outside:
+        parts.append(f"{_format_duration(outside)} outside service hours left out, since the bus was not rostered then")
+    summary = f"{_format_duration(recorded)} of downtime recorded"
+    summary += f": {'; '.join(parts)}." if parts else "."
+
+    return {
+        "recorded_seconds": recorded,
+        "counted_seconds": counted,
+        "outside_roster_seconds": outside,
+        "replaced_seconds": replaced_seconds,
+        "summary": summary,
+    }
+
+
+def _format_duration(seconds: float) -> str:
+    """
+    `5400` as "1 h 30 min", rounded to the minute; under a minute in seconds.
+    """
+    if seconds < 60:
+        return f"{round(seconds)} s"
+    hours, minutes = divmod(round(seconds / 60), 60)
+    if not hours:
+        return f"{minutes} min"
+    return f"{hours} h {minutes} min" if minutes else f"{hours} h"
+
+
 def summarise(
     vehicle_id: str,
     positions: Sequence[Position],
@@ -479,12 +538,17 @@ def summarise(
     counted = None if downtime is None or periods is None else scheduled_downtime(downtime, periods)
     downtime_seconds = None if counted is None else sum(((hi - lo).total_seconds() for lo, hi in counted), 0.0)
 
-    classified = spans(positions, start, end, settings)
-    if counted:
-        classified = without(classified, counted)
+    measured = spans(positions, start, end, settings)
+    classified = without(measured, counted) if counted else measured
     totals = {state: 0.0 for state in State}
     for span in classified:
         totals[span.state] += span.seconds
+    # What the counted downtime took the place of, by state.
+    replaced = {state: 0.0 for state in State}
+    for span in measured:
+        replaced[span.state] += span.seconds
+    for state in State:
+        replaced[state] -= totals[state]
 
     calendar = (end - start).total_seconds()
     working = totals[State.WORKING]
@@ -601,6 +665,12 @@ def summarise(
         result.unavailable["downtime_seconds"] = "needs a timezone; config/app.yaml does not set display.timezone"
         result.unavailable["available_seconds"] = result.unavailable["downtime_seconds"]
     result.unavailable["productive_seconds"] = BLOCKED_KPIS["production_effectiveness"]
+
+    if downtime is not None:
+        recorded = sum(((hi - lo).total_seconds() for lo, hi in downtime), 0.0)
+        result.downtime = downtime_treatment(recorded, downtime_seconds, replaced)
+        if recorded:
+            result.notes["downtime_seconds"] = result.downtime["summary"]
 
     result.check()
     return result
