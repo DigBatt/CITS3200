@@ -485,7 +485,7 @@ document.getElementById('btn-schedule-save').addEventListener('click', async () 
     removeOpen = null;
     renderSchedule();
     setScheduleStatus(saved.configured ? 'Saved.' : 'Saved. Nothing is rostered, so all time counts as unscheduled.');
-    calendar.refresh();
+    window.AdminCalendar?.refresh();
   } catch (err) {
     // The server validates too, so this is where a bad row is reported.
     showScheduleError(err.message);
@@ -502,20 +502,7 @@ document.getElementById('btn-schedule-reset').addEventListener('click', () => {
 
 loadSchedule();
 
-// ---- Calendar: the docked mini month, and the full view it opens ----
+// ---- Calendar ----
 //
-// Wiring lives in calendar.js so the dashboard behaves identically.
-//
-// AUTH (S13): both are view only, over reads that stay public.
-
-const calendar = ServiceCalendar.mount({
-  mini: document.getElementById('mini-calendar'),
-  head: document.getElementById('mini-calendar-head'),
-  panel: document.getElementById('mini-calendar-panel'),
-  overlay: document.getElementById('cal-overlay'),
-  body: document.getElementById('cal-overlay-body'),
-  close: document.getElementById('cal-overlay-close'),
-}, {
-  // The month bar sits in the header and opens the month as an overlay.
-  collapsed: true,
-});
+// The header calendar and the full view are js/admin-calendar.js, loaded after
+// the Figures tab, since the period they pick is that tab's.

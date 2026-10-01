@@ -113,6 +113,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // The month bar sits in the header and opens the month and the sliders
     // as an overlay, so it starts closed: nothing covers the map until asked.
     collapsed: true,
+    // A scheduled or downtime block opens that vehicle's figures for its
+    // time, on the admin page (signing in first if need be).
+    onBlock: ({ vehicle, from, to }) => {
+      window.location.href = `/admin?${new URLSearchParams({ tab: 'figures', vehicles: vehicle, from, to })}`;
+    },
     range: {
       get: () => timelineControl?.getDates(),
       select: (start, end) => timelineControl?.setDates(start, end),

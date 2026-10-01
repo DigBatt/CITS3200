@@ -144,11 +144,25 @@
           to: Math.min(DAY_MINUTES, minutesInto(day, end)),
           reason: record.reason,
           label: `${hhmm(start)}–${hhmm(end)}`,
+          // The whole record, not the part on this day, for opening it.
+          startIso: start.toISOString(),
+          endIso: end.toISOString(),
         }));
     }
 
-    const band = (from, to, className, title, text = '') =>
-      `<div class="${className}" style="top:${pct(from / DAY_MINUTES)};height:${pct((to - from) / DAY_MINUTES)}" title="${escape(title)}">${escape(text)}</div>`;
+    // A block on a lane. With `link` and an onBlock handler it is a button
+    // that opens that vehicle's figures for the block's time.
+    const band = (from, to, className, title, text = '', link = null) => {
+      const style = `top:${pct(from / DAY_MINUTES)};height:${pct((to - from) / DAY_MINUTES)}`;
+      if (!link || !options.onBlock) {
+        return `<div class="${className}" style="${style}" title="${escape(title)}">${escape(text)}</div>`;
+      }
+      return `<div class="${className} is-linked" style="${style}" role="button" tabindex="0"
+                   data-cal-block data-vehicle="${escape(link.vehicle)}" data-from="${escape(link.from)}" data-to="${escape(link.to)}"
+                   title="${escape(`${title} · open in Figures`)}">${escape(text)}</div>`;
+    };
+    // A minute of a day as an instant, for a scheduled block's link.
+    const at = (day, minutes) => new Date(day.getTime() + minutes * 60000).toISOString();
 
     function dayColumn(day, selected) {
       const today = day.toDateString() === new Date().toDateString();
@@ -160,12 +174,14 @@
         .map((vehicle, index) => {
           const scheduled = periodsFor(day, vehicle.id)
             .map((period) =>
-              band(period.from, period.to, 'cal-scheduled', `${vehicle.name ?? vehicle.id} scheduled ${period.label}`, wide ? period.label : ''),
+              band(period.from, period.to, 'cal-scheduled', `${vehicle.name ?? vehicle.id} scheduled ${period.label}`, wide ? period.label : '',
+                { vehicle: vehicle.id, from: at(day, period.from), to: at(day, period.to) }),
             )
             .join('');
           const down = downtimeFor(day, vehicle.id)
             .map((block) =>
-              band(block.from, block.to, 'cal-downtime', `${vehicle.name ?? vehicle.id} down ${block.label} — ${block.reason}`),
+              band(block.from, block.to, 'cal-downtime', `${vehicle.name ?? vehicle.id} down ${block.label} — ${block.reason}`, '',
+                { vehicle: vehicle.id, from: block.startIso, to: block.endIso }),
             )
             .join('');
           return `<div class="cal-lane" style="left:${pct((index * width) / 100)};width:${pct(width / 100)};--cal-vehicle:${escape(vehicle.colour ?? 'currentColor')}" title="${escape(vehicle.name ?? vehicle.id)}">${scheduled}${down}</div>`;
@@ -421,6 +437,12 @@
       const step = event.target.closest('[data-cal-step]');
       const view = event.target.closest('[data-cal-span]');
       const heading = event.target.closest('[data-cal-pick]');
+      const block = event.target.closest('[data-cal-block]');
+
+      if (block) {
+        options.onBlock?.({ vehicle: block.dataset.vehicle, from: block.dataset.from, to: block.dataset.to });
+        return;
+      }
 
       if (heading) {
         if (heading.getAttribute('aria-disabled') !== 'true') pickDay(heading.dataset.calPick);
@@ -451,6 +473,14 @@
         span = next;
         refresh();
       }
+    });
+
+    // A linked block is a button to the keyboard too.
+    container.addEventListener('keydown', (event) => {
+      const block = event.target.closest?.('[data-cal-block]');
+      if (!block || (event.key !== 'Enter' && event.key !== ' ')) return;
+      event.preventDefault();
+      block.click();
     });
 
     refresh();
@@ -1070,7 +1100,7 @@
         full.goTo(day ?? new Date());
       } else {
         // Opens on the week; the 3 day option is in the calendar's controls.
-        full = create(body, { days: 7, anchor: day ?? new Date(), range: options.range });
+        full = create(body, { days: 7, anchor: day ?? new Date(), range: options.range, onBlock: options.onBlock });
       }
       close.focus();
     }

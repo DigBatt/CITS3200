@@ -38,13 +38,17 @@
 
     <div class="app-header-spacer"></div>
 
-    <!-- The calendar's month bar, here in the header, and the month it opens
-         as an overlay below. A day, or the expand button, opens the full
-         calendar. AUTH (S13): view only, and the reads behind it stay public. -->
+    <!-- The calendar, as on the dashboard: the month bar here in the header,
+         and the month and period control it opens as an overlay below. Pick a
+         start and an end date, or drag across days; the expand button opens
+         the full calendar. The period it picks is the Figures tab's
+         (js/admin-calendar.js). AUTH (S13): view only, and the reads behind it
+         stay public. -->
     <div class="period-picker">
       <div class="period-bar" id="mini-calendar-head"></div>
       <div class="period-panel" id="mini-calendar-panel" hidden>
-        <div id="mini-calendar" aria-label="Service calendar, click a day to open it"></div>
+        <div id="mini-calendar" aria-label="Service calendar, pick a start and an end date"></div>
+        <div id="timeline-container"></div>
       </div>
     </div>
 
@@ -99,19 +103,26 @@
         Fleet performance under the GMG time usage model, for the reporting period below.
       </p>
 
-      <!-- Reporting period: whole days, Perth time -->
+      <!-- Reporting period, Perth time to the minute, and the vehicles it
+           covers: the same chips as the dashboard's filter, one or more on.
+           A block clicked in the full calendar fills both in. -->
       <div class="admin-card">
         <p class="admin-card-title">REPORTING PERIOD</p>
 
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label" for="figures-from-date">FROM</label>
-            <input type="date" class="form-input" id="figures-from-date">
+            <label class="form-label" for="figures-from-input">FROM</label>
+            <input type="datetime-local" class="form-input" id="figures-from-input">
           </div>
           <div class="form-group">
-            <label class="form-label" for="figures-to-date">TO</label>
-            <input type="date" class="form-input" id="figures-to-date">
+            <label class="form-label" for="figures-to-input">TO</label>
+            <input type="datetime-local" class="form-input" id="figures-to-input">
           </div>
+        </div>
+
+        <div class="form-group">
+          <span class="form-label" id="figures-vehicles-label">VEHICLES</span>
+          <div class="chip-row" id="figures-vehicle-chips" role="group" aria-labelledby="figures-vehicles-label"></div>
         </div>
 
         <div class="figures-period">
@@ -311,8 +322,11 @@
 <script src="js/timeline.js"></script>
 <script src="js/format.js"></script>
 <script src="js/tum.js"></script>
+<script src="js/vehicle-chips.js"></script>
 <script src="js/admin.js"></script>
 <script src="js/operator.js"></script>
 <script src="js/figures.js"></script>
+<!-- Last: the calendar picks the Figures tab's period. -->
+<script src="js/admin-calendar.js"></script>
 </body>
 </html>

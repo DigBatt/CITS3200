@@ -819,3 +819,159 @@ body.is-overlaid { overflow: hidden; }
 
   .period-bar .mini-month { min-width: 0; }
 }
+
+/* A scheduled or downtime block that opens its vehicle's figures for its
+   time (onBlock in js/calendar.js): pointer, and an outline in the lane's
+   vehicle colour on hover or focus. */
+.cal-scheduled.is-linked,
+.cal-downtime.is-linked { cursor: pointer; }
+
+.cal-scheduled.is-linked:hover,
+.cal-downtime.is-linked:hover,
+.cal-scheduled.is-linked:focus-visible,
+.cal-downtime.is-linked:focus-visible {
+  outline: 2px solid var(--cal-vehicle, #2f7d8f);
+  outline-offset: -1px;
+  z-index: 3;
+}
+
+/* ---- Period control (js/timeline.js) ----
+   Under the month in the header calendar's overlay, on the dashboard and the
+   admin page alike. */
+.timeline-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(28, 25, 23, 0.1);
+  cursor: default;
+}
+
+.timeline-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.timeline-summary {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.66rem;
+  line-height: 1.3;
+  color: rgba(28, 25, 23, 0.65);
+}
+
+.timeline-live-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  padding: 0.2rem 0.55rem;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border: 1px solid rgba(28, 25, 23, 0.2);
+  border-radius: 999px;
+  background: #fff;
+  color: rgba(28, 25, 23, 0.7);
+  cursor: pointer;
+}
+
+.timeline-live-btn:hover { border-color: rgba(28, 25, 23, 0.4); }
+
+/* Colour matches nUWAy 2's vehicle marker (config/vehicles.yaml), reused
+   here as the app's one accent colour rather than introducing a new one. */
+.timeline-live-btn.is-on {
+  border-color: #2f7d8f;
+  background: rgba(47, 125, 143, 0.1);
+  color: #1f5967;
+}
+
+.timeline-live-btn:focus-visible {
+  outline: 2px solid #2f7d8f;
+  outline-offset: 2px;
+}
+
+.timeline-live-dot {
+  display: inline-block;
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c0392b; /* broadcast red -- distinct from any vehicle colour */
+}
+
+.timeline-live-dot[hidden] {
+  display: none;
+}
+
+.timeline-live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #c0392b;
+  animation: timeline-pulse-ring 1.6s ease-out infinite;
+}
+
+@keyframes timeline-pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.timeline-slider {
+  display: grid;
+  grid-template-columns: 3.4rem 1fr 2.4rem;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+}
+
+.timeline-slider-label {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  color: rgba(28, 25, 23, 0.6);
+}
+
+.timeline-slider-label small {
+  font-size: 0.62rem;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+.timeline-slider input[type='range'] {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: #2f7d8f;
+  cursor: pointer;
+}
+
+.timeline-slider input[type='range']:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.timeline-slider-value {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  text-align: right;
+}
+
+.timeline-status {
+  margin: 0;
+  font-size: 0.68rem;
+  color: #a35b00;
+}
+
+.timeline-status:empty {
+  display: none;
+}
