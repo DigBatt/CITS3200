@@ -133,11 +133,17 @@ class Utilisation:
         Raises
         ------
         AssertionError
-            If the measured buckets do not sum to calendar time.
+            If the measured buckets and downtime do not sum to calendar time.
         """
         measured = sum(
             self.buckets[name] or 0.0
-            for name in ("working_seconds", "operating_delay_seconds", "standby_seconds", "not_reporting_seconds")
+            for name in (
+                "working_seconds",
+                "operating_delay_seconds",
+                "standby_seconds",
+                "not_reporting_seconds",
+                "downtime_seconds",
+            )
         )
         calendar = self.buckets["calendar_seconds"] or 0.0
         assert abs(measured - calendar) < 1e-6, f"{measured} != {calendar}"
@@ -355,11 +361,11 @@ def overlap_seconds(start: datetime, end: datetime, periods: Sequence[tuple[date
     return sum((max(0.0, (min(end, closes) - max(start, opens)).total_seconds()) for opens, closes in periods), 0.0)
 
 
-def scheduled_downtime_seconds(
+def scheduled_downtime(
     downtime: Sequence[tuple[datetime, datetime]], periods: Sequence[tuple[datetime, datetime]]
-) -> float:
+) -> list[tuple[datetime, datetime]]:
     """
-    Downtime that falls inside the roster.
+    The parts of the downtime that fall inside the roster.
 
     GMG nests downtime inside scheduled time (`AT = ST - DT`), so a repair
     while the bus was not rostered takes nothing from its availability.
@@ -373,9 +379,48 @@ def scheduled_downtime_seconds(
 
     Returns
     -------
-    float
+    list of (datetime, datetime)
+        Ascending and disjoint.
     """
-    return sum((overlap_seconds(lo, hi, periods) for lo, hi in downtime), 0.0)
+    pieces = [
+        (max(lo, opens), min(hi, closes))
+        for lo, hi in downtime
+        for opens, closes in periods
+        if max(lo, opens) < min(hi, closes)
+    ]
+    return sorted(pieces)
+
+
+def without(classified: Sequence[Span], cut: Sequence[tuple[datetime, datetime]]) -> list[Span]:
+    """
+    The spans with the given periods cut out of them.
+
+    Downtime replaces whatever the telemetry said over the same time, so the
+    buckets and downtime still add up to calendar time.
+
+    Parameters
+    ----------
+    classified : sequence of Span
+    cut : sequence of (datetime, datetime)
+        Ascending and disjoint.
+
+    Returns
+    -------
+    list of Span
+        What is left of each span, keeping its state.
+    """
+    kept: list[Span] = []
+    for span in classified:
+        cursor = span.start
+        for lo, hi in cut:
+            if hi <= cursor or lo >= span.end:
+                continue
+            if lo > cursor:
+                kept.append(Span(span.state, cursor, lo))
+            cursor = hi
+        if cursor < span.end:
+            kept.append(Span(span.state, cursor, span.end))
+    return kept
 
 
 def summarise(
@@ -415,7 +460,15 @@ def summarise(
     ValueError
         If a required threshold is unset, or the window is empty.
     """
+    scheduled = scheduled_seconds(start, end, settings, vehicle_id)
+    periods = service_periods(start, end, settings, vehicle_id)
+    # Unknown without a log, or without a timezone to place the roster in.
+    counted = None if downtime is None or periods is None else scheduled_downtime(downtime, periods)
+    downtime_seconds = None if counted is None else sum(((hi - lo).total_seconds() for lo, hi in counted), 0.0)
+
     classified = spans(positions, start, end, settings)
+    if counted:
+        classified = without(classified, counted)
     totals = {state: 0.0 for state in State}
     for span in classified:
         totals[span.state] += span.seconds
@@ -425,18 +478,12 @@ def summarise(
     delay = totals[State.DELAY]
     standby = totals[State.STANDBY]
     operating = working + delay
-    scheduled = scheduled_seconds(start, end, settings, vehicle_id)
-    periods = service_periods(start, end, settings, vehicle_id)
     # GMG nests working time inside scheduled time, so effective utilisation
     # counts only the working time that fell within service hours.
     scheduled_working = (
         None
         if periods is None
         else sum((seconds_within(span, periods) for span in classified if span.state == State.WORKING), 0.0)
-    )
-    # Unknown without a log, or without a timezone to place the roster in.
-    downtime_seconds = (
-        None if downtime is None or periods is None else scheduled_downtime_seconds(downtime, periods)
     )
 
     result = Utilisation(vehicle_id=vehicle_id, window_start=start, window_end=end)
