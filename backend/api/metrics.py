@@ -12,6 +12,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from backend.api.params import PERTH_TZ, UTC_TZ, parse_time_range, parse_vehicle_ids
 from backend.config import ConfigError
+from backend.downtime import merged_intervals
 from backend.metrics.tum import Settings, summarise
 from backend.models import format_timestamp
 
@@ -58,10 +59,22 @@ def metrics():
 
     settings = Settings.from_config(config)
     tracks = repo.get_positions(vehicle_ids, start, end)
+    # S19: the admin page's downtime log. Without storage there is no log at
+    # all, which leaves the downtime KPIs unavailable rather than at 100%.
+    # Only durations leave here; a record's reason stays admin only.
+    store = current_app.config["DOWNTIME_STORE"]
+    records = store.list(vehicle_ids, start, end) if store else None
+
+    def downtime_for(vehicle_id):
+        if records is None:
+            return None
+        return merged_intervals([r for r in records if r.vehicle_id == vehicle_id], start, end)
 
     try:
         vehicles = [
-            summarise(vehicle.id, tracks.get(vehicle.id, []), start, end, settings).to_dict()
+            summarise(
+                vehicle.id, tracks.get(vehicle.id, []), start, end, settings, downtime=downtime_for(vehicle.id)
+            ).to_dict()
             for vehicle in config.vehicles
             if vehicle.id in vehicle_ids
         ]
