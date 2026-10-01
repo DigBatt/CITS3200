@@ -8,8 +8,53 @@ document.addEventListener('DOMContentLoaded', () => {
     rider: document.getElementById('panel-rider'),
   };
 
+  // S11: the vehicle/route chips and the date-range picker are Fleet/
+  // Operator/Utilisation tools an ordinary rider has no use for (S11.2) --
+  // most people who open the site land on this view, and S11.1/S11.3 are
+  // about it fitting one screen on a phone without scrolling past them
+  // first. Hidden rather than removed, since Utilisation still needs the
+  // vehicle chips to scope its report.
+  //
+  // `riderOverrides` is null when nothing has been overridden; while it
+  // holds a value, the Rider tab's "today, live, every vehicle" forcing is
+  // in effect and that value is what gets put back on leaving.
+  let riderOverrides = null;
+
+  function setRiderChromeHidden(hidden) {
+    document.getElementById('timeline-container')?.classList.toggle('is-rider-hidden', hidden);
+    document.getElementById('vehicle-filter')?.classList.toggle('is-rider-hidden', hidden);
+    document.getElementById('route-filter')?.classList.toggle('is-rider-hidden', hidden);
+  }
+
+  function enterRiderDefaults() {
+    if (riderOverrides) return; // already applied -- e.g. clicking Rider again
+    riderOverrides = {
+      timeline: timelineControl?.getFieldState(),
+      vehicle: Vehicles.getSelection(),
+    };
+    timelineControl?.setLiveToday();
+    Vehicles.select(null); // every vehicle, not whatever one Fleet/Operator had picked
+    setRiderChromeHidden(true);
+  }
+
+  function leaveRiderDefaults() {
+    if (!riderOverrides) return;
+    if (riderOverrides.timeline) timelineControl?.setFieldState(riderOverrides.timeline);
+    Vehicles.select(riderOverrides.vehicle);
+    riderOverrides = null;
+    setRiderChromeHidden(false);
+  }
+
   function setView(view) {
     tabs.forEach((tab) => tab.classList.toggle('is-active', tab.dataset.view === view));
+
+    // Ahead of the Utilisation branch's early return below, since leaving
+    // Rider for Utilisation must still restore the chips it depends on.
+    if (view === 'rider') {
+      enterRiderDefaults();
+    } else {
+      leaveRiderDefaults();
+    }
 
     if (view === 'utilisation') {
       viewMap.hidden = true;

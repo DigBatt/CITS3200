@@ -291,6 +291,14 @@ empty until the API has events and stops. Layout only -- does not touch any
   align-items: center;
 }
 
+.filter-bar[hidden] {
+  display: none;
+}
+
+.is-rider-hidden {
+  display: none;
+}
+
 .filter-bar-label {
   flex: none;
   font: 500 10px Sora, sans-serif;
