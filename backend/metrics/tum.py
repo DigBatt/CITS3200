@@ -345,7 +345,37 @@ def seconds_within(span: Span, periods: Sequence[tuple[datetime, datetime]]) -> 
     """
     How much of a span falls inside the given periods.
     """
-    return sum((max(0.0, (min(span.end, closes) - max(span.start, opens)).total_seconds()) for opens, closes in periods), 0.0)
+    return overlap_seconds(span.start, span.end, periods)
+
+
+def overlap_seconds(start: datetime, end: datetime, periods: Sequence[tuple[datetime, datetime]]) -> float:
+    """
+    How much of `start`..`end` falls inside the given periods.
+    """
+    return sum((max(0.0, (min(end, closes) - max(start, opens)).total_seconds()) for opens, closes in periods), 0.0)
+
+
+def scheduled_downtime_seconds(
+    downtime: Sequence[tuple[datetime, datetime]], periods: Sequence[tuple[datetime, datetime]]
+) -> float:
+    """
+    Downtime that falls inside the roster.
+
+    GMG nests downtime inside scheduled time (`AT = ST - DT`), so a repair
+    while the bus was not rostered takes nothing from its availability.
+
+    Parameters
+    ----------
+    downtime : sequence of (datetime, datetime)
+        Disjoint, as `backend.downtime.merged_intervals` returns them.
+    periods : sequence of (datetime, datetime)
+        This vehicle's service periods, as `service_periods` returns them.
+
+    Returns
+    -------
+    float
+    """
+    return sum((overlap_seconds(lo, hi, periods) for lo, hi in downtime), 0.0)
 
 
 def summarise(
@@ -371,8 +401,8 @@ def summarise(
         This vehicle's downtime as disjoint periods clipped to the window,
         from `backend.downtime.merged_intervals`. None means there is no
         downtime log at all, so the KPIs that need downtime stay blocked; an
-        empty list means the log exists and records none. Not yet applied to
-        the figures (S19).
+        empty list means the log exists and records none. Only downtime
+        inside this vehicle's roster is counted.
 
     Returns
     -------
@@ -404,6 +434,10 @@ def summarise(
         if periods is None
         else sum((seconds_within(span, periods) for span in classified if span.state == State.WORKING), 0.0)
     )
+    # Unknown without a log, or without a timezone to place the roster in.
+    downtime_seconds = (
+        None if downtime is None or periods is None else scheduled_downtime_seconds(downtime, periods)
+    )
 
     result = Utilisation(vehicle_id=vehicle_id, window_start=start, window_end=end)
     result.buckets = {
@@ -416,7 +450,7 @@ def summarise(
         "scheduled_seconds": scheduled,
         "scheduled_working_seconds": scheduled_working,
         "unscheduled_seconds": calendar - scheduled if scheduled is not None else None,
-        "downtime_seconds": None,
+        "downtime_seconds": downtime_seconds,
         "available_seconds": None,
         "productive_seconds": None,
     }
@@ -449,6 +483,9 @@ def summarise(
         )
         result.notes["scheduled_seconds"] = note
         result.notes["unscheduled_seconds"] = note
+        if downtime is not None:
+            # S19: downtime only counts inside the roster, so with none it is 0.
+            result.notes["downtime_seconds"] = note
         result.unavailable["effective_utilisation"] = (
             "needs scheduled time; no service schedule is in the system"
         )
@@ -463,7 +500,10 @@ def summarise(
             "needs a depot; config/app.yaml does not set utilisation.depot, so stopped time "
             "counts as operating delay"
         )
-    result.unavailable["downtime_seconds"] = BLOCKED_KPIS["uptime"]
+    if downtime is None:
+        result.unavailable["downtime_seconds"] = BLOCKED_KPIS["uptime"]
+    elif periods is None:
+        result.unavailable["downtime_seconds"] = "needs a timezone; config/app.yaml does not set display.timezone"
     result.unavailable["available_seconds"] = BLOCKED_KPIS["physical_availability"]
     result.unavailable["productive_seconds"] = BLOCKED_KPIS["production_effectiveness"]
 
