@@ -3,8 +3,9 @@ When a vehicle was operating, split by whether that fell inside its rostered
 service time or outside it.
 
 Operating time is the GMG model's: working plus operating delay, exactly as
-backend.metrics.tum.spans classifies the telemetry, so these intervals add up
-to the same operating time /api/metrics reports. Scheduled time is the
+backend.metrics.tum.spans classifies the telemetry, less any recorded
+downtime in the roster, so these intervals add up to the same operating time
+/api/metrics reports. Scheduled time is the
 vehicle's roster (backend.metrics.tum.service_periods), so a bus out of hours
 shows as operating outside schedule even while another bus is rostered.
 
@@ -18,7 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Sequence
 
-from backend.metrics.tum import Settings, Span, State, service_periods, spans
+from backend.metrics.tum import Settings, Span, State, scheduled_downtime, service_periods, spans, without
 from backend.models import Position, format_timestamp
 
 #: The states GMG counts as operating time.
@@ -105,10 +106,22 @@ def split_by_schedule(
 
 
 def operating_intervals(
-    vehicle_id: str, positions: Sequence[Position], start: datetime, end: datetime, settings: Settings
+    vehicle_id: str,
+    positions: Sequence[Position],
+    start: datetime,
+    end: datetime,
+    settings: Settings,
+    downtime: Optional[Sequence[tuple[datetime, datetime]]] = None,
 ) -> list[OperatingInterval]:
     """
     One vehicle's operating time over a window, split by its roster.
+
+    Parameters
+    ----------
+    downtime : sequence of (datetime, datetime) or None
+        As for backend.metrics.tum.summarise. Downtime inside the roster is
+        taken out of operating time, as /api/metrics does (S19), so the two
+        still agree.
 
     Raises
     ------
@@ -116,5 +129,8 @@ def operating_intervals(
         As backend.metrics.tum.spans: a required threshold is unset, or the
         window is empty.
     """
-    stretches = operating_stretches(spans(positions, start, end, settings))
-    return split_by_schedule(stretches, service_periods(start, end, settings, vehicle_id))
+    classified = spans(positions, start, end, settings)
+    periods = service_periods(start, end, settings, vehicle_id)
+    if downtime and periods is not None:
+        classified = without(classified, scheduled_downtime(downtime, periods))
+    return split_by_schedule(operating_stretches(classified), periods)

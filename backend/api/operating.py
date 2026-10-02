@@ -17,6 +17,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from backend.api.params import PERTH_TZ, UTC_TZ, parse_time_range, parse_vehicle_ids
 from backend.config import ConfigError
+from backend.downtime import intervals_by_vehicle
 from backend.metrics.operating import operating_intervals
 from backend.metrics.tum import Settings
 from backend.models import format_timestamp
@@ -59,6 +60,8 @@ def operating():
 
     settings = Settings.from_config(config)
     tracks = repo.get_positions(vehicle_ids, start, end)
+    # S19: recorded downtime is not operating time, as in /api/metrics.
+    downtime = intervals_by_vehicle(current_app.config["DOWNTIME_STORE"], vehicle_ids, start, end)
 
     try:
         vehicles = [
@@ -66,7 +69,14 @@ def operating():
                 "vehicle_id": vehicle.id,
                 "intervals": [
                     interval.to_dict()
-                    for interval in operating_intervals(vehicle.id, tracks.get(vehicle.id, []), start, end, settings)
+                    for interval in operating_intervals(
+                        vehicle.id,
+                        tracks.get(vehicle.id, []),
+                        start,
+                        end,
+                        settings,
+                        downtime=None if downtime is None else downtime[vehicle.id],
+                    )
                 ],
             }
             for vehicle in config.vehicles

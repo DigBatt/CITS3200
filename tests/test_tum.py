@@ -405,3 +405,27 @@ def test_editing_and_deleting_downtime_changes_the_figures(tmp_path):
     bus_1 = metrics_by_vehicle(client)["1"]
     assert bus_1["buckets"]["downtime_seconds"] == 0
     assert "downtime_seconds" not in bus_1["notes"]
+
+def test_operating_intervals_leave_out_downtime_too(tmp_path):
+    # Downtime over bus 1's driving (16:21-16:58 Perth): /api/operating drops
+    # it as /api/metrics does, so the calendar and the figures still agree.
+    client = sign_in(create_app(make_config(tmp_path)).test_client())
+
+    def operating_seconds():
+        bus_1 = next(v for v in client.get("/api/operating", query_string=SAMPLE_DAY).get_json()["vehicles"]
+                     if v["vehicle_id"] == "1")
+        return sum(
+            (datetime.fromisoformat(i["end"].replace("Z", "+00:00"))
+             - datetime.fromisoformat(i["start"].replace("Z", "+00:00"))).total_seconds()
+            for i in bus_1["intervals"]
+        )
+
+    assert operating_seconds() > 0
+    client.post("/api/downtime", json={
+        "vehicle_id": "1",
+        "start": "2025-09-04T08:00:00Z",  # 16:00-17:00 in Perth, over the driving
+        "end": "2025-09-04T09:00:00Z",
+        "reason": "Workshop",
+    })
+    assert operating_seconds() == 0
+    assert metrics_by_vehicle(client)["1"]["buckets"]["operating_seconds"] == 0

@@ -291,8 +291,9 @@ mini month and draws them in each vehicle's lane. Same `vehicles`, `from` and
 
 Operating time is the time usage model's, working plus operating delay, so the
 intervals add up to the `operating_seconds` `/api/metrics` reports for the same
-window, as long as no downtime is recorded in it: `/api/metrics` takes
-recorded downtime out of operating time (S19), and this endpoint does not yet. Scheduled time is the vehicle's own roster (see `GET /api/schedule`), so
+window. Recorded downtime inside the roster is not operating time, here as in
+`/api/metrics` (S19), so a bus driving during a downtime record shows no
+interval for it. Scheduled time is the vehicle's own roster (see `GET /api/schedule`), so
 an interval is cut wherever its service period opens or closes. With nothing
 rostered, everything is `in_schedule: false`; `in_schedule` is `null` only when
 no `display.timezone` is configured, since the roster cannot then be placed on
