@@ -141,20 +141,13 @@ measurements.
 
 ---
 
-## `GET /api/events`
-
-Engage/disengage events, not implemented yet.
-I dont know the format of the data we get here yet, so this is mostly a placeholder/idea for now.
-
----
-
 ## `GET /api/metrics`
 
 Utilisation figures from the GMG time usage model
 ([GMG Time Utilisation Model.md](GMG%20Time%20Utilisation%20Model.md)), per
 vehicle over a period. Same `vehicles`, `from` and `to` parameters, defaults
 and errors as `/api/positions`. Thresholds come from the `utilisation` block of
-`config/app.yaml`.
+`config/app.yaml`; `500` `data_unavailable` if a required threshold is unset.
 
 ```json
 {

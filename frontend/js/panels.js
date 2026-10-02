@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const viewUtilisation = document.getElementById('view-utilisation');
   const panels = {
     fleet: document.getElementById('panel-fleet'),
-    operator: document.getElementById('panel-operator'),
     rider: document.getElementById('panel-rider'),
   };
 
@@ -39,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
       vehicle: Vehicles.getSelection(),
     };
     timelineControl?.setLiveToday();
-    Vehicles.select(null); // every vehicle, not whatever one Fleet/Operator had picked
+    Vehicles.select(null); // every vehicle, not whatever one Fleet had picked
   }
 
   function leaveRiderDefaults() {
@@ -76,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // The rider's stop picker hides every other stop to cut clutter (S15),
     // js/map.js:isolateStop(). That is Rider-only, so leaving the tab
-    // restores every stop for Fleet and Operator; returning to it re-applies
+    // restores every stop for Fleet; returning to it re-applies
     // whatever the picker still has chosen or waiting.
     if (view === 'rider') {
       window.Rider?.syncMapIsolation();
@@ -145,17 +144,4 @@ document.addEventListener('DOMContentLoaded', () => {
   initCollapsibleFilterBar('vehicle-filter', 'nuway.vehicleFilterCollapsed');
   initCollapsibleFilterBar('route-filter', 'nuway.routeFilterCollapsed');
 
-  // Header clock: cosmetic only.
-  const clock = document.getElementById('app-clock');
-  if (clock) {
-    const tick = () => {
-      clock.textContent = new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      });
-    };
-    tick();
-    setInterval(tick, 1000);
-  }
 });

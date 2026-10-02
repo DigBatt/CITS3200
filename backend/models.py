@@ -192,25 +192,3 @@ class Downtime:
             created_at=parse_timestamp(raw["created_at"]),
             updated_at=parse_timestamp(raw["updated_at"]),
         )
-
-
-@dataclass(frozen=True)
-class Event:
-    """
-    An engage or disengage.
-
-    Placeholder.
-    """
-
-    vehicle_id: str
-    timestamp: datetime
-    kind: Optional[str] = None
-    detail: Optional[str] = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "vehicle_id": self.vehicle_id,
-            "timestamp": format_timestamp(self.timestamp),
-            "kind": self.kind,
-            "detail": self.detail,
-        }

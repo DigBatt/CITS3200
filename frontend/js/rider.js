@@ -81,8 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Re-applied by panels.js whenever the Rider tab becomes active again.
   // Leaving the tab already restores every stop itself (map.js is shared
-  // with Fleet and Operator), so this only isolates while Rider is the one
-  // actually showing — background polling must not hide stops on another tab.
+  // with Fleet), so this only isolates while Rider is the one actually
+  // showing — background polling must not hide stops on another tab.
   function syncMapIsolation() {
     const riderTabIsActive = document.getElementById('panel-rider')?.hidden === false;
     isolateStop(riderTabIsActive ? activeStopId : null);

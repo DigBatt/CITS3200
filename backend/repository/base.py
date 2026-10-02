@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import replace
 from datetime import datetime
 from typing import Iterable, Optional, Sequence
-from backend.models import Event, Position
+from backend.models import Position
 
 class RepositoryError(Exception):
     """
@@ -131,29 +131,6 @@ class Repository(ABC):
             If a row names a vehicle the store does not know, or the write fails.
         """
         raise NotImplementedError(f"{type(self).__name__} is read-only")
-
-    def get_events(
-        self,
-        vehicle_ids: Optional[Sequence[str]] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
-    ) -> dict[str, list[Event]]:
-        """
-        Engage/disengage events per vehicle.
-
-        Parameters
-        ----------
-        vehicle_ids : sequence of str, optional
-            None or empty means the whole fleet.
-        start, end : datetime, optional
-            Inclusive UTC bounds, unused for now.
-
-        Returns
-        -------
-        dict of {str: list of Event}
-            A key per requested id, all empty.
-        """
-        return {vehicle_id: [] for vehicle_id in self._resolve_ids(vehicle_ids)}
 
     def _resolve_ids(self, vehicle_ids: Optional[Iterable[str]]) -> list[str]:
         """
