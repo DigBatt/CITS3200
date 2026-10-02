@@ -969,6 +969,29 @@ only -- does not touch any `.timeline-*` rule above, which stays owned by the da
   background: rgba(28, 25, 23, 0.4);
 }
 
+/* ---- Bus markers: each bus's latest position, numbered (js/map.js) ---- */
+
+.bus-marker {
+  background: none;
+  border: none;
+}
+
+.bus-marker span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; /* BUS_MARKER_SIZE in js/map.js */
+  height: 28px;
+  box-sizing: border-box;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(28, 25, 23, 0.35);
+  font: 700 14px/1 Sora, sans-serif;
+  color: #ffffff;
+  /* White on the lighter bus colours is borderline, so a faint dark edge. */
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.45);
+}
+
 /* ---- Stop markers (S07) ---- */
 
 .stop-label {
