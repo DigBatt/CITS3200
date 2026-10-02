@@ -477,8 +477,33 @@ only -- does not touch any `.timeline-*` rule above, which stays owned by the da
 }
 
 .vehicle-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font: 400 11.5px Sora, sans-serif;
   color: rgba(28, 25, 23, 0.55);
+}
+
+/* Traffic light beside "Last seen": how long ago the vehicle was last heard
+   from (backend/freshness.py). */
+.freshness-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9);
+}
+
+.freshness-green {
+  background: oklch(0.62 0.16 150);
+}
+
+.freshness-yellow {
+  background: oklch(0.8 0.16 85);
+}
+
+.freshness-red {
+  background: oklch(0.58 0.2 27);
 }
 
 .vehicle-stats {

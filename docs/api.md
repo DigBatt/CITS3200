@@ -37,6 +37,7 @@ Liveness is computed server side from `config/app.yaml`.
 {
   "generated_at": "2025-09-04T08:59:00Z",
   "inactivity_threshold_seconds": 300,
+  "freshness_rule": { "green_within_weekdays": 1, "red_after_days": 10 },
   "vehicles": [
     {
       "id": "1",
@@ -45,6 +46,7 @@ Liveness is computed server side from `config/app.yaml`.
       "status": "active",
       "last_seen": "2025-09-04T08:58:37.495682Z",
       "seconds_since_last_seen": 22.5,
+      "freshness": "green",
       "last_position": {
         "vehicle_id": "1",
         "timestamp": "2025-09-04T08:58:37.495682Z",
@@ -64,6 +66,7 @@ Liveness is computed server side from `config/app.yaml`.
       "status": "inactive",
       "last_seen": null,
       "seconds_since_last_seen": null,
+      "freshness": null,
       "last_position": null
     }
   ]
@@ -74,6 +77,17 @@ Liveness is computed server side from `config/app.yaml`.
 all is `inactive` with a `null` position.
 
 `inactivity_threshold_seconds` is echoed.
+
+`freshness` is the traffic light shown beside "Last seen", from the
+`liveness` settings in `config/app.yaml` (echoed as `freshness_rule`), in Perth
+days:
+
+| Value | When last seen |
+|---|---|
+| `green` | Today, or within `green_within_weekdays` weekdays before today. With 1, a bus last seen on Friday is still green on Monday. |
+| `yellow` | Before that, but no more than `red_after_days` days ago. |
+| `red` | More than `red_after_days` calendar days ago. |
+| `null` | Never: no telemetry at all. |
 
 ---
 

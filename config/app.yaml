@@ -12,6 +12,12 @@ storage:
 liveness:
   inactivity_threshold_seconds: 300 # when data is to be rendered as grey.
   expected_poll_interval_seconds: 6
+  # The traffic light beside "Last seen" (backend/freshness.py). Green when
+  # last seen today or within this many weekdays before it, so with 1 a bus
+  # last seen on Friday is still green on Monday.
+  green_within_weekdays: 1
+  # Red when last seen more than this many calendar days ago; yellow between.
+  red_after_days: 10
 
 display:
   # timestamp info

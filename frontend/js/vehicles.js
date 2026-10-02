@@ -5,7 +5,8 @@
 //
 // Also owns the liveness presentation: a vehicle the server reports as
 // inactive is greyed AND labelled. The threshold comes from the server; this
-// module never computes liveness.
+// module never computes liveness. The same goes for the green/yellow/red
+// light beside "Last seen", which is the server's `freshness`.
 //
 // Clearing the filter restores the whole fleet.
 //
@@ -14,6 +15,7 @@
 
 (function () {
   let fleet = [];
+  let freshnessRule = null;
   let selected = null; // null means the whole fleet
   let onChange = null;
   let latestRefresh = 0;
@@ -37,6 +39,7 @@
       const data = await getVehicles();
       if (request !== latestRefresh) return;
       fleet = data.vehicles;
+      freshnessRule = data.freshness_rule ?? null;
       refreshError = null;
     } catch (error) {
       if (request !== latestRefresh) return;
@@ -55,6 +58,23 @@
     if (vehicle.last_seen === null) return 'No telemetry received';
     if (vehicle.status === 'active') return `Last packet ${formatAge(vehicle.seconds_since_last_seen)} ago`;
     return `Last seen ${formatInstant(vehicle.last_seen)}`;
+  }
+
+  // Spelt out for the tooltip and screen readers, since colour alone says
+  // nothing to either.
+  function freshnessLabel(freshness) {
+    const weekdays = freshnessRule?.green_within_weekdays ?? 1;
+    const days = freshnessRule?.red_after_days;
+    const lastWeekday = weekdays === 1 ? 'the last weekday' : `the last ${weekdays} weekdays`;
+    if (freshness === 'green') return `Seen today or on ${lastWeekday}`;
+    if (freshness === 'yellow') return `Not seen since before ${lastWeekday}`;
+    return days == null ? 'Not seen for a long time' : `Not seen for more than ${days} days`;
+  }
+
+  function freshnessDot(vehicle) {
+    if (!vehicle.freshness) return '';
+    const label = escapeHtml(freshnessLabel(vehicle.freshness));
+    return `<span class="freshness-dot freshness-${escapeHtml(vehicle.freshness)}" role="img" aria-label="${label}" title="${label}"></span>`;
   }
 
   // Only an active vehicle's readings are current enough to show.
@@ -80,7 +100,7 @@
             <span class="vehicle-id">${escapeHtml(nameOf(vehicle.id))}</span>
             <span class="vehicle-badge ${active ? 'badge-active' : 'badge-inactive'}">${active ? 'ACTIVE' : 'INACTIVE'}</span>
           </div>
-          <div class="vehicle-note">${escapeHtml(note(vehicle))}</div>
+          <div class="vehicle-note">${freshnessDot(vehicle)}${escapeHtml(note(vehicle))}</div>
           <div class="vehicle-stats">
             ${stats(vehicle).map((value) => `<span>${escapeHtml(value)}</span>`).join('')}
           </div>
