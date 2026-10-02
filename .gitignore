@@ -8,8 +8,22 @@ __pycache__/
 .env
 claude.md
 data/live/
-data/admin/
+data/*.sqlite3
+data/*.sqlite3-wal
+data/*.sqlite3-shm
+node_modules/
+.expo/
+expo-env.d.ts
 mobile/
+# Downtime records, snapshot settings and daily snapshots (storage.directory).
+data/admin/
 
-# S13 admin credentials and session key; see config/secrets.example.yaml
+# Where downtime used to be kept before it moved under storage.directory.
+data/downtime.json
+data/.downtime.json.*.tmp
+
+# S13 admin credentials and keys; see config/secrets.example.yaml. Never commit.
 config/secrets.yaml
+
+# Log files, wherever a tool writes them (e.g. Expo's mobile/.expo/dev/logs/).
+*.log

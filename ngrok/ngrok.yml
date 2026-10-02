@@ -1,0 +1,53 @@
+# ngrok agent config (v3) for testing the rider app off the local network.
+# See ngrok/README.md. Nothing here is started automatically.
+#
+# No authtoken lives in this file. Run `ngrok config add-authtoken <token>`
+# once; that writes the default config, which is merged with this one when
+# both are passed with --config.
+#
+# Each `url` is a reserved ngrok domain. Reserve them in the ngrok dashboard
+# and change the names, or delete the `url` lines to get random hostnames.
+# Random hostnames change on every start, and the mobile app bakes the API
+# URL in at build time, so a reserved domain for `nuway-api` saves rebuilds.
+
+version: 3
+
+endpoints:
+  # Mobile app -> Flask JSON API. Everything the app calls lives under /api/:
+  # vehicles, positions, stops, routes, pickup-requests. Anything else is
+  # refused so the dashboard, admin page and static files stay off this URL.
+  - name: nuway-api
+    url: https://nuway-api.ngrok.app
+    upstream:
+      url: 5001
+    traffic_policy:
+      on_http_request:
+        - expressions:
+            - "!req.url.path.startsWith('/api/')"
+          actions:
+            - type: deny
+              config:
+                status_code: 404
+
+  # Browser -> the whole Flask port: dashboard at /, admin at /admin, and the
+  # API. Basic auth because the admin page has no login of its own yet.
+  # The password lives in the account vault, not here. See README.md.
+  - name: nuway-dashboard
+    url: https://nuway-dashboard.ngrok.app
+    upstream:
+      url: 5001
+    traffic_policy:
+      on_http_request:
+        - actions:
+            - type: basic-auth
+              config:
+                realm: nuway
+                credentials:
+                  - "operator:${secrets.get('nuway', 'dashboard-password')}"
+
+  # Expo Go -> Metro dev server, so a phone on any network can load the app.
+  # Metro must be told to advertise this hostname, see the README.
+  - name: nuway-metro
+    url: https://nuway-metro.ngrok.app
+    upstream:
+      url: 8081

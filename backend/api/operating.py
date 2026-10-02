@@ -1,8 +1,13 @@
 """
-GET /api/metrics
+GET /api/operating
 
-Utilisation figures from the GMG time usage model, per vehicle over the
-requested window.
+When each vehicle was operating over a window, split by whether that fell
+inside or outside its rostered service time. For the service calendar, which
+marks both on the mini month and draws them in each vehicle's lane.
+
+Reads positions the way /api/positions and /api/metrics do, from the
+repository the live logger writes to, and classifies them with the same time
+usage model (backend.metrics.operating), so the calendar and the figures agree.
 """
 
 from __future__ import annotations
@@ -12,32 +17,27 @@ from flask import Blueprint, current_app, jsonify, request
 
 from backend.api.params import PERTH_TZ, UTC_TZ, parse_time_range, parse_vehicle_ids
 from backend.config import ConfigError
-from backend.downtime import merged_intervals
-from backend.metrics.tum import Settings, summarise
+from backend.metrics.operating import operating_intervals
+from backend.metrics.tum import Settings
 from backend.models import format_timestamp
 
-bp = Blueprint("metrics", __name__)
+bp = Blueprint("operating", __name__)
 
 
-@bp.get("/api/metrics")
-def metrics():
+@bp.get("/api/operating")
+def operating():
     """
-    Utilisation for a selection and a period.
+    Operating intervals for a selection and a period.
 
-    Query params are those of /api/positions: `vehicles`, `from`, `to`.
+    Query params are those of /api/metrics: `vehicles`, `from`, `to`, with the
+    same defaults (start of today in Perth, to now) and the same errors.
 
     Returns
     -------
     flask.Response
         JSON: the resolved `from` and `to`, and `vehicles`, one entry per
-        selected vehicle with its `buckets`, `kpis` and `unavailable`. 400 in
-        the documented shape for a bad parameter.
-
-    Raises
-    ------
-    ConfigError
-        If the `utilisation` thresholds are unset, since the model cannot
-        classify anything without them.
+        selected vehicle with its `intervals`, each `{start, end, in_schedule}`.
+        `in_schedule` is null only when no timezone is configured.
     """
     config = current_app.config["NUWAY_CONFIG"]
     repo = current_app.config["REPOSITORY"]
@@ -59,32 +59,20 @@ def metrics():
 
     settings = Settings.from_config(config)
     tracks = repo.get_positions(vehicle_ids, start, end)
-    # S19: the admin page's downtime log. Without storage there is no log at
-    # all, which leaves the downtime KPIs unavailable rather than at 100%.
-    # Only durations leave here; a record's reason stays admin only.
-    store = current_app.config["DOWNTIME_STORE"]
-    records = store.list(vehicle_ids, start, end) if store else None
-
-    def downtime_for(vehicle_id):
-        if records is None:
-            return None
-        return merged_intervals([r for r in records if r.vehicle_id == vehicle_id], start, end)
 
     try:
         vehicles = [
-            summarise(
-                vehicle.id, tracks.get(vehicle.id, []), start, end, settings, downtime=downtime_for(vehicle.id)
-            ).to_dict()
+            {
+                "vehicle_id": vehicle.id,
+                "intervals": [
+                    interval.to_dict()
+                    for interval in operating_intervals(vehicle.id, tracks.get(vehicle.id, []), start, end, settings)
+                ],
+            }
             for vehicle in config.vehicles
             if vehicle.id in vehicle_ids
         ]
     except ValueError as exc:
         raise ConfigError(str(exc)) from exc
 
-    return jsonify(
-        {
-            "from": format_timestamp(start),
-            "to": format_timestamp(end),
-            "vehicles": vehicles,
-        }
-    )
+    return jsonify({"from": format_timestamp(start), "to": format_timestamp(end), "vehicles": vehicles})

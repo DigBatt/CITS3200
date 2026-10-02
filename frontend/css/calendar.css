@@ -1,0 +1,1009 @@
+/* Service calendar (S21). Shared by the admin Schedule tab and the dashboard
+   Schedule view, so it depends on no page specific styles. */
+
+/* On :root rather than .cal, since the mini month sits outside .cal and
+   downtime has to read the same in both. Orange rather than red, so it is
+   not mistaken for the red now line and today marker. */
+:root {
+  --cal-downtime: #f97316;
+  /* Operating time (/api/operating): green inside the roster, pink outside
+     it. Apart from the blue roster, orange downtime, red now line and every
+     vehicle colour. */
+  --cal-op-in: #059669;
+  --cal-op-out: #db2777;
+}
+
+.cal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  --cal-line: rgba(128, 128, 128, 0.28);
+  --cal-scheduled: rgba(56, 189, 248, 0.22);
+  --cal-scheduled-edge: rgba(56, 189, 248, 0.75);
+  --cal-now: #ef4444;
+}
+
+/* Vehicle toggles: multi select, unlike the dashboard's single vehicle filter */
+.cal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.cal-chip {
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--cal-line);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.cal-chip::before {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  background: var(--cal-vehicle);
+  vertical-align: baseline;
+}
+
+.cal-chip.is-on {
+  opacity: 1;
+  border-color: var(--cal-vehicle);
+}
+
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+
+.cal-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.cal-swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  border: 1px solid var(--cal-line);
+}
+
+.cal-swatch.is-scheduled { background: var(--cal-scheduled); border-color: var(--cal-scheduled-edge); }
+.cal-swatch.is-unscheduled { background: transparent; }
+.cal-swatch.is-downtime {
+  background: repeating-linear-gradient(45deg, var(--cal-downtime) 0 3px, transparent 3px 6px);
+  border-color: var(--cal-downtime);
+}
+/* Outside the selected period wears what downtime used to: neutral
+   hatching. The selection itself stays clear. */
+.cal-swatch.is-outside-period {
+  background: repeating-linear-gradient(45deg, currentColor 0 3px, transparent 3px 6px);
+  opacity: 0.8;
+}
+.cal-swatch.is-now { background: var(--cal-now); border-color: var(--cal-now); }
+.cal-swatch.is-op-in { background: var(--cal-op-in); border-color: var(--cal-op-in); }
+.cal-swatch.is-op-out { background: var(--cal-op-out); border-color: var(--cal-op-out); }
+
+/* Navigation: step by a day in the 3 day view, by a week in the 7 day one */
+.cal-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cal-nav {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+
+.cal-step,
+.cal-today,
+.cal-view {
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--cal-line);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cal-step { font-size: 0.95rem; padding-block: 0.18rem; }
+.cal-today[disabled] { opacity: 0.4; cursor: default; }
+
+.cal-range {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.cal-views { display: inline-flex; gap: 0.2rem; margin-left: auto; }
+.cal-view.is-on { border-color: currentColor; font-weight: 600; }
+
+.cal.is-loading { opacity: 0.6; }
+
+/* The board: an hour gutter, then one column per day */
+.cal-grid {
+  display: grid;
+  grid-template-columns: 3.2rem repeat(var(--cal-days, 3), minmax(0, 1fr));
+  gap: 0.3rem;
+  /* 22rem unless the container gives it more, since the bands are positioned
+     as percentages and so need a resolved height either way. */
+  flex: 1 1 22rem;
+  min-height: 20rem;
+}
+
+.cal-hours {
+  position: relative;
+  font-size: 0.65rem;
+  opacity: 0.6;
+}
+
+.cal-hours span {
+  position: absolute;
+  right: 0.3rem;
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+.cal-day {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cal-day-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0 0.2rem 0.25rem;
+  font-size: 0.7rem;
+  border-bottom: 1px solid var(--cal-line);
+}
+
+.cal-day-name { text-transform: uppercase; letter-spacing: 0.06em; }
+.cal-day-date { opacity: 0.6; }
+.cal-day.is-today .cal-day-name { font-weight: 700; }
+.cal-day.is-today .cal-day-head { border-bottom-color: var(--cal-now); }
+
+/* Where the calendar picks the period, each heading is a button: click one
+   day for the start and another for the end (js/calendar.js, pickDay). It
+   keeps the heading's look, with the period's days tinted and a half made
+   pick's start marked. */
+button.cal-day-head {
+  width: 100%;
+  font: inherit;
+  font-size: 0.7rem;
+  color: inherit;
+  text-align: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--cal-line);
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+}
+
+button.cal-day-head:hover { background: rgba(47, 125, 143, 0.12); }
+button.cal-day-head:focus-visible { outline: 2px solid #2f7d8f; outline-offset: 1px; }
+button.cal-day-head.is-in-period { background: rgba(47, 125, 143, 0.14); }
+button.cal-day-head.is-pick-start { background: rgba(47, 125, 143, 0.36); font-weight: 600; }
+button.cal-day-head[aria-disabled='true'] { cursor: not-allowed; opacity: 0.45; }
+button.cal-day-head[aria-disabled='true']:hover { background: transparent; }
+
+/* What the next heading click does, at the end of the legend. */
+.cal-pick-hint {
+  margin-left: auto;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+/* Nothing drawn on a column is scheduled, so the bare column IS non-scheduled */
+.cal-day-body {
+  position: relative;
+  flex: 1;
+  border: 1px solid var(--cal-line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.cal-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--cal-line);
+  opacity: 0.5;
+}
+
+/* One lane per shown vehicle: its roster and its downtime, side by side */
+.cal-lane {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  color: var(--cal-vehicle);
+  border-right: 1px solid var(--cal-line);
+}
+
+.cal-lane:last-child { border-right: none; }
+
+.cal-scheduled {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--cal-scheduled);
+  border-top: 1px solid var(--cal-scheduled-edge);
+  border-bottom: 1px solid var(--cal-scheduled-edge);
+  font-size: 0.58rem;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  color: inherit;
+}
+
+.cal-no-vehicles {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-size: 0.65rem;
+  opacity: 0.5;
+  text-align: center;
+}
+
+.cal-downtime {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  min-height: 2px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(45deg, var(--cal-downtime) 0 4px, transparent 4px 8px);
+  border: 1px solid var(--cal-downtime);
+}
+
+/* Time outside the selected period, across every lane of the day, so the
+   selection is what stands out clear. Light enough to read the roster and
+   downtime through, and it passes the pointer on to them. */
+.cal-outside {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(45deg, currentColor 0 4px, transparent 4px 8px);
+  opacity: 0.3;
+}
+
+.cal-outside[hidden] { display: none; }
+
+/* The edge that meets the selection: the bottom of the band before it, the
+   top of the band after it. */
+.cal-outside.meets-selection[data-cal-outside='before'] { border-bottom: 1px solid currentColor; }
+.cal-outside.meets-selection[data-cal-outside='after'] { border-top: 1px solid currentColor; }
+
+.cal-now {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  border-top: 2px solid var(--cal-now);
+  pointer-events: none;
+}
+
+.cal-now span {
+  position: absolute;
+  right: 2px;
+  top: 1px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--cal-now);
+}
+
+.cal-caption,
+.cal-empty,
+.cal-error {
+  margin: 0;
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+.cal-error { color: #ef4444; opacity: 1; }
+
+@media (max-width: 720px) {
+  .cal-grid { grid-template-columns: 2.4rem repeat(var(--cal-days, 3), minmax(0, 1fr)); flex: 0 0 18rem; min-height: 18rem; }
+  .cal-scheduled { font-size: 0; }
+  .cal-day-date { display: none; }
+}
+
+
+/* ---- Mini month (S21) ----
+   A month at a glance in the admin dock. Unlabelled on purpose: the dock is
+   obviously a calendar, and the full view names itself. */
+
+.mini { display: flex; flex-direction: column; gap: 0.35rem; }
+
+.mini-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+}
+
+/* The month name is the fold control, so it reads as a button but sits flat
+   in the bar until hovered. */
+.mini-month {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.mini-month:hover { background: rgba(128, 128, 128, 0.12); }
+
+.mini-chevron {
+  font-size: 0.6rem;
+  opacity: 0.6;
+}
+
+/* Folded: the bar alone. The dock keeps its width so it does not jump about
+   as it opens and closes. */
+.mini.is-collapsed { gap: 0; }
+
+.mini-step {
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mini-dows,
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+}
+
+.mini-dows {
+  font-size: 0.6rem;
+  opacity: 0.5;
+  text-align: center;
+}
+
+.mini-day {
+  font: inherit;
+  font-size: 0.68rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 0.18rem 0 0.12rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mini-day:hover { background: rgba(128, 128, 128, 0.12); }
+.mini-day.is-outside { opacity: 0.32; }
+
+.mini-day.is-today .mini-num {
+  background: var(--cal-now, #ef4444);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 0.28rem;
+  font-weight: 700;
+}
+
+/* The underline: what happened that day, service and/or downtime. */
+.mini-marks {
+  display: flex;
+  gap: 1px;
+  height: 3px;
+  width: 70%;
+}
+
+.mini-mark {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.mini-mark.is-service { background: rgba(56, 189, 248, 0.9); }
+.mini-mark.is-downtime { background: var(--cal-downtime); }
+.mini-mark.is-op-in { background: var(--cal-op-in); }
+.mini-mark.is-op-out { background: var(--cal-op-out); }
+
+.mini-legend {
+  display: flex;
+  flex-wrap: wrap; /* four keys now: service, downtime, and operating in and outside schedule */
+  gap: 0.25rem 0.6rem;
+  font-size: 0.6rem;
+  opacity: 0.7;
+}
+
+.mini-legend span { display: inline-flex; align-items: center; gap: 0.25rem; }
+.mini-legend .mini-mark { width: 0.6rem; flex: none; }
+
+/* Range picking (the dashboard dock). Days join into one band across a
+   week, so the columns close up, and a press on the grid drags rather than
+   scrolls or selects text. */
+.mini.is-ranged .mini-grid {
+  column-gap: 0;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mini-day.is-in-range {
+  border-radius: 0;
+  background: rgba(47, 125, 143, 0.16);
+}
+
+.mini-day.is-in-range:hover { background: rgba(47, 125, 143, 0.26); }
+.mini-day.is-range-start { border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
+.mini-day.is-range-end { border-top-right-radius: 5px; border-bottom-right-radius: 5px; }
+
+.mini-day.is-range-start,
+.mini-day.is-range-end {
+  background: rgba(47, 125, 143, 0.32);
+  font-weight: 600;
+}
+
+/* Picking: the range so far is shown dashed until the end date is picked,
+   and the start date stands out while it waits for one. */
+.mini-day.is-preview { background: rgba(47, 125, 143, 0.1); box-shadow: inset 0 0 0 1px rgba(47, 125, 143, 0.35); }
+.mini-day.is-preview.is-range-start,
+.mini-day.is-preview.is-range-end { background: rgba(47, 125, 143, 0.22); }
+.mini-day.is-pending { background: #2f7d8f; color: #fff; }
+.mini-day.is-pending .mini-num { color: #fff; }
+
+/* What the next click does. */
+.mini-hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.66rem;
+  line-height: 1.35;
+  opacity: 0.75;
+}
+
+/* Nothing has happened there yet, so it cannot be picked. */
+.mini-day.is-future {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.mini-day.is-future:hover { background: transparent; }
+
+.mini-expand { font-size: 0.75rem; }
+
+/* ---- Full calendar overlay ---- */
+
+.cal-overlay {
+  position: fixed;
+  inset: 0;
+  /* Above the dashboard's docked mini month (900), which is itself above
+     Leaflet's controls. */
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2vmin;
+  background: rgba(15, 12, 10, 0.55);
+}
+
+.cal-overlay[hidden] { display: none; }
+
+.cal-overlay-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(1400px, 96vw);
+  height: min(900px, 92vh);
+  padding: 1rem 1.15rem 1.15rem;
+  border-radius: 12px;
+  background: #fff;
+  color: #1c1917;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+}
+
+.cal-overlay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cal-overlay-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* The board fills the panel, so a week of lanes has room to be read. */
+.cal-overlay-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.cal-overlay-body .cal {
+  flex: 1;
+  min-height: 0;
+}
+
+body.is-overlaid { overflow: hidden; }
+
+@media (max-width: 720px) {
+  .cal-overlay { padding: 0; }
+  .cal-overlay-panel { width: 100vw; height: 100vh; border-radius: 0; }
+}
+
+
+/* ---- Range tools: the period, picked from the full calendar ----
+   Sits between the visible days' label and the 3/7 day toggle, and takes
+   the room between them. Wraps under the navigation on a narrow screen. */
+
+.cal-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.cal-range-pick { position: relative; }
+
+.cal-range-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font: inherit;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--cal-line);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cal-range-btn:hover,
+.cal-range-btn[aria-expanded='true'] { border-color: currentColor; }
+
+.cal-range-chevron { font-size: 0.6rem; opacity: 0.6; }
+
+.cal-range-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
+  width: 16rem;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(28, 25, 23, 0.18);
+}
+
+.cal-range-pop[hidden] { display: none; }
+
+.cal-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 18rem;
+}
+
+.cal-slider-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  font: inherit;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--cal-line);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cal-slider-btn.is-on { border-color: currentColor; font-weight: 600; }
+.cal-slider-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.cal-slider-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cal-line);
+}
+
+.cal-slider-live.is-on .cal-slider-live-dot { background: var(--cal-now); }
+
+.cal-slider-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Two range inputs laid over one track. Only their thumbs take the pointer,
+   so either can be grabbed wherever it sits. */
+.cal-slider-track {
+  position: relative;
+  height: 1.25rem;
+}
+
+/* Inset by the thumb's radius, so the fill and the dots line up with the
+   thumbs' centres rather than the inputs' edges. */
+.cal-slider-rail {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: var(--cal-line);
+}
+
+.cal-slider-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.45;
+}
+
+.cal-measure-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2f7d8f;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.cal-slider-rail .cal-measure-dot {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.cal-measure-dot[hidden] { display: none; }
+
+.cal-slider-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  z-index: 2;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.cal-slider-input.is-top { z-index: 3; }
+
+.cal-slider-input::-webkit-slider-runnable-track { height: 100%; background: transparent; }
+.cal-slider-input::-moz-range-track { background: transparent; }
+
+.cal-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 14px;
+  height: 14px;
+  margin-top: calc((1.25rem - 14px) / 2);
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid currentColor;
+  cursor: grab;
+}
+
+.cal-slider-input::-moz-range-thumb {
+  pointer-events: auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid currentColor;
+  cursor: grab;
+}
+
+.cal-slider-input:active::-webkit-slider-thumb { cursor: grabbing; }
+.cal-slider-input:disabled::-webkit-slider-thumb { border-color: var(--cal-line); cursor: not-allowed; }
+.cal-slider-input:disabled::-moz-range-thumb { border-color: var(--cal-line); cursor: not-allowed; }
+.cal-slider-input:focus-visible::-webkit-slider-thumb { outline: 2px solid #2f7d8f; outline-offset: 2px; }
+
+.cal-slider-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.64rem;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+/* ---- The month bar in a page header, and the overlay it opens ----
+   js/calendar.js's mount() with `head` and `panel`: the bar lives in the
+   header, so no docked calendar covers the page; the month (and, on the
+   dashboard, the time sliders) opens below it as an overlay.
+
+   Layering: above Leaflet's panes and controls (up to 1000) and the map's
+   2D / 3D toggle (1100), below the full calendar overlay (2000). */
+
+.period-picker {
+  position: relative;
+  flex: none;
+}
+
+.period-bar .mini-head {
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(28, 25, 23, 0.14);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.period-bar .mini-step {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.2rem 0.45rem;
+}
+
+.period-bar .mini-step:hover,
+.period-bar .mini-month:hover { background: rgba(28, 25, 23, 0.07); }
+
+.period-bar .mini-month {
+  min-width: 9.5rem;
+  font-size: 0.78rem;
+  border-radius: 999px;
+}
+
+.period-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 1500;
+  width: 17rem;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(28, 25, 23, 0.2);
+}
+
+.period-panel[hidden] { display: none; }
+
+/* A phone: the overlay spans the screen under the header, which
+   js/calendar.js measures since the header wraps, and scrolls if it must. */
+@media (max-width: 600px) {
+  .period-panel {
+    position: fixed;
+    top: calc(var(--app-header-bottom, 64px) + 6px);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: calc(100vh - var(--app-header-bottom, 64px) - 14px);
+    overflow-y: auto;
+  }
+
+  .period-bar .mini-month { min-width: 0; }
+}
+
+/* A scheduled or downtime block that opens its vehicle's figures for its
+   time (onBlock in js/calendar.js): pointer, and an outline in the lane's
+   vehicle colour on hover or focus. */
+.cal-scheduled.is-linked,
+.cal-downtime.is-linked { cursor: pointer; }
+
+.cal-scheduled.is-linked:hover,
+.cal-downtime.is-linked:hover,
+.cal-scheduled.is-linked:focus-visible,
+.cal-downtime.is-linked:focus-visible {
+  outline: 2px solid var(--cal-vehicle, #2f7d8f);
+  outline-offset: -1px;
+  z-index: 3;
+}
+
+/* ---- Period control (js/timeline.js) ----
+   Under the month in the header calendar's overlay, on the dashboard and the
+   admin page alike. */
+.timeline-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(28, 25, 23, 0.1);
+  cursor: default;
+}
+
+.timeline-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.timeline-summary {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.66rem;
+  line-height: 1.3;
+  color: rgba(28, 25, 23, 0.65);
+}
+
+.timeline-live-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  padding: 0.2rem 0.55rem;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border: 1px solid rgba(28, 25, 23, 0.2);
+  border-radius: 999px;
+  background: #fff;
+  color: rgba(28, 25, 23, 0.7);
+  cursor: pointer;
+}
+
+.timeline-live-btn:hover { border-color: rgba(28, 25, 23, 0.4); }
+
+/* Colour matches nUWAy 2's vehicle marker (config/vehicles.yaml), reused
+   here as the app's one accent colour rather than introducing a new one. */
+.timeline-live-btn.is-on {
+  border-color: #2f7d8f;
+  background: rgba(47, 125, 143, 0.1);
+  color: #1f5967;
+}
+
+.timeline-live-btn:focus-visible {
+  outline: 2px solid #2f7d8f;
+  outline-offset: 2px;
+}
+
+.timeline-live-dot {
+  display: inline-block;
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c0392b; /* broadcast red -- distinct from any vehicle colour */
+}
+
+.timeline-live-dot[hidden] {
+  display: none;
+}
+
+.timeline-live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #c0392b;
+  animation: timeline-pulse-ring 1.6s ease-out infinite;
+}
+
+@keyframes timeline-pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.timeline-slider {
+  display: grid;
+  grid-template-columns: 3.4rem 1fr 2.4rem;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+}
+
+.timeline-slider-label {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  color: rgba(28, 25, 23, 0.6);
+}
+
+.timeline-slider-label small {
+  font-size: 0.62rem;
+  color: rgba(28, 25, 23, 0.45);
+}
+
+.timeline-slider input[type='range'] {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: #2f7d8f;
+  cursor: pointer;
+}
+
+.timeline-slider input[type='range']:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.timeline-slider-value {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  text-align: right;
+}
+
+.timeline-status {
+  margin: 0;
+  font-size: 0.68rem;
+  color: #a35b00;
+}
+
+.timeline-status:empty {
+  display: none;
+}
+
+/* Operating time in a vehicle's lane: a bar down its middle, over the
+   roster band, so whether it falls inside scheduled time is plain to see. */
+.cal-operating {
+  position: absolute;
+  left: 35%;
+  right: 35%;
+  min-height: 2px;
+  border-radius: 2px;
+}
+
+.cal-operating.is-in { background: var(--cal-op-in); }
+.cal-operating.is-out { background: var(--cal-op-out); }
+.cal-operating.is-unknown { background: rgba(28, 25, 23, 0.45); }
+.cal-operating.is-linked { cursor: pointer; }
+
+.cal-operating.is-linked:hover,
+.cal-operating.is-linked:focus-visible {
+  outline: 2px solid var(--cal-vehicle, #2f7d8f);
+  outline-offset: 1px;
+  z-index: 3;
+}

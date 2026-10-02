@@ -1,15 +1,17 @@
 // Timeline period control.
 //
-// A start/end date+time picker, plus a "Live" toggle that pins the end of
-// the range to now and keeps refetching, producing the from/to parameters
-// in docs/api.md.
+// Owns the selected period and turns it into the from/to parameters in
+// docs/api.md. The days are chosen on a calendar, by dragging across them
+// (js/calendar.js, both the docked mini month and the full calendar's
+// dropdown); this control sits under the mini month with a Live button,
+// which pins the end of the range to now and keeps refetching, and a Start
+// and End time slider. The full calendar has its own slider over the same
+// state. End sliders are disabled while Live is on.
 //
-// While Live is on, the End row is hidden rather than just disabled, and a
-// plain-language summary line states the resolved range -- both came out
-// of testing feedback that a greyed-out End field still showing a stale
-// date looked broken even when it was correctly being ignored.
+// A plain-language summary line states the resolved range -- that came out
+// of testing feedback that an ignored End field looked broken.
 //
-// Defaults to today, live, when the page loads, per S06's third criterion.
+// Defaults to live when the page loads, per S06's third criterion.
 // Dates and times are chosen and displayed in Perth time; the API wants
 // UTC instants, so everything is converted here before onChange fires.
 // Perth is UTC+8 year round (docs/data-schema.md s4) -- WA has no DST --
@@ -97,21 +99,95 @@ function formatDisplay(dateStr, timeStr) {
   return `${day} ${MONTH_ABBR[month - 1]} ${year}, ${hour12}:${String(minute).padStart(2, '0')} ${period}`;
 }
 
+const DAY_LAST_MINUTE = 1439;
+const MINUTE_MS = 60000;
+const HOUR_MS = 60 * MINUTE_MS;
+// How often the map is refetched while a slider is being dragged. Often
+// enough that the trail follows the thumb, not so often that it fires a
+// request per pixel. main.js draws each response unless a newer one has
+// already been drawn.
+const SCRUB_THROTTLE_MS = 120;
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/** "HH:MM" to minutes past midnight. */
+function toMinutes(timeStr) {
+  const [hour, minute] = timeStr.split(':').map(Number);
+  return hour * 60 + minute;
+}
+
+/** Minutes past midnight to "HH:MM". */
+function toTimeString(minutes) {
+  return `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`;
+}
+
+/** "YYYY-MM-DD" to "4 Sep", for the slider labels. */
+function formatShortDate(dateStr) {
+  const [, month, day] = dateStr.split('-').map(Number);
+  return `${day} ${MONTH_ABBR[month - 1]}`;
+}
+
+/** The UTC instant, in ms, of midnight starting a Perth date. */
+function perthDayStartMs(dateStr) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return Date.UTC(year, month - 1, day, -PERTH_UTC_OFFSET_HOURS);
+}
+
+/** A UTC instant in ms as a Perth date and minute of the day. */
+function toPerth(ms) {
+  const shifted = new Date(ms + PERTH_UTC_OFFSET_HOURS * HOUR_MS);
+  return {
+    date: shifted.toISOString().slice(0, 10),
+    min: shifted.getUTCHours() * 60 + shifted.getUTCMinutes(),
+  };
+}
+
+/** A UTC instant in ms for the summary line, e.g. "4 Sep 2025, 4:21 pm". */
+function formatInstant(ms) {
+  const { date, min } = toPerth(ms);
+  return formatDisplay(date, toTimeString(min));
+}
+
 /**
- * Mount a start/end date-time range picker into `container`, with a "Live"
- * toggle for the end of the range.
+ * Mount the period control into `container`: a Live button, and a Start and
+ * an End time slider under the mini calendar.
+ *
+ * The selection has two parts. The *span* is the run of days picked on a
+ * calendar, by dragging across them (js/calendar.js calls `setDates`, and
+ * reads `getDates` back to paint them). The *window* is the start and end
+ * instant inside that span, which is what the map and metrics are fetched
+ * for. Picking days opens the window out to the whole span; the sliders
+ * then narrow it.
+ *
+ * The dock's two sliders set the time of day at each end of the window, on
+ * whichever day that end sits. The full calendar's slider covers the whole
+ * span with one thumb per end, through `scrub`. Either way the map refetches
+ * as a thumb moves, so the trail and each vehicle's end marker follow it --
+ * the end effectively scrubs where the fleet was at that moment.
+ *
+ * Live pins the end of the window to now and keeps refetching. End sliders
+ * are disabled while it is on, since there is no end to choose.
  *
  * @param {HTMLElement} container
  * @param {Object} [options]
- * @param {(range: {from: string|null, to: string|null, live: boolean}) => void} [options.onChange]
- *   Called with the UTC `from`/`to` instants (`null` when a field is blank)
- *   whenever the selection changes -- including once on mount with the
- *   default (today, live) -- and on every live poll tick.
+ * @param {(range: {from: string|null, to: string|null, live: boolean, scrub: boolean, dragging: boolean}) => void} [options.onChange]
+ *   Called with the UTC `from`/`to` instants whenever the selection changes
+ *   -- including once on mount with the default -- and on every live poll
+ *   tick. `scrub` is true when a slider moved or a poll ticked, so the
+ *   caller can redraw without refitting the map under the operator's hand.
+ *   `dragging` is true for the updates fired while a slider thumb is still
+ *   held, so the caller can keep them light.
  * @param {number} [options.livePollMs] - How often to re-fire onChange
  *   while live, so the caller can refetch. Defaults to 15s, matching
  *   config/app.yaml's refresh_interval_seconds.
  * @returns {{
  *   getRange: () => {from: string|null, to: string|null, live: boolean},
+ *   getDates: () => {start: string, end: string, live: boolean},
+ *   getWindow: () => Object,
+ *   setDates: (start: string, end: string) => void,
+ *   setLive: (on: boolean) => void,
+ *   scrub: (ends: {startMs?: number, endMs?: number}) => void,
+ *   release: () => void,
  *   reset: () => void,
  *   getFieldState: () => Object,
  *   setFieldState: (state: Object) => void,
@@ -121,156 +197,233 @@ function formatDisplay(dateStr, timeStr) {
  * }}
  */
 function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_POLL_MS } = {}) {
-  const todayStr = getPerthDateString();
-  const nowStr = getPerthTimeString();
+  const todayOnLoad = getPerthDateString();
+  // Instants are UTC ms on whole minutes. `endMs` is the start of the last
+  // minute included, and is ignored while live.
+  const state = {
+    spanStart: DEV_DEFAULT_START_DATE,
+    spanEnd: todayOnLoad,
+    startMs: perthDayStartMs(DEV_DEFAULT_START_DATE) + toMinutes(DEV_DEFAULT_START_TIME) * MINUTE_MS,
+    endMs: 0,
+    live: true,
+  };
 
   container.innerHTML = `
     <div class="timeline-control">
-      <div class="timeline-row">
-        <span class="timeline-row-label">Start</span>
-        <input type="date" id="timeline-start-date" value="${DEV_DEFAULT_START_DATE}" max="${todayStr}" autocomplete="off">
-        <input type="time" id="timeline-start-time" value="${DEV_DEFAULT_START_TIME}" autocomplete="off">
+      <div class="timeline-head">
+        <p class="timeline-summary" id="timeline-summary-text"></p>
+        <button type="button" class="timeline-live-btn" id="timeline-live" title="Set the end of the range to now, and keep it there">
+          <span class="timeline-live-dot" aria-hidden="true"></span>Live
+        </button>
       </div>
-      <div class="timeline-row" id="timeline-end-row">
-        <span class="timeline-row-label">End</span>
-        <input type="date" id="timeline-end-date" value="${todayStr}" max="${todayStr}" autocomplete="off">
-        <input type="time" id="timeline-end-time" value="${nowStr}" autocomplete="off">
-      </div>
-      <div class="timeline-live">
-        <label class="timeline-switch" for="timeline-live">
-          <input type="checkbox" id="timeline-live" checked aria-labelledby="timeline-live-label">
-          <span class="timeline-switch-track"></span>
-          <span class="timeline-switch-knob"></span>
-        </label>
-        <span id="timeline-live-label">Live (end = now)</span>
-        <span class="timeline-live-dot" aria-hidden="true"></span>
-      </div>
-      <p class="timeline-summary">Showing <strong id="timeline-summary-text"></strong></p>
+      <label class="timeline-slider">
+        <span class="timeline-slider-label">Start <small id="timeline-start-date"></small></span>
+        <input type="range" id="timeline-start" min="0" max="${DAY_LAST_MINUTE}" step="1">
+        <output class="timeline-slider-value" id="timeline-start-value" for="timeline-start"></output>
+      </label>
+      <label class="timeline-slider">
+        <span class="timeline-slider-label">End <small id="timeline-end-date"></small></span>
+        <input type="range" id="timeline-end" min="0" max="${DAY_LAST_MINUTE}" step="1">
+        <output class="timeline-slider-value" id="timeline-end-value" for="timeline-end"></output>
+      </label>
       <p class="timeline-status" aria-live="polite"></p>
     </div>
   `;
 
-  const startDate = container.querySelector('#timeline-start-date');
-  const startTime = container.querySelector('#timeline-start-time');
-  const endDate = container.querySelector('#timeline-end-date');
-  const endTime = container.querySelector('#timeline-end-time');
-  const endRow = container.querySelector('#timeline-end-row');
-  const liveToggle = container.querySelector('#timeline-live');
-  const liveDot = container.querySelector('.timeline-live-dot');
   const summaryText = container.querySelector('#timeline-summary-text');
+  const liveButton = container.querySelector('#timeline-live');
+  const liveDot = container.querySelector('.timeline-live-dot');
+  const startSlider = container.querySelector('#timeline-start');
+  const endSlider = container.querySelector('#timeline-end');
+  const startDateLabel = container.querySelector('#timeline-start-date');
+  const endDateLabel = container.querySelector('#timeline-end-date');
+  const startValue = container.querySelector('#timeline-start-value');
+  const endValue = container.querySelector('#timeline-end-value');
   const status = container.querySelector('.timeline-status');
 
   let pollHandle = null;
+  let scrubHandle = null;
+  let lastScrubAt = 0;
+
+  const today = () => getPerthDateString();
+  // Now, down to the minute, since that is the resolution everything moves in.
+  const nowMs = () => Math.floor(Date.now() / MINUTE_MS) * MINUTE_MS;
+  // Where the window actually ends: now while live, `endMs` otherwise.
+  const effectiveEndMs = () => (state.live ? nowMs() : state.endMs);
+  // The span as instants: midnight starting the first day, to the last
+  // minute of the last day or now, whichever comes first.
+  const spanStartMs = () => perthDayStartMs(state.spanStart);
+  const spanEndMs = () => Math.min(perthDayStartMs(state.spanEnd) + DAY_LAST_MINUTE * MINUTE_MS, nowMs());
+
+  // The start stays inside the span and at least a minute before the end;
+  // the end stays inside the span, after the start, and not past now.
+  const clampStart = (ms) => Math.max(spanStartMs(), Math.min(ms, effectiveEndMs() - MINUTE_MS));
+  const clampEnd = (ms) => Math.max(state.startMs + MINUTE_MS, Math.min(ms, spanEndMs()));
 
   function currentRange() {
-    const from = perthToUtcIso(startDate.value, startTime.value);
-    // Live ignores whatever sits in the (hidden) end inputs and means
-    // "now": send no `to` at all and let the server default apply
-    // (docs/api.md), so every poll genuinely reaches the latest data
-    // rather than replaying a stale "now" captured when the toggle was
-    // switched on.
-    const to = liveToggle.checked ? null : perthToUtcIso(endDate.value, endTime.value);
-    return { from, to, live: liveToggle.checked };
+    const from = new Date(state.startMs).toISOString();
+    // Live sends no `to` at all and lets the server default apply
+    // (docs/api.md), so every poll genuinely reaches the latest data rather
+    // than replaying a stale "now". Otherwise the end minute is inclusive.
+    const to = state.live ? null : new Date(state.endMs + 59000).toISOString();
+    return { from, to, live: state.live };
   }
 
-  function updateSummary() {
-    const startDisplay = formatDisplay(startDate.value, startTime.value);
-    // Real current date/time, not the word "now" -- refreshes on every
-    // poll tick while Live is on, so the summary visibly advances rather
-    // than sitting static.
-    const endDisplay = liveToggle.checked
-      ? formatDisplay(getPerthDateString(), getPerthTimeString())
-      : formatDisplay(endDate.value, endTime.value);
-    summaryText.textContent = `${startDisplay} \u2192 ${endDisplay}`;
+  function render() {
+    const start = toPerth(state.startMs);
+    const end = toPerth(effectiveEndMs());
+    summaryText.textContent = `${formatInstant(state.startMs)} → ${formatInstant(effectiveEndMs())}`;
+
+    startSlider.value = start.min;
+    startValue.textContent = toTimeString(start.min);
+    startDateLabel.textContent = formatShortDate(start.date);
+
+    endSlider.value = end.min;
+    endSlider.disabled = state.live;
+    endValue.textContent = state.live ? 'now' : toTimeString(end.min);
+    endDateLabel.textContent = formatShortDate(end.date);
+
+    liveButton.classList.toggle('is-on', state.live);
+    liveButton.setAttribute('aria-pressed', String(state.live));
+    liveDot.hidden = !state.live;
   }
 
-  function emit() {
+  function emit(scrub = false, dragging = false) {
+    clearTimeout(scrubHandle);
+    scrubHandle = null;
     status.textContent = '';
-    updateSummary();
-    onChange?.(currentRange());
+    render();
+    onChange?.({ ...currentRange(), scrub, dragging });
   }
 
-  function stopPolling() {
+  function syncPolling() {
     if (pollHandle !== null) {
       clearInterval(pollHandle);
       pollHandle = null;
     }
+    if (state.live) pollHandle = setInterval(() => emit(true), livePollMs);
   }
 
-  function syncLiveState() {
-    const isLive = liveToggle.checked;
-    // Hidden, not just disabled -- a greyed-out End field still showing a
-    // stale date reads as broken even when it's correctly being ignored
-    // (see the timeline-picker-redesign discussion).
-    endRow.hidden = isLive;
-    endDate.disabled = isLive;
-    endTime.disabled = isLive;
-    liveDot.hidden = !isLive;
-    stopPolling();
-    if (isLive) {
-      pollHandle = setInterval(emit, livePollMs);
-    }
+  /**
+   * Move either end of the window while a thumb is held. Labels follow at
+   * once; the refetch goes out at most once per SCRUB_THROTTLE_MS, with a
+   * trailing one to catch where the thumb stopped. Call `release` on letting
+   * go, which refetches straight away.
+   */
+  function scrub({ startMs, endMs } = {}) {
+    if (startMs !== undefined) state.startMs = clampStart(startMs);
+    if (endMs !== undefined && !state.live) state.endMs = clampEnd(endMs);
+    render();
+    clearTimeout(scrubHandle);
+    const wait = SCRUB_THROTTLE_MS - (Date.now() - lastScrubAt);
+    const fire = () => {
+      lastScrubAt = Date.now();
+      emit(true, true);
+    };
+    if (wait <= 0) fire();
+    else scrubHandle = setTimeout(fire, wait);
   }
 
-  function guardFutureDate(input) {
-    if (input.value > todayStr) {
-      input.value = todayStr;
-      status.textContent = 'Future dates are not available yet.';
-    }
+  const release = () => emit(true);
+
+  // The dock sliders are a time of day, on whichever day that end sits.
+  startSlider.addEventListener('input', () => {
+    scrub({ startMs: perthDayStartMs(toPerth(state.startMs).date) + Number(startSlider.value) * MINUTE_MS });
+  });
+  endSlider.addEventListener('input', () => {
+    scrub({ endMs: perthDayStartMs(toPerth(state.endMs).date) + Number(endSlider.value) * MINUTE_MS });
+  });
+  startSlider.addEventListener('change', release);
+  endSlider.addEventListener('change', release);
+
+  function setLive(on) {
+    state.live = on;
+    // Either way the span now runs to today. Switching Live off leaves the
+    // end at the moment it was switched off, ready to be dragged back.
+    state.spanEnd = today();
+    state.endMs = nowMs();
+    state.startMs = clampStart(state.startMs);
+    syncPolling();
+    emit();
   }
 
-  startDate.addEventListener('change', () => { guardFutureDate(startDate); emit(); });
-  startTime.addEventListener('change', emit);
-  endDate.addEventListener('change', () => { guardFutureDate(endDate); emit(); });
-  endTime.addEventListener('change', emit);
-  liveToggle.addEventListener('change', () => { syncLiveState(); emit(); });
+  liveButton.addEventListener('click', () => setLive(!state.live));
 
-  syncLiveState();
-  // Fire once immediately so the caller is told about the default (today,
-  // live) on load, per S06's third criterion -- otherwise onChange only
-  // fires after the user manually changes something.
+  /**
+   * Take a new span of Perth dates, as a calendar hands them over. The window
+   * opens out to the whole span so nothing chosen is hidden at first; the
+   * sliders narrow it from there. Live survives only a span that still ends
+   * today.
+   */
+  function setDates(startDate, endDate) {
+    const todayStr = today();
+    if (startDate > endDate) [startDate, endDate] = [endDate, startDate];
+    let clamped = false;
+    if (endDate > todayStr) { endDate = todayStr; clamped = true; }
+    if (startDate > todayStr) { startDate = todayStr; clamped = true; }
+
+    state.spanStart = startDate;
+    state.spanEnd = endDate;
+    state.live = state.live && endDate === todayStr;
+    state.endMs = spanEndMs();
+    state.startMs = clampStart(spanStartMs());
+    syncPolling();
+    emit();
+    if (clamped) status.textContent = 'Future dates are not available yet.';
+  }
+
+  state.endMs = nowMs();
+  syncPolling();
+  // Fire once immediately so the caller is told about the default on load,
+  // per S06's third criterion -- otherwise onChange only fires after the
+  // user manually changes something.
   emit();
 
   return {
     getRange: currentRange,
-    reset: () => {
-      startDate.value = DEV_DEFAULT_START_DATE;
-      startTime.value = DEV_DEFAULT_START_TIME;
-      endDate.value = todayStr;
-      endTime.value = getPerthTimeString();
-      liveToggle.checked = true;
-      syncLiveState();
-      emit();
-    },
-    // S11: the raw field values (not the resolved UTC range getRange()
-    // returns), so the Rider tab's forced "today, live" can be undone back
-    // to exactly what was on screen before, not just some equivalent range.
-    getFieldState: () => ({
-      startDate: startDate.value,
-      startTime: startTime.value,
-      endDate: endDate.value,
-      endTime: endTime.value,
-      live: liveToggle.checked,
+    // The span as Perth "YYYY-MM-DD", for the mini calendar to paint.
+    getDates: () => ({ start: state.spanStart, end: state.live ? today() : state.spanEnd, live: state.live }),
+    // The span and window as UTC ms, for the full calendar's slider and the
+    // selection it paints. `endMs` is the start of the last minute included.
+    getWindow: () => ({
+      spanStartMs: spanStartMs(),
+      spanEndMs: state.live ? nowMs() : spanEndMs(),
+      startMs: state.startMs,
+      endMs: effectiveEndMs(),
+      live: state.live,
     }),
-    setFieldState: (state) => {
-      startDate.value = state.startDate;
-      startTime.value = state.startTime;
-      endDate.value = state.endDate;
-      endTime.value = state.endTime;
-      liveToggle.checked = state.live;
-      syncLiveState();
+    setDates,
+    setLive,
+    scrub,
+    release,
+    reset: () => {
+      state.spanStart = DEV_DEFAULT_START_DATE;
+      state.startMs = perthDayStartMs(DEV_DEFAULT_START_DATE) + toMinutes(DEV_DEFAULT_START_TIME) * MINUTE_MS;
+      setLive(true);
+    },
+    // S11: the whole selection as it stands (an opaque snapshot, not the
+    // resolved UTC range getRange() returns), so the Rider tab's forced
+    // "today, live" can be undone back to exactly what was selected before,
+    // not just some equivalent range.
+    getFieldState: () => ({ ...state }),
+    setFieldState: (saved) => {
+      Object.assign(state, saved);
+      syncPolling();
       emit();
     },
     // S11: riders always see from midnight today to now, regardless of
     // whatever period an operator had selected -- getFieldState()/
     // setFieldState() above are what let the caller put that back afterwards.
-    // Recomputes today's date rather than reusing the page-load `todayStr`,
-    // in case the tab has been open since before midnight.
+    // Recomputes today's date rather than reusing the page-load date, in case
+    // the tab has been open since before midnight.
     setLiveToday: () => {
-      startDate.value = getPerthDateString();
-      startTime.value = '00:00';
-      liveToggle.checked = true;
-      syncLiveState();
+      const todayStr = today();
+      state.spanStart = todayStr;
+      state.spanEnd = todayStr;
+      state.startMs = perthDayStartMs(todayStr);
+      state.live = true;
+      state.endMs = nowMs();
+      syncPolling();
       emit();
     },
     // Called by main.js when a fetch for the selected range comes back
@@ -288,8 +441,8 @@ function createTimelineControl(container, { onChange, livePollMs = DEFAULT_LIVE_
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createTimelineControl, getPerthDateString, getPerthTimeString, perthToUtcIso, formatDisplay };
+  module.exports = { createTimelineControl, getPerthDateString, getPerthTimeString, perthToUtcIso, formatDisplay, formatInstant };
 }
 if (typeof window !== 'undefined') {
-  window.Timeline = { createTimelineControl, getPerthDateString, getPerthTimeString, perthToUtcIso, formatDisplay };
+  window.Timeline = { createTimelineControl, getPerthDateString, getPerthTimeString, perthToUtcIso, formatDisplay, formatInstant };
 }
