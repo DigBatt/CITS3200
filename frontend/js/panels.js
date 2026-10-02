@@ -58,6 +58,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     updateChromeVisibility(view);
 
+    // One configured bus runs off campus; Fleet's "fit to every vehicle"
+    // would zoom out to include it, which is not what a rider choosing a
+    // campus stop needs (js/map.js:setCampusFocus()).
+    setCampusFocus(view === 'rider');
+
     if (view === 'utilisation') {
       viewMap.hidden = true;
       viewUtilisation.hidden = false;

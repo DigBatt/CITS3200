@@ -9,6 +9,15 @@ const layers = { trails: null, stops: null };
 
 let pendingFit = null;
 
+// Rider tab: always frame the campus stops, never the fleet's full extent.
+// One configured bus runs off campus, and fitting to every vehicle's position
+// (fitTo() below, called from drawTracks()) would zoom out to include it --
+// fine for Fleet, not what a rider picking a campus stop needs to see. Set
+// from the configured stops (js/stops.js:init(), the campus the shuttles
+// actually serve) rather than hardcoded, so it tracks config/stops.yaml.
+let focusOnCampus = false;
+let campusBounds = null;
+
 // Every stop label drawn at once is unreadable when zoomed out past the
 // campus, so below this the names are hidden and the markers stay.
 const STOP_LABEL_MIN_ZOOM = 15;
@@ -199,13 +208,37 @@ function drawTracks(vehicles, { fit = true } = {}) {
 
 // A hidden map measures 0x0, and fitting to that zooms all the way in, so a
 // fit made while the map is hidden waits for showMap().
+//
+// While focusOnCampus is set, this ignores whatever bounds the caller passed
+// (the fleet's actual positions) and frames the campus instead -- the single
+// choke point every fit (live poll, selection change, tab switch) goes
+// through, so the override can't be missed from some other call site.
 function fitTo(bounds) {
+  const target = focusOnCampus && campusBounds ? campusBounds : bounds;
   if (map.getContainer().clientWidth === 0) {
-    pendingFit = bounds;
+    pendingFit = target;
     return;
   }
   pendingFit = null;
-  map.fitBounds(bounds, { padding: [24, 24] });
+  map.fitBounds(target, { padding: [24, 24] });
+}
+
+// The configured stops' extent (js/stops.js:init()). Recomputed whenever the
+// stop list loads; if focusOnCampus was already switched on by then (a slow
+// network, a fast tab click), frames it immediately rather than waiting for
+// the next unrelated fit.
+function setCampusBounds(stops) {
+  campusBounds = stops.length ? L.latLngBounds(stops.map((stop) => [stop.latitude, stop.longitude])) : null;
+  if (focusOnCampus && campusBounds) fitTo(campusBounds);
+}
+
+// Enter/leave the Rider tab's campus-only framing (js/panels.js). Fits
+// immediately on enabling, rather than waiting for the next position poll to
+// happen to trigger one -- which, if the rider's selection hadn't actually
+// changed, might not come at all.
+function setCampusFocus(enabled) {
+  focusOnCampus = enabled;
+  if (enabled && campusBounds) fitTo(campusBounds);
 }
 
 // Call when the map becomes visible again: it re-measures the container,
