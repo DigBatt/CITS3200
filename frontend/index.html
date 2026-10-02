@@ -68,6 +68,15 @@
       <div class="chip-row" id="route-filter-chips"></div>
     </div>
 
+    <!-- ============ Area filter chips, rendered by js/area.js ============ -->
+    <!-- Pins the map to one named area (UWA Campus or Eglinton), overriding
+         the normal fit-to-every-vehicle framing -- useful since nUWAy 2 runs
+         in Eglinton, far from the rest of the fleet. -->
+    <div class="filter-bar" id="area-filter">
+      <button type="button" class="filter-bar-label" aria-expanded="true" aria-controls="area-filter-chips">AREA</button>
+      <div class="chip-row" id="area-filter-chips"></div>
+    </div>
+
     <main>
       <!-- ============ Fleet / Operator / Rider share the map ============ -->
       <div class="dashboard-view" id="view-map">
@@ -248,6 +257,7 @@
   <script src="js/api.js"></script>
   <script src="js/map.js"></script>
   <script src="js/stops.js"></script>
+  <script src="js/area.js"></script>
   <script src="js/timeline.js"></script>
   <script src="js/format.js"></script>
   <script src="js/vehicles.js"></script>
