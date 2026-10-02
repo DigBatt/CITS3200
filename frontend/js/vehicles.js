@@ -5,16 +5,20 @@
 //
 // Also owns the liveness presentation: a vehicle the server reports as
 // inactive is greyed AND labelled. The threshold comes from the server; this
-// module never computes liveness.
+// module never computes liveness. The same goes for the green/yellow/red
+// light beside "Last seen", which is the server's `freshness`.
 //
 // Clearing the filter restores the whole fleet.
 //
-// The selection is one vehicle or the whole fleet. A chip or a fleet row
-// selects that vehicle; "All vehicles", or the selected row again, clears it.
+// The selection is any set of vehicles, or the whole fleet. A chip or a fleet
+// row adds that vehicle to the selection, or takes it out again if it was
+// already in; "All vehicles" clears it. Taking out the last one, or picking
+// every vehicle, is the whole fleet again.
 
 (function () {
   let fleet = [];
-  let selected = null; // null means the whole fleet
+  let freshnessRule = null;
+  let selected = new Set(); // empty means the whole fleet
   let onChange = null;
   let latestRefresh = 0;
   let refreshError = null;
@@ -23,11 +27,30 @@
     return fleet.find((vehicle) => vehicle.id === id)?.name ?? `Vehicle ${id}`;
   }
 
-  function select(id) {
-    if (id === selected) return;
-    selected = id;
+  // The selected ids in fleet order, or null for the whole fleet. Fleet order,
+  // so picking 2 then 1 asks for the same as 1 then 2, and the map is not
+  // refitted for a selection that has not changed.
+  function getSelection() {
+    if (selected.size === 0) return null;
+    const order = fleet.map((vehicle) => vehicle.id);
+    return [...selected].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  }
+
+  // Replace the selection: one id, a list of ids, or null for the whole fleet.
+  function select(ids) {
+    const next = new Set(ids === null ? [] : [].concat(ids));
+    if (fleet.length && fleet.every((vehicle) => next.has(vehicle.id))) next.clear();
+    if (next.size === selected.size && [...next].every((id) => selected.has(id))) return;
+    selected = next;
     render();
-    onChange?.(selected);
+    onChange?.(getSelection());
+  }
+
+  // Add a vehicle to the selection, or take it out if it is already in.
+  function toggle(id) {
+    const next = new Set(selected);
+    if (!next.delete(id)) next.add(id);
+    select([...next]);
   }
 
   // Refetch liveness. Called on every load, so it keeps pace with live polling.
@@ -37,6 +60,7 @@
       const data = await getVehicles();
       if (request !== latestRefresh) return;
       fleet = data.vehicles;
+      freshnessRule = data.freshness_rule ?? null;
       refreshError = null;
     } catch (error) {
       if (request !== latestRefresh) return;
@@ -57,6 +81,23 @@
     return `Last seen ${formatInstant(vehicle.last_seen)}`;
   }
 
+  // Spelt out for the tooltip and screen readers, since colour alone says
+  // nothing to either.
+  function freshnessLabel(freshness) {
+    const weekdays = freshnessRule?.green_within_weekdays ?? 1;
+    const days = freshnessRule?.red_after_days;
+    const lastWeekday = weekdays === 1 ? 'the last weekday' : `the last ${weekdays} weekdays`;
+    if (freshness === 'green') return `Seen today or on ${lastWeekday}`;
+    if (freshness === 'yellow') return `Not seen since before ${lastWeekday}`;
+    return days == null ? 'Not seen for a long time' : `Not seen for more than ${days} days`;
+  }
+
+  function freshnessDot(vehicle) {
+    if (!vehicle.freshness) return '';
+    const label = escapeHtml(freshnessLabel(vehicle.freshness));
+    return `<span class="freshness-dot freshness-${escapeHtml(vehicle.freshness)}" role="img" aria-label="${label}" title="${label}"></span>`;
+  }
+
   // Only an active vehicle's readings are current enough to show.
   function stats(vehicle) {
     const position = vehicle.status === 'active' ? vehicle.last_position : null;
@@ -70,7 +111,7 @@
 
   function rowHtml(vehicle) {
     const active = vehicle.status === 'active';
-    const classes = ['vehicle-row', active ? '' : 'is-offline', vehicle.id === selected ? 'is-selected' : '']
+    const classes = ['vehicle-row', active ? '' : 'is-offline', selected.has(vehicle.id) ? 'is-selected' : '']
       .filter(Boolean)
       .join(' ');
     return `
@@ -80,7 +121,7 @@
             <span class="vehicle-id">${escapeHtml(nameOf(vehicle.id))}</span>
             <span class="vehicle-badge ${active ? 'badge-active' : 'badge-inactive'}">${active ? 'ACTIVE' : 'INACTIVE'}</span>
           </div>
-          <div class="vehicle-note">${escapeHtml(note(vehicle))}</div>
+          <div class="vehicle-note">${freshnessDot(vehicle)}${escapeHtml(note(vehicle))}</div>
           <div class="vehicle-stats">
             ${stats(vehicle).map((value) => `<span>${escapeHtml(value)}</span>`).join('')}
           </div>
@@ -98,8 +139,8 @@
     const chip = (id, label, isActive) =>
       `<button type="button" class="chip${isActive ? ' is-active' : ''}" data-vehicle="${escapeHtml(id)}">${escapeHtml(label)}</button>`;
     document.getElementById('vehicle-filter-chips').innerHTML = [
-      chip('all', 'All vehicles', selected === null),
-      ...fleet.map((vehicle) => chip(vehicle.id, nameOf(vehicle.id), vehicle.id === selected)),
+      chip('all', 'All vehicles', selected.size === 0),
+      ...fleet.map((vehicle) => chip(vehicle.id, nameOf(vehicle.id), selected.has(vehicle.id))),
     ].join('');
 
     document.getElementById('vehicle-list').innerHTML = fleet.length
@@ -121,14 +162,16 @@
 
     document.getElementById('vehicle-filter-chips').addEventListener('click', (event) => {
       const chip = event.target.closest('.chip');
-      if (chip) select(chip.dataset.vehicle === 'all' ? null : chip.dataset.vehicle);
+      if (!chip) return;
+      if (chip.dataset.vehicle === 'all') select(null);
+      else toggle(chip.dataset.vehicle);
     });
 
     document.getElementById('vehicle-list').addEventListener('click', (event) => {
       const row = event.target.closest('.vehicle-row');
-      if (row) select(row.dataset.vehicleRow === selected ? null : row.dataset.vehicleRow);
+      if (row) toggle(row.dataset.vehicleRow);
     });
   }
 
-  window.Vehicles = { init, refresh, select, nameOf, getSelection: () => selected };
+  window.Vehicles = { init, refresh, select, toggle, nameOf, getSelection };
 })();

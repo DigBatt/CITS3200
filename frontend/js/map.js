@@ -13,6 +13,11 @@ let pendingFit = null;
 // campus, so below this the names are hidden and the markers stay.
 const STOP_LABEL_MIN_ZOOM = 15;
 
+// Bus markers: a numbered circle, in px. Kept in step with .bus-marker in
+// css/dashboard.css.
+const BUS_MARKER_SIZE = 28;
+const BUS_MARKER_FALLBACK_COLOUR = 'rgba(28, 25, 23, 0.8)';
+
 // Stops are drawn in their own pane, under the trails and vehicle markers.
 let stopRenderer = null;
 
@@ -59,6 +64,10 @@ function initMap() {
 
   map.createPane('stops').style.zIndex = 350; // below overlayPane (400)
   stopRenderer = L.svg({ pane: 'stops' });
+
+  // The bus markers sit above the stop labels (tooltipPane, 650), so a bus
+  // waiting at a stop is not hidden under its name. Popups (700) stay on top.
+  map.createPane('buses').style.zIndex = 660;
 
   layers.stops = L.layerGroup().addTo(map);
   layers.trails = L.layerGroup().addTo(map);
@@ -146,6 +155,17 @@ function applyStopLabelZoom() {
   map.getContainer().classList.toggle('hide-stop-labels', map.getZoom() < STOP_LABEL_MIN_ZOOM);
 }
 
+// The bus's latest position in the period: its number in a circle of its
+// colour, so each bus on the map can be told apart without the legend.
+function busIcon(vehicle) {
+  return L.divIcon({
+    className: 'bus-marker',
+    html: `<span style="background: ${escapeHtml(vehicle.colour ?? BUS_MARKER_FALLBACK_COLOUR)}">${escapeHtml(vehicle.vehicle_id)}</span>`,
+    iconSize: [BUS_MARKER_SIZE, BUS_MARKER_SIZE],
+    iconAnchor: [BUS_MARKER_SIZE / 2, BUS_MARKER_SIZE / 2], // centred on the position
+  });
+}
+
 function drawTracks(vehicles, { fit = true } = {}) {
   layers.trails.clearLayers();
   if (fit) pendingFit = null;
@@ -166,7 +186,7 @@ function drawTracks(vehicles, { fit = true } = {}) {
     // over the stops, so a clickable trail would swallow clicks on a stop
     // underneath it.
     L.polyline(points, { weight: 3, interactive: false, ...style }).addTo(layers.trails);
-    L.circleMarker(points[points.length - 1], { radius: 6, weight: 2, fillOpacity: 1, ...style })
+    L.marker(points[points.length - 1], { icon: busIcon(vehicle), pane: 'buses', keyboard: false })
       .bindPopup(`${vehicle.name ?? vehicle.vehicle_id} — ${vehicle.count} positions`)
       .addTo(layers.trails);
 
