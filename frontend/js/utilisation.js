@@ -145,7 +145,7 @@
       .join('');
   }
 
-  function renderTable(entries, total) {
+  function renderTable(entries, total, totalLabel) {
     const columns = ['VEHICLE', ...KPIS.map((kpi) => kpi.short), 'WORKING', 'NOT REPORTING'];
     const row = (name, figures, attributes) => `
       <div ${attributes}>
@@ -159,15 +159,15 @@
       `<div class="util-table-header">${columns.map((column) => `<span>${column}</span>`).join('')}</div>`,
       ...entries.map((entry) =>
         row(Vehicles.nameOf(entry.vehicle_id), entry, `class="util-table-row" data-vehicle="${escapeHtml(entry.vehicle_id)}"`)),
-      total ? row('Fleet total', total, 'class="util-table-row util-table-average"') : '',
+      total ? row(totalLabel, total, 'class="util-table-row util-table-average"') : '',
     ].join('');
   }
 
-  function draw(figures, entries, pooled) {
+  function draw(figures, entries, pooled, totalLabel) {
     renderKpis(figures);
     renderPie(figures);
     renderTimeModel(figures, pooled);
-    renderTable(entries, pooled ? figures : null);
+    renderTable(entries, pooled ? figures : null, totalLabel);
   }
 
   function render(data) {
@@ -175,9 +175,16 @@
     if (!entries.length) return showError('No vehicles selected.');
 
     const pooled = entries.length > 1;
-    const scope = pooled ? `Fleet total · ${entries.length} vehicles` : Vehicles.nameOf(entries[0].vehicle_id);
+    // Only the whole fleet is the fleet total; a few picked vehicles are
+    // named, so the heading says which ones were pooled.
+    const wholeFleet = Vehicles.getSelection() === null;
+    const scope = !pooled
+      ? Vehicles.nameOf(entries[0].vehicle_id)
+      : wholeFleet
+        ? `Fleet total · ${entries.length} vehicles`
+        : `${entries.map((entry) => Vehicles.nameOf(entry.vehicle_id)).join(' + ')} · combined`;
     document.getElementById('util-scope').textContent = `${scope} · ${formatInstant(data.from)} → ${formatInstant(data.to)}`;
-    draw(pool(entries), entries, pooled);
+    draw(pool(entries), entries, pooled, wholeFleet ? 'Fleet total' : 'Selection total');
   }
 
   function showError(message) {

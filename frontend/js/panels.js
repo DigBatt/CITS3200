@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
       vehicle: Vehicles.getSelection(),
     };
     timelineControl?.setLiveToday();
-    Vehicles.select(null); // every vehicle, not whatever one Fleet had picked
+    Vehicles.select(null); // every vehicle, not whichever ones Fleet had picked
   }
 
   function leaveRiderDefaults() {

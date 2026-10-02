@@ -29,7 +29,7 @@ function humanizeError(message) {
 async function load() {
   const request = ++latestLoad;
   const query = {
-    vehicles: Vehicles.getSelection(),
+    vehicles: Vehicles.getSelection()?.join(','),
     from: currentRange?.from,
     to: currentRange?.to,
   };
