@@ -39,6 +39,7 @@ class Config:
     admin: Optional[dict[str, Any]]
     stops: StopNetwork
     storage_directory: Optional[Path] = None
+    snapshot_default_metrics: Optional[list[str]] = None
     green_within_weekdays: Optional[int] = None
     red_after_days: Optional[int] = None
 
@@ -104,6 +105,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
             admin=app.get("admin"),
             stops=_parse_stops(stops_raw, stops_path, bounds),
             storage_directory=PROJECT_ROOT / storage_directory if storage_directory else None,
+            snapshot_default_metrics=(app.get("snapshots") or {}).get("default_metrics"),
             green_within_weekdays=liveness.get("green_within_weekdays"),
             red_after_days=liveness.get("red_after_days"),
         )
