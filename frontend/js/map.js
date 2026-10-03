@@ -9,6 +9,40 @@ const layers = { trails: null, stops: null };
 
 let pendingFit = null;
 
+// Pin the map to one area, overriding the normal "fit to every visible
+// vehicle" framing (fitTo() below, via drawTracks()) -- used by the Rider
+// tab, which always frames the campus (js/panels.js), and the Area chips
+// (js/area.js), e.g. for Eglinton, where nUWAy 2 runs far from the rest of
+// the fleet. A function, not a snapshot of bounds, so a pin made before its
+// extent is known or before it changes (the campus's, see setCampusBounds()
+// below) still resolves to the right thing later.
+let pinnedBoundsFn = null;
+
+// The fleet's actual extent, kept up to date by every drawTracks() call
+// regardless of fit/pin state (below). What unpinMap() snaps straight back
+// to, rather than leaving the map wherever the pin last left it until some
+// unrelated later poll happens to trigger a fit.
+let lastVehicleBounds = null;
+
+function pinMapTo(boundsFn) {
+  pinnedBoundsFn = boundsFn;
+  const bounds = boundsFn();
+  if (bounds) fitTo(bounds);
+}
+
+function unpinMap() {
+  pinnedBoundsFn = null;
+  if (lastVehicleBounds) fitTo(lastVehicleBounds);
+}
+
+// The configured stops' extent (js/stops.js:init()), what the Rider tab and
+// the Area chips' "UWA Campus" option both pin to.
+let campusBounds = null;
+
+function getCampusBounds() {
+  return campusBounds;
+}
+
 // Every stop label drawn at once is unreadable when zoomed out past the
 // campus, so below this the names are hidden and the markers stay.
 const STOP_LABEL_MIN_ZOOM = 15;
@@ -193,19 +227,41 @@ function drawTracks(vehicles, { fit = true } = {}) {
     bounds.extend(points);
   }
 
+  // Only while nothing is pinned: a pinned view (Rider, or an Area chip) can
+  // be showing an entirely different vehicle/date selection underneath (the
+  // Rider tab forces "today", unrelated to whatever Fleet had), and that
+  // must not overwrite what unpinMap() below snaps back to once the pin
+  // comes off.
+  if (bounds.isValid() && !pinnedBoundsFn) lastVehicleBounds = bounds;
+
   if (drawn > 0 && fit) fitTo(bounds);
   return drawn;
 }
 
 // A hidden map measures 0x0, and fitting to that zooms all the way in, so a
 // fit made while the map is hidden waits for showMap().
+//
+// While something is pinned, this ignores whatever bounds the caller passed
+// (the fleet's actual positions) and frames the pin instead -- the single
+// choke point every fit (live poll, selection change, tab switch) goes
+// through, so the override can't be missed from some other call site.
 function fitTo(bounds) {
+  const target = pinnedBoundsFn?.() ?? bounds;
   if (map.getContainer().clientWidth === 0) {
-    pendingFit = bounds;
+    pendingFit = target;
     return;
   }
   pendingFit = null;
-  map.fitBounds(bounds, { padding: [24, 24] });
+  map.fitBounds(target, { padding: [24, 24] });
+}
+
+// Recomputed whenever the stop list loads (js/stops.js:init()). If the map
+// is currently pinned to the campus -- the Rider tab, or the Area chips'
+// "UWA Campus" (both pin the same getCampusBounds function, by reference) --
+// frames it immediately rather than waiting for the next unrelated fit.
+function setCampusBounds(stops) {
+  campusBounds = stops.length ? L.latLngBounds(stops.map((stop) => [stop.latitude, stop.longitude])) : null;
+  if (pinnedBoundsFn === getCampusBounds && campusBounds) fitTo(campusBounds);
 }
 
 // Call when the map becomes visible again: it re-measures the container,

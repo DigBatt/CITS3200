@@ -358,6 +358,7 @@
 }
 
 .operator-empty,
+.operator-notice,
 .operator-error {
   padding: 12px 14px;
   margin-bottom: 10px;
@@ -368,6 +369,15 @@
 .operator-empty {
   background: rgba(28, 25, 23, 0.04);
   color: rgba(28, 25, 23, 0.6);
+}
+
+/* S15 follow-up: "select a vehicle before Picked up is enabled" -- a thing
+   to do, not a problem, so the amber of a prompt rather than .operator-error's
+   red. */
+.operator-notice {
+  background: oklch(0.75 0.14 75 / 12%);
+  border: 1px solid oklch(0.75 0.14 75 / 45%);
+  color: oklch(0.4 0.1 75);
 }
 
 .operator-error {

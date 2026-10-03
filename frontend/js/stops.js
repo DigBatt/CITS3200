@@ -109,6 +109,7 @@
     render();
     drawStops(stops, { popupHtml });
     highlightRoute(stops, selected, routeOf(selected)?.colour);
+    setCampusBounds(stops); // js/map.js: what the Rider tab frames instead of the fleet's extent
   }
 
   // In service order, which is the route's order and not the stop file's.

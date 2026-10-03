@@ -74,6 +74,7 @@ async function load() {
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
   Stops.init();
+  Area.init();
   Vehicles.init({ onChange: () => load() });
 
   timelineControl = Timeline.createTimelineControl(

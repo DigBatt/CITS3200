@@ -221,19 +221,44 @@ def collect_at_stop(stop_id: str):
     """
     The operator has picked up the riders waiting at a stop (S10).
 
+    Body: `{"vehicle_id", "route_id"}`, both required (S15 follow-up) -- a
+    review attaches to whichever vehicle and route the operator says they are
+    running, since there is no published schedule yet to look that up from
+    instead (PickupRequest.vehicle_id/route_id, docs/api.md). The admin page
+    enforces picking both before this is ever called; this is the check that
+    actually matters, since nothing stops a direct API call skipping it.
+
     Every open request at the stop is closed, whichever route the rider was
     waiting for. The records are kept, marked `collected` with `cleared_at`.
 
     Returns
     -------
     flask.Response
-        `404` `unknown_stop` if the stop is not configured. Otherwise `200`
-        with the requests closed, empty if nobody was waiting.
+        `404` `unknown_stop` if the stop is not configured. `400`
+        `missing_field` if either body field is left out, `unknown_vehicle`
+        or `unknown_route` if either is not configured. Otherwise `200` with
+        the requests closed, empty if nobody was waiting.
     """
     network = _network()
     if network.stop(stop_id) is None:
         message = f"No stop with id '{stop_id}'. Known ids: {', '.join(network.stops) or 'none'}."
         return jsonify({"error": {"code": "unknown_stop", "message": message}}), 404
 
-    closed = _store().collect(stop_id, datetime.now(timezone.utc))
+    body = request.get_json(silent=True) or {}
+    vehicle_id = body.get("vehicle_id")
+    route_id = body.get("route_id")
+    if not vehicle_id or not route_id:
+        message = "Both 'vehicle_id' and 'route_id' are required to mark a stop picked up."
+        return jsonify({"error": {"code": "missing_field", "message": message}}), 400
+
+    config = current_app.config["NUWAY_CONFIG"]
+    if config.vehicle(vehicle_id) is None:
+        known = ", ".join(v.id for v in config.vehicles)
+        message = f"No vehicle with id '{vehicle_id}'. Known ids: {known or 'none'}."
+        return jsonify({"error": {"code": "unknown_vehicle", "message": message}}), 400
+    if network.route(route_id) is None:
+        message = f"No route with id '{route_id}'. Known ids: {', '.join(network.routes) or 'none'}."
+        return jsonify({"error": {"code": "unknown_route", "message": message}}), 400
+
+    closed = _store().collect(stop_id, vehicle_id, route_id, datetime.now(timezone.utc))
     return jsonify({"collected": [r.to_dict() for r in closed]})

@@ -140,6 +140,12 @@ class PickupRequest:
     status: str
     created_at: datetime
     cleared_at: Optional[datetime] = None
+    # Set only once collected (backend/api/pickup_requests.py:collect_at_stop()),
+    # from whichever vehicle and route the operator said they were running at
+    # the time -- there is no schedule yet to look this up from instead. A
+    # review (Review below) is attributed to a pickup through these.
+    vehicle_id: Optional[str] = None
+    route_id: Optional[str] = None
 
     OPEN = "open"
     COLLECTED = "collected"
@@ -153,7 +159,112 @@ class PickupRequest:
             "status": self.status,
             "created_at": format_timestamp(self.created_at),
             "cleared_at": format_timestamp(self.cleared_at) if self.cleared_at else None,
+            "vehicle_id": self.vehicle_id,
+            "route_id": self.route_id,
         }
+
+
+@dataclass(frozen=True)
+class Review:
+    """
+    A rider's review of one completed pickup (S15 follow-up).
+
+    `vehicle_id`, `route_id` and `wait_minutes` are not asked of the rider:
+    they are read off the `PickupRequest` the review is attributed to
+    (`pickup_request_id`) at the moment it is saved
+    (backend/api/reviews.py:create_review()), since that is the operator's
+    own record of which vehicle and route it was and exactly how long the
+    wait was -- more reliable than asking the rider to recall either.
+
+    Every field below `created_at` besides `safety_rating` and `app_rating`
+    is optional: an empty string (not stored as null, so the file's shape is
+    uniform) rather than forcing a rider through a long form to leave a
+    quick rating.
+    """
+
+    id: str
+    pickup_request_id: str
+    stop_id: str
+    vehicle_id: Optional[str]
+    route_id: Optional[str]
+    wait_minutes: Optional[float]
+    created_at: datetime
+
+    # Safety & comfort
+    safety_rating: int  # 1-5
+    vehicle_behaviour: str
+    obstacle_interaction: str
+
+    # Efficiency & operations
+    punctuality: str  # "early" | "on_time" | "late" | ""
+    ride_duration_ok: str  # "yes" | "no" | ""
+    purpose: str
+
+    # Route & accessibility
+    stop_quality: str  # "good" | "could_be_better" | ""
+    ramp_needed: str  # "yes" | "no" | ""
+
+    # Tech & interface
+    app_rating: int  # 1-5
+    app_comment: str
+
+    # Rider demographics. The rider's browser remembers these between
+    # reviews (a cookie, js/rider.js), so a returning rider does not have to
+    # re-answer them -- not sent to or read back from the server at all.
+    role: str  # "undergrad" | "postgrad" | "staff" | "visitor" | ""
+    usage_frequency: str  # "daily" | "weekly" | "occasional" | "first_time" | ""
+
+    # Recommendations / improvements
+    comments: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "pickup_request_id": self.pickup_request_id,
+            "stop_id": self.stop_id,
+            "vehicle_id": self.vehicle_id,
+            "route_id": self.route_id,
+            "wait_minutes": self.wait_minutes,
+            "created_at": format_timestamp(self.created_at),
+            "safety_rating": self.safety_rating,
+            "vehicle_behaviour": self.vehicle_behaviour,
+            "obstacle_interaction": self.obstacle_interaction,
+            "punctuality": self.punctuality,
+            "ride_duration_ok": self.ride_duration_ok,
+            "purpose": self.purpose,
+            "stop_quality": self.stop_quality,
+            "ramp_needed": self.ramp_needed,
+            "app_rating": self.app_rating,
+            "app_comment": self.app_comment,
+            "role": self.role,
+            "usage_frequency": self.usage_frequency,
+            "comments": self.comments,
+        }
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> "Review":
+        return cls(
+            id=str(raw["id"]),
+            pickup_request_id=str(raw["pickup_request_id"]),
+            stop_id=str(raw["stop_id"]),
+            vehicle_id=raw.get("vehicle_id"),
+            route_id=raw.get("route_id"),
+            wait_minutes=raw.get("wait_minutes"),
+            created_at=parse_timestamp(raw["created_at"]),
+            safety_rating=int(raw["safety_rating"]),
+            vehicle_behaviour=str(raw.get("vehicle_behaviour") or ""),
+            obstacle_interaction=str(raw.get("obstacle_interaction") or ""),
+            punctuality=str(raw.get("punctuality") or ""),
+            ride_duration_ok=str(raw.get("ride_duration_ok") or ""),
+            purpose=str(raw.get("purpose") or ""),
+            stop_quality=str(raw.get("stop_quality") or ""),
+            ramp_needed=str(raw.get("ramp_needed") or ""),
+            app_rating=int(raw["app_rating"]),
+            app_comment=str(raw.get("app_comment") or ""),
+            role=str(raw.get("role") or ""),
+            usage_frequency=str(raw.get("usage_frequency") or ""),
+            comments=str(raw.get("comments") or ""),
+        )
 
 
 @dataclass(frozen=True)

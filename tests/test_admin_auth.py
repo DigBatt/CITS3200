@@ -14,11 +14,12 @@ from backend.auth import load_secrets
 from backend.config import DEFAULT_CONFIG_DIR, ConfigError
 from tests.admin_support import ADMIN_PASSWORD, ADMIN_USERNAME, sign_in, write_admin_secrets
 
-# Admin-only endpoints, as (method, path).
+# Admin-only endpoints, as (method, path, body). body is None for a GET.
 ADMIN_ENDPOINTS = [
-    ("GET", "/api/pickup-requests"),
-    ("GET", "/api/routes/full-campus-loop/waiting"),
-    ("POST", "/api/stops/reid-library/collect"),
+    ("GET", "/api/pickup-requests", None),
+    ("GET", "/api/routes/full-campus-loop/waiting", None),
+    ("POST", "/api/stops/reid-library/collect", {"vehicle_id": "1", "route_id": "full-campus-loop"}),
+    ("GET", "/api/reviews", None),
 ]
 
 
@@ -64,9 +65,9 @@ def test_admin_html_cannot_be_fetched_around_the_sign_in(client):
     assert response.headers["Location"] == "/admin"
 
 
-@pytest.mark.parametrize(("method", "path"), ADMIN_ENDPOINTS)
-def test_admin_endpoints_are_401_signed_out(client, method, path):
-    response = client.open(path, method=method)
+@pytest.mark.parametrize(("method", "path", "body"), ADMIN_ENDPOINTS)
+def test_admin_endpoints_are_401_signed_out(client, method, path, body):
+    response = client.open(path, method=method, json=body)
     assert response.status_code == 401
     assert response.get_json()["error"]["code"] == "not_signed_in"
 
@@ -81,10 +82,10 @@ def test_right_credentials_sign_in(client):
     assert client.get("/admin").status_code == 200
 
 
-@pytest.mark.parametrize(("method", "path"), ADMIN_ENDPOINTS)
-def test_admin_endpoints_work_signed_in(client, method, path):
+@pytest.mark.parametrize(("method", "path", "body"), ADMIN_ENDPOINTS)
+def test_admin_endpoints_work_signed_in(client, method, path, body):
     sign_in(client)
-    assert client.open(path, method=method).status_code == 200
+    assert client.open(path, method=method, json=body).status_code == 200
 
 
 @pytest.mark.parametrize(
