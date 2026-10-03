@@ -261,3 +261,105 @@ async function deleteRecord(id) {
 }
 
 loadDowntime();
+
+ // ---- Snapshot metric selection (S16) ----
+
+const snapshotCheckboxes = document.querySelectorAll(
+  '#snapshot-metrics input[type="checkbox"]'
+);
+
+const snapshotSaveButton = document.getElementById('btn-snapshot-save');
+const snapshotStatus = document.getElementById('snapshot-status');
+
+let savedSnapshotMetrics = [];
+
+function selectedSnapshotMetrics() {
+  return Array.from(snapshotCheckboxes)
+    .filter(checkbox => checkbox.checked)
+    .map(checkbox => checkbox.value);
+}
+
+function updateSnapshotSaveButton() {
+  const selected = selectedSnapshotMetrics();
+
+  // Only enable Save when at least one metric is selected
+  // and the selection differs from the saved settings.
+  snapshotSaveButton.disabled =
+    selected.length === 0 ||
+    JSON.stringify(selected) === JSON.stringify(savedSnapshotMetrics);
+}
+
+snapshotCheckboxes.forEach(checkbox => {
+  checkbox.addEventListener('change', () => {
+    snapshotStatus.textContent = '';
+    updateSnapshotSaveButton();
+  });
+});
+
+// Load the saved metric selection from the backend.
+async function loadSnapshotSettings() {
+  snapshotSaveButton.disabled = true;
+  snapshotStatus.textContent = 'Loading snapshot settings...';
+
+  try {
+    const { ok, status, data } = await downtimeRequest(
+      'GET',
+      '/api/snapshot-settings'
+    );
+
+    if (!ok) {
+      throw new Error(
+        data?.error?.message ?? `Could not load snapshot settings (${status}).`
+      );
+    }
+
+    savedSnapshotMetrics = data.metrics;
+
+    snapshotCheckboxes.forEach(checkbox => {
+      checkbox.checked = savedSnapshotMetrics.includes(checkbox.value);
+    });
+
+    snapshotStatus.textContent = '';
+    updateSnapshotSaveButton();
+
+  } catch (err) {
+    snapshotStatus.textContent = err.message;
+  }
+}
+
+// Save the administrator's selected metrics.
+snapshotSaveButton.addEventListener('click', async () => {
+  const selected = selectedSnapshotMetrics();
+
+  if (!selected.length) {
+    snapshotStatus.textContent = 'Please select at least one metric.';
+    return;
+  }
+
+  snapshotSaveButton.disabled = true;
+  snapshotStatus.textContent = 'Saving...';
+
+  try {
+    const { ok, status, data } = await downtimeRequest(
+      'PUT',
+      '/api/snapshot-settings',
+      { metrics: selected }
+    );
+
+    if (!ok) {
+      throw new Error(
+        data?.error?.message ?? `Could not save snapshot settings (${status}).`
+      );
+    }
+
+    savedSnapshotMetrics = data.metrics;
+    snapshotStatus.textContent = 'Snapshot settings saved successfully.';
+
+  } catch (err) {
+    snapshotStatus.textContent = err.message;
+  } finally {
+    updateSnapshotSaveButton();
+  }
+});
+
+loadSnapshotSettings();

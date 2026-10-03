@@ -199,24 +199,57 @@
       </div>
     </div>
 
-    <!-- ---- Snapshots (S16, S17): not yet implemented ---- -->
-    <div class="admin-panel" id="tab-snapshots" hidden>
-      <h1 class="admin-section-title">Daily snapshots</h1>
-      <p class="admin-section-sub">Choose which metrics the system saves each day, and download past snapshots.</p>
+<!-- ---- Snapshots (S16 metric selection, S17 daily generation) ---- -->
+<div class="admin-panel" id="tab-snapshots" hidden>
+  <h1 class="admin-section-title">Daily snapshots</h1>
+  <p class="admin-section-sub">
+    Choose which metrics the system saves each day, and download past snapshots.
+  </p>
 
-      <div class="admin-card">
-        <p class="admin-card-title">METRIC SELECTION</p>
-        <div class="stub-notice">
-          <span class="stub-notice-dot"></span>
-          Snapshot configuration (S16) and daily generation (S17) are not yet implemented. This panel will let you choose which metrics are captured and download past snapshots once they are.
-        </div>
-      </div>
+  <!-- S16: Metric selection -->
+  <div class="admin-card">
+    <p class="admin-card-title">METRIC SELECTION</p>
 
-      <div class="admin-card">
-        <p class="admin-card-title">PAST SNAPSHOTS</p>
-        <p class="empty-state">No snapshots recorded yet.</p>
-      </div>
+    <p class="admin-section-sub">
+      Select the metrics to include in future daily snapshots.
+    </p>
+
+    <div id="snapshot-metrics">
+      <label class="snapshot-metric">
+        <input type="checkbox" value="asset_utilisation">
+        Asset utilisation
+      </label>
+
+      <label class="snapshot-metric">
+        <input type="checkbox" value="operating_efficiency">
+        Operating efficiency
+      </label>
+
+      <label class="snapshot-metric">
+        <input type="checkbox" value="effective_utilisation">
+        Effective utilisation
+      </label>
     </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn-primary"
+              id="btn-snapshot-save" disabled>
+        Save selection
+      </button>
+    </div>
+
+    <p id="snapshot-status" role="status" aria-live="polite"></p>
+  </div>
+
+  <!-- S17: Daily snapshot generation (separate issue) -->
+  <div class="admin-card">
+    <p class="admin-card-title">PAST SNAPSHOTS</p>
+    <p class="empty-state">
+      Daily snapshot generation and downloads are not yet available.
+    </p>
+  </div>
+</div>
+
 
   </main>
 </div>
