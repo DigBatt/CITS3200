@@ -66,7 +66,7 @@ function loadMapLibre() {
  *   where `trail` is its recent track as [lng, lat] pairs, or null for a bus
  *   with no position, which leaves the camera on campus with no bus drawn.
  */
-export async function mount(host, { onStatus = () => {}, spin: spinAtStart = true } = {}) {
+export async function mount(host, { onStatus = () => {}, spin: spinAtStart = true, paused: pausedAtStart = false } = {}) {
   onStatus('Loading the 3D campus…');
   let maplibregl;
   let modelData;
@@ -179,6 +179,10 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
   // here it only makes a moving bus jump rather than glide.
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let spin = spinAtStart;
+  // Paused, nothing moves: set while the view is built out of sight ahead of
+  // being shown (js/view3d.js, warming up), so the camera keeps still and the
+  // map can finish loading, rather than orbiting for nobody.
+  let paused = pausedAtStart;
   let onScreen = true;
   let frame = null;
   let lastTime = null;
@@ -225,8 +229,8 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
   }
 
   function schedule() {
-    if (frame !== null || !onScreen || document.hidden) {
-      if (!onScreen || document.hidden) lastTime = null;
+    if (frame !== null || paused || !onScreen || document.hidden) {
+      if (paused || !onScreen || document.hidden) lastTime = null;
       return;
     }
     // Not spinning, there is nothing to animate once a glide is done.
@@ -287,6 +291,27 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
 
   return {
     show,
+    setPaused(next) {
+      paused = next;
+      schedule();
+    },
+    // Resolves once everything in view has loaded and been drawn: the tiles,
+    // and the fonts for their labels. MapLibre says so with `idle`, which only
+    // comes while the camera is still, so call it paused. Gives up after
+    // `timeoutMs` rather than wait on a slow tile server for ever.
+    whenReady(timeoutMs = 20000) {
+      return new Promise((resolve) => {
+        if (map.loaded() && map.areTilesLoaded()) {
+          resolve();
+          return;
+        }
+        const timer = setTimeout(resolve, timeoutMs);
+        map.once('idle', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+    },
     setSpin(on) {
       spin = on;
       schedule();

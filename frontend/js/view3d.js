@@ -12,7 +12,15 @@
 //   earth   Google's photorealistic 3D tiles (js/earth3d.js), which need a
 //           Google Maps API key and are off without one (/api/earth).
 // Both follow the same bus and the same Spin setting. Each view's modules
-// are only fetched the first time it is shown.
+// are only fetched the first time it is needed.
+//
+// The campus view is warmed up in the background shortly after the page
+// loads: built out of sight, paused, until its tiles and fonts are in, then
+// put away. Switching to 3D then only reveals it. A first load otherwise
+// waits on a chain of round trips to the tile server (style, tile index,
+// tiles, fonts), several seconds from Perth. Skipped where it would cost the
+// viewer: Save-Data, a 2G connection, a phone-sized screen, or the Rider tab.
+// Earth is never warmed up, since each load is billed to the key's account.
 
 (function () {
   // How much of a bus's track to draw behind it.
@@ -126,6 +134,9 @@
 
   // ---- Loading the views ----
 
+  // True while the campus view is being built out of sight (warmUp below).
+  let warming = false;
+
   function load(name) {
     const view = views[name];
     if (view.loading) return view.loading;
@@ -133,11 +144,18 @@
       view.status = message;
       if (active === name) showStatus();
     };
-    const options = { onStatus, spin: els.spin.checked, ...(name === 'earth' ? { apiKey: earthKey } : {}) };
+    const options = {
+      onStatus,
+      spin: els.spin.checked,
+      // Built while warming up: stay still until shown.
+      paused: warming,
+      ...(name === 'earth' ? { apiKey: earthKey } : {}),
+    };
     view.loading = import(new URL(MODULES[name], document.baseURI).href)
       .then((module) => module.mount(els.hosts[name], options))
       .then((mounted) => {
         view.api = mounted;
+        if (!warming) mounted.setPaused?.(false);
         render();
       })
       .catch((error) => {
@@ -180,7 +198,13 @@
   function setMode(is3d) {
     els.toggle.checked = is3d;
     els.toggleLabel.classList.toggle('is-on', is3d);
+    // Shown for real now, even if it was still warming up out of sight.
+    if (is3d && warming) {
+      warming = false;
+      els.view.classList.remove('is-warming');
+    }
     els.view.hidden = !is3d;
+    if (is3d) views.campus.api?.setPaused(false);
     els.pane.classList.toggle('is-3d', is3d);
     if (is3d) {
       askAboutEarth();
@@ -192,6 +216,44 @@
   }
 
   els.toggle.addEventListener('change', () => setMode(els.toggle.checked));
+
+  // ---- Warming up ----
+
+  const WARM_UP_AFTER_MS = 2500;
+
+  function worthWarmingUp() {
+    const connection = navigator.connection;
+    if (connection?.saveData) return false;
+    if (/2g$/.test(connection?.effectiveType ?? '')) return false;
+    if (window.matchMedia('(max-width: 760px)').matches) return false;
+    if (document.querySelector('#app-tabs .app-tab.is-active')?.dataset.view === 'rider') return false;
+    return true;
+  }
+
+  // Build the campus view out of sight: present and sized, so the map loads
+  // what is around the bus, but invisible and paused. Once it has drawn
+  // everything, put it away; showing it later needs nothing more fetched.
+  function warmUp() {
+    if (views.campus.loading || !els.view.hidden || !worthWarmingUp()) return;
+    warming = true;
+    els.view.classList.add('is-warming');
+    els.view.hidden = false;
+    load('campus')
+      .then(() => views.campus.api?.whenReady())
+      .finally(() => {
+        if (!warming) return; // switched to 3D meanwhile; it is on show
+        warming = false;
+        els.view.classList.remove('is-warming');
+        els.view.hidden = true;
+      });
+  }
+
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      const idle = window.requestIdleCallback ?? ((callback) => setTimeout(callback, 0));
+      idle(warmUp, { timeout: 4000 });
+    }, WARM_UP_AFTER_MS);
+  });
 
   // ---- Spin ----
 

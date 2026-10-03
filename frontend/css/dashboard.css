@@ -1544,6 +1544,14 @@ only -- does not touch any `.timeline-*` rule above, which stays owned by the da
 
 .campus3d[hidden] { display: none; }
 
+/* Being built out of sight before it is first shown (js/view3d.js): laid out
+   at full size so the map loads what is around the bus, but invisible and
+   letting every click through to the 2D map. */
+.campus3d.is-warming {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* Two classes deep so it outranks maplibre-gl.css, which is loaded after
    this sheet and sets the container to position: relative. */
 .campus3d .campus3d-map {
