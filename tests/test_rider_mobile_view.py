@@ -95,18 +95,22 @@ def go_to_fleet(page):
 
 # ---- S11: the chips and date picker are hidden on the Rider tab ----
 
+# The date picker is the calendar's month bar in the header. Its sliders sit
+# in an overlay that starts closed, so the bar is the part always on screen.
+DATE_PICKER = "#dashboard-mini-head"
+
 
 def test_chrome_visible_by_default_on_fleet(page):
     assert page.locator("#vehicle-filter").is_visible()
     assert page.locator("#route-filter").is_visible()
-    assert page.locator("#timeline-container").is_visible()
+    assert page.locator(DATE_PICKER).is_visible()
 
 
 def test_rider_tab_hides_the_chips_and_date_picker(page):
     go_to_rider(page)
     assert page.locator("#vehicle-filter").is_hidden()
     assert page.locator("#route-filter").is_hidden()
-    assert page.locator("#timeline-container").is_hidden()
+    assert page.locator(DATE_PICKER).is_hidden()
 
 
 def test_leaving_rider_restores_the_chrome(page):
@@ -114,17 +118,22 @@ def test_leaving_rider_restores_the_chrome(page):
     go_to_fleet(page)
     assert page.locator("#vehicle-filter").is_visible()
     assert page.locator("#route-filter").is_visible()
-    assert page.locator("#timeline-container").is_visible()
+    assert page.locator(DATE_PICKER).is_visible()
 
 
 # ---- S11: riders default to today, live, every vehicle ----
 
 
+def period(page):
+    """The selected span as Perth dates, as the calendar paints it."""
+    return page.evaluate("timelineControl.getDates()")
+
+
 def test_rider_tab_forces_today_live(page):
     go_to_rider(page)
-    assert page.is_checked("#timeline-live")
+    assert page.get_attribute("#timeline-live", "aria-pressed") == "true"
     today = page.evaluate("new Date().toLocaleDateString('en-CA', {timeZone: 'Australia/Perth'})")
-    assert page.input_value("#timeline-start-date") == today
+    assert period(page) == {"start": today, "end": today, "live": True}
 
 
 def test_rider_tab_forces_every_vehicle(page):
@@ -147,14 +156,15 @@ def test_leaving_rider_restores_the_previous_vehicle_selection(page):
 
 def test_previous_period_and_vehicle_are_restored_after_rider(page):
     page.click('#vehicle-filter-chips .chip[data-vehicle="2"]')
-    page.click("#timeline-live", force=True)  # switch Live off
-    page.fill("#timeline-start-date", "2024-01-01")
+    # What a drag across days in the calendar hands over. A span that ends
+    # before today switches Live off.
+    page.evaluate("timelineControl.setDates('2024-01-01', '2024-01-03')")
 
     go_to_rider(page)
     go_to_fleet(page)
 
-    assert page.input_value("#timeline-start-date") == "2024-01-01"
-    assert not page.is_checked("#timeline-live")
+    assert period(page) == {"start": "2024-01-01", "end": "2024-01-03", "live": False}
+    assert page.get_attribute("#timeline-live", "aria-pressed") == "false"
     assert page.locator('#vehicle-filter-chips .chip[data-vehicle="2"]').get_attribute("class") == "chip is-active"
 
 
