@@ -417,7 +417,7 @@ whole window as unscheduled with a note saying why. See **Empty schedules**.
 
 ## `PUT /api/schedule`
 
-Replaces the whole schedule. The roster is sent in one piece rather than a row
+*Admin only.* Replaces the whole schedule. The roster is sent in one piece rather than a row
 at a time, because it is written back into a config file: one read, one
 validated write, no half applied edit.
 

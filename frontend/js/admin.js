@@ -528,7 +528,7 @@ document.getElementById('schedule-days').addEventListener('click', event => {
 });
 
 document.getElementById('btn-schedule-save').addEventListener('click', async () => {
-  // AUTH (S13): an operator or administrator only action.
+  // AUTH (S13): admin only; a 401 here sends the page to sign in.
   const button = document.getElementById('btn-schedule-save');
   button.disabled = true;
   showScheduleError('');

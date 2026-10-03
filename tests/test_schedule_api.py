@@ -12,19 +12,27 @@ import yaml
 
 from backend.app import create_app
 from backend.config import DEFAULT_CONFIG_DIR
+from tests.admin_support import sign_in, write_admin_secrets
 
 
 @pytest.fixture
-def client(tmp_path):
+def signed_out(tmp_path):
     # A copy of the real config, since a write here rewrites app.yaml.
     config_dir = tmp_path / "config"
     shutil.copytree(DEFAULT_CONFIG_DIR, config_dir)
+    write_admin_secrets(config_dir)
 
     app = create_app(config_dir=config_dir)
     app.config.update(TESTING=True, DOWNTIME_STORE=app.config["DOWNTIME_STORE"])
     with app.test_client() as test_client:
         test_client.config_dir = config_dir
         yield test_client
+
+
+@pytest.fixture
+def client(signed_out):
+    # PUT is admin only (S13).
+    return sign_in(signed_out)
 
 
 def test_get_returns_the_whole_week(client):
@@ -35,9 +43,17 @@ def test_get_returns_the_whole_week(client):
     assert body["configured"] is True
 
 
-def test_get_is_public(client):
+def test_get_is_public(signed_out):
     # No session, no header, no cookie. S13 must keep it that way.
-    assert client.get("/api/schedule").status_code == 200
+    assert signed_out.get("/api/schedule").status_code == 200
+
+
+def test_put_needs_sign_in(signed_out):
+    before = (signed_out.config_dir / "app.yaml").read_text()
+    response = signed_out.put("/api/schedule", json={"monday": [["08:00", "17:00"]]})
+    assert response.status_code == 401
+    assert response.get_json()["error"]["code"] == "not_signed_in"
+    assert (signed_out.config_dir / "app.yaml").read_text() == before
 
 
 def test_put_replaces_the_roster(client):
