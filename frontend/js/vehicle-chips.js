@@ -68,8 +68,12 @@
       },
       /** The selected ids, [] for the whole fleet. */
       get: () => [...selected],
-      /** As the API's `vehicles` parameter: "1,2", or null for the whole fleet. */
-      query: () => (selected.size ? [...selected].join(',') : null),
+      /** As the API's `vehicles` parameter: "1,2", or null for the whole fleet.
+          In fleet order, so picking 2 then 1 asks for the same as 1 then 2. */
+      query: () =>
+        selected.size
+          ? fleet.filter((vehicle) => selected.has(vehicle.id)).map((vehicle) => vehicle.id).join(',')
+          : null,
       has: (id) => selected.size === 0 || selected.has(id),
       /** Replace the selection without announcing it, e.g. from a link. */
       set(ids) {

@@ -5,20 +5,19 @@ The roster lives in `utilisation.service_hours` of config/app.yaml, so it is
 configuration, and editing it here is the same as editing the file: the
 figures recalculate on the next /api/metrics with no code change.
 
-AUTHENTICATION (S13), not implemented yet:
+AUTHENTICATION (S13):
 
     GET is public, and stays public. The dashboard shows scheduled time to
     anyone, so anyone may read the roster behind it.
 
-    PUT is an operator and administrator action. Until S13 lands it is open,
-    exactly like the /api/downtime writes. When S13 arrives, the guard goes
-    on `replace_schedule` below and nowhere else, since it is the only write
-    in this module. See the marker in that function.
+    PUT is admin only, through the same `admin_required` guard as the
+    /api/downtime writes. It is the only write in this module.
 """
 
 from __future__ import annotations
 from flask import Blueprint, current_app, jsonify, request
 
+from backend.auth import admin_required
 from backend.config import load_config
 from backend.schedule import DAYS, Schedule, ScheduleError, load_schedule, save_schedule
 
@@ -82,9 +81,10 @@ def get_schedule():
 
 
 @bp.put("/api/schedule")
+@admin_required
 def replace_schedule():
     """
-    Replace the whole schedule.
+    Replace the whole schedule. Admin only (S13).
 
     The whole roster is sent at once rather than a row at a time, because it
     is written back into a config file: one read, one validated write, no
@@ -97,11 +97,10 @@ def replace_schedule():
     Returns
     -------
     flask.Response
-        200 with the stored schedule in the shape of `_payload`, or 400 for
-        a malformed roster, or 500 if the config file cannot be written.
+        200 with the stored schedule in the shape of `_payload`, 401 when not
+        signed in, 400 for a malformed roster, or 500 if the config file
+        cannot be written.
     """
-    # AUTH (S13): the guard belongs here. Reject anyone who is not a signed in
-    # operator or administrator before the body is read, and leave GET open.
     body = request.get_json(silent=True)
     if isinstance(body, dict) and "schedule" in body:
         body = body["schedule"]

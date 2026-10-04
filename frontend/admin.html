@@ -88,6 +88,9 @@
           <span class="operator-updated" id="operator-updated"></span>
         </div>
         <div class="operator-empty" id="operator-empty" hidden>No riders waiting on this route.</div>
+        <!-- S15 follow-up: a review is attributed to whichever vehicle the
+             operator says is running, so "Picked up" needs one chosen first. -->
+        <div class="operator-notice" id="operator-vehicle-notice" hidden>Select a vehicle above to mark a pickup.</div>
         <div class="operator-error" id="operator-error" hidden></div>
         <ol class="operator-stops" id="operator-stops"></ol>
       </div>
@@ -223,9 +226,8 @@
     </div>
 
     <!-- ---- Service schedule (S21): stored in config/app.yaml, see /api/schedule ---- -->
-    <!-- AUTH (S13): this tab is open to anyone while sign in does not exist. Once it
-         does, editing here is for operators and administrators; the dashboard keeps
-         read only access through GET /api/schedule. -->
+    <!-- AUTH (S13): saving needs sign in (PUT /api/schedule is admin only); the
+         dashboard keeps read only access through GET /api/schedule. -->
     <div class="admin-panel" id="tab-schedule" hidden>
       <h1 class="admin-section-title">Service schedule</h1>
       <p class="admin-section-sub">When the fleet is rostered to run. The dashboard uses this to tell scheduled service time apart from everything else.</p>

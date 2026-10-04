@@ -7,25 +7,27 @@ document.addEventListener('DOMContentLoaded', () => {
     rider: document.getElementById('panel-rider'),
   };
 
-  // S11: the vehicle/route chips and the date-range picker are tools an
+  // S11: the vehicle/route/area chips and the date-range picker are tools an
   // ordinary rider has no use for (S11.2) -- most people who open the site
   // land on this view, and S11.1/S11.3 are about it fitting one screen on a
-  // phone without scrolling past them first. The route chips also serve no
-  // purpose on Utilisation, which scopes its report by vehicle, not route.
-  // Hidden rather than removed either way, since e.g. Utilisation still
-  // needs the vehicle chips.
+  // phone without scrolling past them first. The route and area chips also
+  // serve no purpose on Utilisation (which has no map to pin, and scopes its
+  // report by vehicle, not route). Hidden rather than removed either way,
+  // since e.g. Utilisation still needs the vehicle chips.
   //
   // `riderOverrides` is null when nothing has been overridden; while it
-  // holds a value, the Rider tab's "today, live, every vehicle" forcing is
-  // in effect and that value is what gets put back on leaving.
+  // holds a value, the Rider tab's "today, live, every vehicle, campus only"
+  // forcing is in effect and that value is what gets put back on leaving.
   let riderOverrides = null;
 
   function updateChromeVisibility(view) {
     const hideVehicle = view === 'rider';
     const hideRoute = view === 'rider' || view === 'utilisation';
+    const hideArea = view === 'rider' || view === 'utilisation';
     const hideTimeline = view === 'rider';
     document.getElementById('vehicle-filter')?.classList.toggle('is-chrome-hidden', hideVehicle);
     document.getElementById('route-filter')?.classList.toggle('is-chrome-hidden', hideRoute);
+    document.getElementById('area-filter')?.classList.toggle('is-chrome-hidden', hideArea);
     // The date-range picker is the header calendar, with the period control
     // inside its overlay, so the whole of it is hidden, bar and all.
     document.querySelector('.app-header .period-picker')?.classList.toggle('is-chrome-hidden', hideTimeline);
@@ -36,15 +38,24 @@ document.addEventListener('DOMContentLoaded', () => {
     riderOverrides = {
       timeline: timelineControl?.getFieldState(),
       vehicle: Vehicles.getSelection(),
+      area: window.Area?.getSelection(),
     };
     timelineControl?.setLiveToday();
-    Vehicles.select(null); // every vehicle, not whatever one Fleet had picked
+    Vehicles.select(null); // every vehicle, not whichever ones Fleet had picked
+    window.Area?.select(null); // the Area chips are hidden anyway; this is what the next line pins instead
+    pinMapTo(getCampusBounds); // campus only, regardless of whatever area was pinned
   }
 
   function leaveRiderDefaults() {
     if (!riderOverrides) return;
     if (riderOverrides.timeline) timelineControl?.setFieldState(riderOverrides.timeline);
     Vehicles.select(riderOverrides.vehicle);
+    // restore(), not select(): the Rider tab's forced campus pin (above)
+    // changed the map's actual pin without going through Area at all, so
+    // its own "id hasn't changed" guard in select() would otherwise wrongly
+    // skip putting the real pin back when the saved selection is the same
+    // null/area it already thinks is active.
+    window.Area?.restore(riderOverrides.area);
     riderOverrides = null;
   }
 
@@ -143,5 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initCollapsibleFilterBar('vehicle-filter', 'nuway.vehicleFilterCollapsed');
   initCollapsibleFilterBar('route-filter', 'nuway.routeFilterCollapsed');
+  initCollapsibleFilterBar('area-filter', 'nuway.areaFilterCollapsed');
 
 });

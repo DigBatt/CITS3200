@@ -330,8 +330,33 @@ shared with the admin page.
 }
 
 .vehicle-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font: 400 11.5px Sora, sans-serif;
   color: rgba(28, 25, 23, 0.55);
+}
+
+/* Traffic light beside "Last seen": how long ago the vehicle was last heard
+   from (backend/freshness.py). */
+.freshness-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9);
+}
+
+.freshness-green {
+  background: oklch(0.62 0.16 150);
+}
+
+.freshness-yellow {
+  background: oklch(0.8 0.16 85);
+}
+
+.freshness-red {
+  background: oklch(0.58 0.2 27);
 }
 
 .vehicle-stats {
@@ -624,6 +649,14 @@ shared with the admin page.
   width: 100%;
 }
 
+/* js/rider.js hides #rider-review-button once the review form is revealed;
+   same fix .rider-waiting[hidden]/.review-form[hidden] etc. already need,
+   `display: flex` above otherwise outranking the browser's own
+   `[hidden] { display: none }`. */
+.request-button[hidden] {
+  display: none;
+}
+
 .request-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -752,6 +785,131 @@ shared with the admin page.
   text-align: center;
 }
 
+/* ---- Rider: the review form (S15 follow-up) ---- */
+
+.rider-collected {
+  align-items: stretch; /* overrides the flex-start above: the form needs the full card width */
+}
+
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+/* Same reason .rider-waiting[hidden]/.rider-collected[hidden] need this
+   above: `display: flex` here would otherwise outrank the browser's own
+   `[hidden] { display: none }`. */
+.review-form[hidden] {
+  display: none;
+}
+
+.review-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 12px 14px;
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-radius: 10px;
+}
+
+.review-section legend {
+  padding: 0 4px;
+  font: 600 11px Sora, sans-serif;
+  letter-spacing: 0.03em;
+  color: rgba(28, 25, 23, 0.6);
+}
+
+.review-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-label {
+  font: 400 12.5px/1.4 Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.8);
+}
+
+.review-required {
+  color: oklch(0.6 0.19 25);
+}
+
+.review-select,
+.review-text {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(28, 25, 23, 0.16);
+  border-radius: 7px;
+  background: #fff;
+  color: #1c1917;
+  font: 400 13px Sora, sans-serif;
+  resize: vertical;
+}
+
+.review-select:focus,
+.review-text:focus {
+  outline: 2px solid oklch(0.62 0.17 300);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+/* A row of radio inputs styled as rating buttons: the input is kept (for
+   real keyboard/screen-reader semantics) but visually hidden behind its
+   styled label. */
+.review-rating {
+  display: flex;
+  gap: 6px;
+}
+
+.review-rating label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(28, 25, 23, 0.16);
+  border-radius: 8px;
+  font: 600 13px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.65);
+  cursor: pointer;
+}
+
+.review-rating input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.review-rating input:checked + span {
+  color: #fff;
+}
+
+.review-rating label:has(input:checked) {
+  background: oklch(0.62 0.17 300);
+  border-color: oklch(0.62 0.17 300);
+}
+
+.review-rating label:has(input:focus-visible) {
+  outline: 2px solid oklch(0.62 0.17 300);
+  outline-offset: 2px;
+}
+
+.review-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-actions .btn-outline {
+  text-align: center;
+}
+
 /* ---- Map pane: legend + route note overlaid on the Leaflet map ---- */
 
 .map-pane {
@@ -795,6 +953,29 @@ shared with the admin page.
 
 .map-legend-dot.dot-offline {
   background: rgba(28, 25, 23, 0.4);
+}
+
+/* ---- Bus markers: each bus's latest position, numbered (js/map.js) ---- */
+
+.bus-marker {
+  background: none;
+  border: none;
+}
+
+.bus-marker span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; /* BUS_MARKER_SIZE in js/map.js */
+  height: 28px;
+  box-sizing: border-box;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(28, 25, 23, 0.35);
+  font: 700 14px/1 Sora, sans-serif;
+  color: #ffffff;
+  /* White on the lighter bus colours is borderline, so a faint dark edge. */
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.45);
 }
 
 /* ---- Stop markers (S07) ---- */

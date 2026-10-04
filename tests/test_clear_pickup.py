@@ -86,24 +86,27 @@ def test_collect_closes_only_open_requests_at_that_stop():
     b, _ = store.create("shared", "rider-b", NOW - timedelta(minutes=1))
     other, _ = store.create("north-end", "rider-a", NOW - timedelta(minutes=2))
 
-    closed = store.collect("shared", NOW)
+    closed = store.collect("shared", "1", "loop", NOW)
 
     assert [r.id for r in closed] == [a.id, b.id]
-    assert all(r.status == PickupRequest.COLLECTED and r.cleared_at == NOW for r in closed)
+    assert all(
+        r.status == PickupRequest.COLLECTED and r.cleared_at == NOW and r.vehicle_id == "1" and r.route_id == "loop"
+        for r in closed
+    )
     assert [r.id for r in store.list(status=PickupRequest.OPEN)] == [other.id]
 
 
 def test_collect_with_nobody_waiting_closes_nothing():
     store = PickupRequestStore()
-    assert store.collect("shared", NOW) == []
+    assert store.collect("shared", "1", "loop", NOW) == []
 
 
 def test_collect_does_not_touch_already_closed_requests():
     store = PickupRequestStore()
     store.create("shared", "rider-a", NOW - timedelta(minutes=3))
-    store.collect("shared", NOW - timedelta(minutes=1))
+    store.collect("shared", "1", "loop", NOW - timedelta(minutes=1))
 
-    assert store.collect("shared", NOW) == []
+    assert store.collect("shared", "1", "loop", NOW) == []
     (kept,) = store.list()
     assert kept.cleared_at == NOW - timedelta(minutes=1)
 
@@ -124,7 +127,7 @@ def test_expire_closes_only_requests_older_than_max_age():
 def test_expire_leaves_collected_requests_collected():
     store = PickupRequestStore()
     store.create("shared", "rider-a", NOW - timedelta(minutes=30))
-    store.collect("shared", NOW - timedelta(minutes=20))
+    store.collect("shared", "1", "loop", NOW - timedelta(minutes=20))
 
     assert store.expire(NOW, timedelta(minutes=10)) == []
     assert store.list()[0].status == PickupRequest.COLLECTED
@@ -133,12 +136,16 @@ def test_expire_leaves_collected_requests_collected():
 # ---- Criterion 1: marking a pickup collected clears the stop ----
 
 
+def collect(client, stop_id, vehicle_id="1", route_id="loop"):
+    return client.post(f"/api/stops/{stop_id}/collect", json={"vehicle_id": vehicle_id, "route_id": route_id})
+
+
 def test_collect_clears_the_stop_on_the_next_refresh(app, client):
     open_request(app, "shared", "rider-a", minutes_ago=3)
     open_request(app, "shared", "rider-b", minutes_ago=1)
     open_request(app, "south-end", "rider-c", minutes_ago=2)
 
-    response = client.post("/api/stops/shared/collect")
+    response = collect(client, "shared")
 
     assert response.status_code == 200
     collected = response.get_json()["collected"]
@@ -147,30 +154,63 @@ def test_collect_clears_the_stop_on_the_next_refresh(app, client):
     assert waiting(client, "loop") == {"north-end": 0, "shared": 0, "south-end": 1}
 
 
+def test_collect_stamps_the_vehicle_and_route_onto_closed_requests(app, client):
+    open_request(app, "shared", "rider-a", minutes_ago=3)
+
+    response = collect(client, "shared", vehicle_id="2", route_id="spur")
+
+    (closed,) = response.get_json()["collected"]
+    assert closed["vehicle_id"] == "2"
+    assert closed["route_id"] == "spur"
+
+
 def test_collect_at_a_shared_stop_clears_it_on_every_route(app, client):
     open_request(app, "shared", "rider-a", minutes_ago=3)
 
-    client.post("/api/stops/shared/collect")
+    collect(client, "shared")
 
     assert waiting(client, "loop")["shared"] == 0
     assert waiting(client, "spur")["shared"] == 0
 
 
 def test_collect_with_nobody_waiting_is_ok_and_empty(client):
-    response = client.post("/api/stops/shared/collect")
+    response = collect(client, "shared")
     assert response.status_code == 200
     assert response.get_json() == {"collected": []}
 
 
 def test_collect_at_unknown_stop_is_404(client):
+    # Checked ahead of the body, so this is 404 even with none sent at all.
     response = client.post("/api/stops/nowhere/collect")
     assert response.status_code == 404
     assert response.get_json()["error"]["code"] == "unknown_stop"
 
 
+# ---- S15 follow-up: both vehicle and route are required to collect ----
+
+
+@pytest.mark.parametrize("body", [{}, {"vehicle_id": "1"}, {"route_id": "loop"}, {"vehicle_id": "", "route_id": "loop"}])
+def test_collect_without_both_fields_is_400(client, body):
+    response = client.post("/api/stops/shared/collect", json=body)
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "missing_field"
+
+
+def test_collect_with_unknown_vehicle_is_400(client):
+    response = collect(client, "shared", vehicle_id="no-such-vehicle")
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "unknown_vehicle"
+
+
+def test_collect_with_unknown_route_is_400(client):
+    response = collect(client, "shared", route_id="no-such-route")
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "unknown_route"
+
+
 def test_rider_can_ask_again_after_being_collected(client):
     first = client.post("/api/pickup-requests", json={"stop_id": "shared"})
-    client.post("/api/stops/shared/collect")
+    collect(client, "shared")
     again = client.post("/api/pickup-requests", json={"stop_id": "shared"})
 
     assert again.status_code == 201
@@ -219,7 +259,7 @@ def test_no_expiry_configured_means_requests_stay_open(config_dir):
 def test_cleared_requests_are_kept_with_the_time_they_were_cleared(app, client):
     open_request(app, "shared", "rider-a", minutes_ago=3)
     open_request(app, "north-end", "rider-b", minutes_ago=EXPIRE_AFTER_MINUTES + 5)
-    client.post("/api/stops/shared/collect")
+    collect(client, "shared")
 
     (collected,) = statuses(client, "collected")
     (expired,) = statuses(client, "expired")

@@ -96,3 +96,21 @@ async function cancelPickupRequest(requestId) {
   }
   return body.request;
 }
+
+// POST /api/reviews. No auth: the rider_token cookie ties the review to the
+// rider's own completed pickup request server-side. Resolves to the stored
+// review, or throws with the API's message (e.g. the two ratings are
+// required).
+async function submitReview(payload) {
+  const response = await fetch('/api/reviews', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
+  }
+  return body.review;
+}

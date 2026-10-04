@@ -19,7 +19,8 @@ Codes: `bad_timestamp`, `bad_range` (from > to), `unknown_vehicle`,
 `unknown_stop`, `unknown_route`, `unknown_request`, `not_your_request`,
 `request_not_open`, `data_unavailable`, `not_signed_in`, `bad_credentials`,
 `admin_not_configured`, `missing_field`, `overlap`, `unknown_downtime`,
-`invalid_schedule`.
+`invalid_schedule`, `request_not_collected`, `bad_rating`,
+
 
 **Signing in.** Endpoints marked *Admin only* answer `401` `not_signed_in`
 until the browser has signed in through `POST /api/admin/login` (see
@@ -38,6 +39,7 @@ Liveness is computed server side from `config/app.yaml`.
 {
   "generated_at": "2025-09-04T08:59:00Z",
   "inactivity_threshold_seconds": 300,
+  "freshness_rule": { "green_within_weekdays": 1, "red_after_days": 10 },
   "vehicles": [
     {
       "id": "1",
@@ -46,6 +48,7 @@ Liveness is computed server side from `config/app.yaml`.
       "status": "active",
       "last_seen": "2025-09-04T08:58:37.495682Z",
       "seconds_since_last_seen": 22.5,
+      "freshness": "green",
       "last_position": {
         "vehicle_id": "1",
         "timestamp": "2025-09-04T08:58:37.495682Z",
@@ -65,6 +68,7 @@ Liveness is computed server side from `config/app.yaml`.
       "status": "inactive",
       "last_seen": null,
       "seconds_since_last_seen": null,
+      "freshness": null,
       "last_position": null
     }
   ]
@@ -75,6 +79,17 @@ Liveness is computed server side from `config/app.yaml`.
 all is `inactive` with a `null` position.
 
 `inactivity_threshold_seconds` is echoed.
+
+`freshness` is the traffic light shown beside "Last seen", from the
+`liveness` settings in `config/app.yaml` (echoed as `freshness_rule`), in Perth
+days:
+
+| Value | When last seen |
+|---|---|
+| `green` | Today, or within `green_within_weekdays` weekdays before today. With 1, a bus last seen on Friday is still green on Monday. |
+| `yellow` | Before that, but no more than `red_after_days` days ago. |
+| `red` | More than `red_after_days` calendar days ago. |
+| `null` | Never: no telemetry at all. |
 
 ---
 
@@ -459,7 +474,7 @@ whole window as unscheduled with a note saying why. See **Empty schedules**.
 
 ## `PUT /api/schedule`
 
-Replaces the whole schedule. The roster is sent in one piece rather than a row
+*Admin only.* Replaces the whole schedule. The roster is sent in one piece rather than a row
 at a time, because it is written back into a config file: one read, one
 validated write, no half applied edit.
 
@@ -737,16 +752,104 @@ recorded position, labelled with its age.
 
 The operator has picked up the riders at a stop. Every `open` request at
 the stop becomes `collected`, whichever route the rider was waiting for, since
-requests belong to a stop and not a route. No body. `404` `unknown_stop` if the
-stop is not configured.
+requests belong to a stop and not a route. `404` `unknown_stop` if the stop is
+not configured.
+
+```json
+{ "vehicle_id": "1", "route_id": "campus-loop" }
+```
+
+Both fields are required (S15 follow-up): `400` `missing_field` if either is
+left out, `unknown_vehicle` or `unknown_route` if either is not configured.
+The admin page disables "Picked up" until both are chosen, but this is the
+check that actually matters, since nothing stops a direct API call skipping
+it. They are stamped onto every request closed (`PickupRequest.vehicle_id`/
+`route_id` below) so a review of the pickup (see Reviews) is attributed to
+them. There is no published schedule yet to read this from instead; once
+there is, it should be looked up automatically rather than asked of the
+operator here.
 
 Returns the requests closed, empty if nobody was waiting:
 
 ```json
-{ "collected": [ { "...": "as in POST /api/pickup-requests, with status collected and cleared_at set" } ] }
+{
+  "collected": [
+    {
+      "id": "3f1c2b7a9e4d4f0b8c6a1d2e3f4a5b6c",
+      "stop_id": "reid-library",
+      "status": "collected",
+      "created_at": "2025-09-04T08:58:37.495682Z",
+      "cleared_at": "2025-09-04T09:01:02.000000Z",
+      "vehicle_id": "1",
+      "route_id": "campus-loop"
+    }
+  ]
+}
 ```
 
 A rider who asks again at the same stop afterwards opens a new request.
+
+---
+
+## Reviews
+
+S15 follow-up. A rider's review of one completed pickup. The form itself is
+rider-facing (no sign-in); reading submitted reviews back is admin only.
+
+### `POST /api/reviews`
+
+No sign-in: the `rider_token` cookie (S08.2) ties this to the rider's own
+pickup request, the same way the rest of the rider-facing endpoints do.
+
+```json
+{
+  "pickup_request_id": "3f1c2b7a9e4d4f0b8c6a1d2e3f4a5b6c",
+  "safety_rating": 5,
+  "vehicle_behaviour": "Smooth, confident around pedestrians",
+  "obstacle_interaction": "",
+  "punctuality": "on_time",
+  "ride_duration_ok": "yes",
+  "purpose": "class",
+  "stop_quality": "good",
+  "ramp_needed": "no",
+  "app_rating": 4,
+  "app_comment": "",
+  "role": "undergrad",
+  "usage_frequency": "weekly",
+  "comments": ""
+}
+```
+
+`safety_rating` and `app_rating` (1-5) are the only required fields; every
+other field defaults to `""` if left out. `vehicle_id`, `route_id` and
+`wait_minutes` are not sent by the client at all -- they are read off the
+pickup request itself (`PickupRequest.vehicle_id`/`route_id`, set by
+`POST /api/stops/<id>/collect` above, and `cleared_at - created_at`), since
+that is the operator's own record of which vehicle and route it was and
+exactly how long the wait was, more reliable than asking the rider to recall
+either. `role` and `usage_frequency` are the two fields the rider view
+remembers in a cookie between reviews -- that remembering is entirely
+client-side (js/rider.js); the server does not read the cookie or store
+anything beyond what is in the body.
+
+`404` `unknown_request` if `pickup_request_id` is not on record. `403`
+`not_your_request` if it is not this rider's own. `409`
+`request_not_collected` if it was never marked collected -- only a completed
+pickup can be reviewed. `400` `bad_rating` if either rating is missing or
+outside 1-5. Otherwise `201` with the stored review, shaped as the body
+above plus `id`, `stop_id`, `vehicle_id`, `route_id`, `wait_minutes` and
+`created_at`.
+
+### `GET /api/reviews`
+
+*Admin only.*
+
+Every review, ascending by submission time. A review carries nothing that
+identifies the rider, but is still the client's data, not public.
+
+```json
+{ "reviews": [ { "...": "as in POST's response" } ] }
+```
 
 ---
 
@@ -758,10 +861,11 @@ session cookie (`HttpOnly`, `SameSite=Lax`), which lasts
 `admin.session_hours` in `config/app.yaml`.
 
 Admin only: the `/admin` page, `GET /api/pickup-requests`,
-`GET /api/routes/<id>/waiting`, `POST /api/stops/<id>/collect` and every
-`/api/downtime` endpoint. A
-signed-out request for `/admin` is redirected to
-`/admin-login?next=<the page asked for>`, which returns there after signing in.
+`GET /api/routes/<id>/waiting`, `POST /api/stops/<id>/collect`,
+`GET /api/reviews`, and every `/api/downtime` endpoint. `POST /api/reviews`
+is rider-facing, not admin only. A signed-out request for `/admin` is
+redirected to `/admin-login?next=<the page asked for>`, which returns there
+after signing in.
 
 **Limits.** One account shared by every operator and administrator, so anyone
 who can use the operator view can also change downtime and snapshot settings.
