@@ -62,7 +62,7 @@ def test_put_replaces_the_roster(client):
 
     body = response.get_json()
     assert body["schedule"]["tuesday"] == [
-        {"start": "06:00", "end": "09:00", "vehicles": None, "starts_on": None, "ends_on": None}
+        {"start": "06:00", "end": "09:00", "vehicles": None, "starts_on": None, "ends_on": None, "operator": None}
     ]
     assert body["schedule"]["monday"] == []
     assert client.get("/api/schedule").get_json()["schedule"]["tuesday"][0]["start"] == "06:00"
@@ -72,7 +72,7 @@ def test_put_accepts_a_wrapped_body(client):
     response = client.put("/api/schedule", json={"schedule": {"friday": [["08:00", "15:00"]]}})
     assert response.status_code == 200
     assert response.get_json()["schedule"]["friday"] == [
-        {"start": "08:00", "end": "15:00", "vehicles": None, "starts_on": None, "ends_on": None}
+        {"start": "08:00", "end": "15:00", "vehicles": None, "starts_on": None, "ends_on": None, "operator": None}
     ]
 
 

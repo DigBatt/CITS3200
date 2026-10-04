@@ -856,6 +856,14 @@
    roster and still editable, but not in force today. */
 .sched-period.is-inactive { opacity: 0.62; }
 
+.sched-operator {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+}
+.sched-operator input { font-size: 0.72rem; padding: 0.15rem 0.3rem; flex: 1; min-width: 0; }
+
 .sched-from {
   display: flex;
   align-items: center;

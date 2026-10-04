@@ -301,7 +301,7 @@ async function api(path, options) {
 // scheduled time to anyone. Saving is for operators and administrators, so
 // when sign in exists, guard the save below and the PUT it calls.
 
-let schedule = null;   // { monday: [{start, end, vehicles}], ... }
+let schedule = null;   // { monday: [{start, end, vehicles, operator}], ... }
 let scheduleDays = [];
 let scheduleFleet = [];
 let removeOpen = null;
@@ -408,6 +408,11 @@ function renderSchedule() {
                   aria-expanded="${removeOpen === key}">Remove</button>
         </div>
         ${vehicleChips(day, index, period.vehicles)}
+        <label class="sched-operator">
+          <span>Operator</span>
+          <input type="text" class="form-input" maxlength="80" placeholder="Who drives it (optional)"
+                 value="${escHtml(period.operator ?? '')}" data-operator="${key}" aria-label="Operator">
+        </label>
         <label class="sched-from">
           <input type="checkbox" data-starts-toggle="${key}" ${period.starts_on ? 'checked' : ''}>
           <span>Start on</span>
@@ -455,6 +460,8 @@ document.getElementById('schedule-days').addEventListener('input', event => {
 
   if (input.dataset.edge) {
     schedule[input.dataset.day][Number(input.dataset.index)][input.dataset.edge] = input.value;
+  } else if (input.dataset.operator) {
+    periodAt(input.dataset.operator).operator = input.value.trim() || null;
   } else if (input.dataset.startsDate) {
     periodAt(input.dataset.startsDate).starts_on = input.value || null;
   } else if (input.dataset.removeDate) {
@@ -483,7 +490,7 @@ document.getElementById('schedule-days').addEventListener('click', event => {
 
   if (add) {
     (schedule[add.dataset.add] ??= []).push({
-      start: '08:00', end: '17:00', vehicles: null, starts_on: null, ends_on: null,
+      start: '08:00', end: '17:00', vehicles: null, starts_on: null, ends_on: null, operator: null,
     });
     removeOpen = null;
   } else if (openRemove) {

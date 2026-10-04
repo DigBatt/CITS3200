@@ -417,3 +417,45 @@ def test_a_period_without_dates_writes_no_date_keys(app_yaml):
     save_schedule(app_yaml, Schedule.from_dict({"monday": [{"start": "08:00", "end": "17:00"}]}))
     block = app_yaml.read_text().split("service_hours:")[1].split("logger:")[0]
     assert "starts_on:" not in block and "ends_on:" not in block
+
+
+# ---- Operators: who drives a period ----
+
+
+def test_a_period_may_name_its_operator():
+    schedule = Schedule.from_dict({"tuesday": [{"start": "13:00", "end": "15:00", "vehicles": ["4"], "operator": "Jeremy"}]})
+    assert schedule.for_day("tuesday", "4")[0].operator == "Jeremy"
+    assert schedule.to_dict()["tuesday"][0]["operator"] == "Jeremy"
+
+
+def test_a_period_without_an_operator_reports_none():
+    schedule = Schedule.from_dict({"monday": [{"start": "08:00", "end": "17:00"}]})
+    assert schedule.to_dict()["monday"][0]["operator"] is None
+
+
+def test_an_operator_name_is_tidied_and_blank_means_none():
+    schedule = Schedule.from_dict({"monday": [
+        {"start": "08:00", "end": "09:00", "operator": "  Tom   Kitchin "},
+        {"start": "10:00", "end": "11:00", "operator": "   "},
+    ]})
+    assert [period.operator for period in schedule.for_day("monday")] == ["Tom Kitchin", None]
+
+
+@pytest.mark.parametrize("bad", [42, ["Jeremy"], "x" * 81])
+def test_a_bad_operator_is_rejected(bad):
+    with pytest.raises(ScheduleError, match="operator"):
+        Schedule.from_dict({"monday": [{"start": "08:00", "end": "17:00", "operator": bad}]})
+
+
+def test_operators_survive_the_yaml_round_trip(app_yaml):
+    schedule = Schedule.from_dict({"friday": [
+        {"start": "10:00", "end": "11:00", "vehicles": ["4"], "operator": 'Lee, Zheng: "demo" #1'},
+        {"start": "13:00", "end": "15:00", "vehicles": ["4"], "operator": "Punit"},
+    ]})
+    save_schedule(app_yaml, schedule)
+    assert load_schedule(app_yaml) == schedule
+
+
+def test_a_period_without_an_operator_writes_no_operator_key(app_yaml):
+    save_schedule(app_yaml, Schedule.from_dict({"monday": [{"start": "08:00", "end": "17:00"}]}))
+    assert "operator:" not in app_yaml.read_text()
