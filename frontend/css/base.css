@@ -12,3 +12,28 @@ body {
   margin: 0;
   font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
+
+/* Vehicle chips (js/vehicle-chips.js): the dashboard's vehicle filter and the
+   admin Figures tab pick vehicles with the same buttons. */
+.chip-row {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font: 500 11.5px Sora, sans-serif;
+  background: #fff;
+  color: rgba(28, 25, 23, 0.6);
+  border: 1px solid rgba(28, 25, 23, 0.14);
+}
+
+.chip.is-active {
+  background: #1c1917;
+  color: #fff;
+  border-color: #1c1917;
+}

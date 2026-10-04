@@ -14,6 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/calendar.css">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
@@ -26,14 +27,29 @@
       <span class="app-header-brand-tag">ADMIN</span>
     </div>
 
-<nav class="app-tabs" id="admin-tabs" aria-label="Admin sections">
-  <button type="button" class="app-tab is-active" data-tab="operator">Operator view</button>
-  <button type="button" class="app-tab" data-tab="figures">Figures</button>
-  <button type="button" class="app-tab" data-tab="downtime">Downtime</button>
-  <button type="button" class="app-tab" data-tab="snapshots">Snapshots</button>
-</nav>
+    <nav class="app-tabs" id="admin-tabs" aria-label="Admin sections">
+      <button type="button" class="app-tab is-active" data-tab="operator">Operator view</button>
+      <button type="button" class="app-tab" data-tab="figures">Figures</button>
+      <button type="button" class="app-tab" data-tab="downtime">Downtime</button>
+      <button type="button" class="app-tab" data-tab="schedule">Schedule</button>
+      <button type="button" class="app-tab" data-tab="snapshots">Snapshots</button>
+    </nav>
 
     <div class="app-header-spacer"></div>
+
+    <!-- The calendar, as on the dashboard: the month bar here in the header,
+         and the month and period control it opens as an overlay below. Pick a
+         start and an end date, or drag across days; the expand button opens
+         the full calendar. The period it picks is the Figures tab's
+         (js/admin-calendar.js). AUTH (S13): view only, and the reads behind it
+         stay public. -->
+    <div class="period-picker">
+      <div class="period-bar" id="mini-calendar-head"></div>
+      <div class="period-panel" id="mini-calendar-panel" hidden>
+        <div id="mini-calendar" aria-label="Service calendar, pick a start and an end date"></div>
+        <div id="timeline-container"></div>
+      </div>
+    </div>
 
     <!-- Return to dashboard and sign out -->
     <a href="/" class="btn-signout">Return to Dashboard</a>
@@ -80,63 +96,70 @@
       </div>
     </div>
 
-<!-- ---- Figures view (#70): figures populated by #71 ---- -->
-<div class="admin-panel" id="tab-figures" hidden>
-  <h1 class="admin-section-title">Figures</h1>
-  <p class="admin-section-sub">
-    View fleet performance figures for the selected reporting period.
-  </p>
+    <!-- ---- Figures (#70, #71): every GMG time usage model figure for a
+         period, from /api/metrics. A figure the data cannot support shows as
+         unavailable with the reason, never as zero. Rendered by js/figures.js. ---- -->
+    <div class="admin-panel" id="tab-figures" hidden>
+      <h1 class="admin-section-title">Figures</h1>
+      <p class="admin-section-sub">
+        Fleet performance under the GMG time usage model, for the reporting period below.
+      </p>
 
-  <!-- Reporting period -->
-  <div class="admin-card">
-    <p class="admin-card-title">REPORTING PERIOD</p>
+      <!-- Reporting period, Perth time to the minute, and the vehicles it
+           covers: the same chips as the dashboard's filter, one or more on.
+           A block clicked in the full calendar fills both in. -->
+      <div class="admin-card">
+        <p class="admin-card-title">REPORTING PERIOD</p>
 
-    <div class="figures-period">
-      <div>
-        <span class="figures-label">FROM</span>
-        <span class="figures-period-value" id="figures-from">—</span>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="figures-from-input">FROM</label>
+            <input type="datetime-local" class="form-input" id="figures-from-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="figures-to-input">TO</label>
+            <input type="datetime-local" class="form-input" id="figures-to-input">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <span class="form-label" id="figures-vehicles-label">VEHICLES</span>
+          <div class="chip-row" id="figures-vehicle-chips" role="group" aria-labelledby="figures-vehicles-label"></div>
+        </div>
+
+        <div class="figures-period">
+          <div>
+            <span class="figures-label">COVERING</span>
+            <span class="figures-period-value"><span id="figures-from">&mdash;</span> &rarr; <span id="figures-to">&mdash;</span></span>
+          </div>
+          <div>
+            <span class="figures-label">VEHICLES</span>
+            <span class="figures-period-value" id="figures-scope">&mdash;</span>
+          </div>
+        </div>
+
+        <p class="form-warning figures-error" id="figures-error" role="alert"></p>
       </div>
 
-      <div>
-        <span class="figures-label">TO</span>
-        <span class="figures-period-value" id="figures-to">—</span>
+      <div class="admin-card">
+        <p class="admin-card-title">KEY PERFORMANCE INDICATORS</p>
+        <div class="figures-grid" id="figures-kpis" aria-live="polite"></div>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">TIME CATEGORIES</p>
+        <table class="figures-time">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Time</th>
+              <th>Share of calendar time</th>
+            </tr>
+          </thead>
+          <tbody id="figures-time"></tbody>
+        </table>
       </div>
     </div>
-  </div>
-
-  <!-- Figure cards -->
-  <div class="admin-card">
-    <p class="admin-card-title">FLEET FIGURES</p>
-
-    <div class="figures-grid">
-
-      <div class="figure-card">
-        <p class="figure-name">Asset utilisation</p>
-        <p class="figure-value" id="figure-asset-utilisation">—</p>
-        <p class="figure-definition">
-          Operating time as a proportion of total calendar time.
-        </p>
-      </div>
-
-      <div class="figure-card">
-        <p class="figure-name">Operating efficiency</p>
-        <p class="figure-value" id="figure-operating-efficiency">—</p>
-        <p class="figure-definition">
-          Working time as a proportion of operating time.
-        </p>
-      </div>
-
-      <div class="figure-card">
-        <p class="figure-name">Effective utilisation</p>
-        <p class="figure-value" id="figure-effective-utilisation">—</p>
-        <p class="figure-definition">
-          Working time during scheduled service hours as a proportion of scheduled time.
-        </p>
-      </div>
-
-    </div>
-  </div>
-</div>
 
     <!-- ---- Downtime: stored by /api/downtime, driven by js/admin.js ---- -->
     <div class="admin-panel" id="tab-downtime" hidden>
@@ -202,6 +225,34 @@
       </div>
     </div>
 
+    <!-- ---- Service schedule (S21): stored in config/app.yaml, see /api/schedule ---- -->
+    <!-- AUTH (S13): saving needs sign in (PUT /api/schedule is admin only); the
+         dashboard keeps read only access through GET /api/schedule. -->
+    <div class="admin-panel" id="tab-schedule" hidden>
+      <h1 class="admin-section-title">Service schedule</h1>
+      <p class="admin-section-sub">When the fleet is rostered to run. The dashboard uses this to tell scheduled service time apart from everything else.</p>
+
+      <div class="admin-card">
+        <p class="admin-card-title">WEEKLY SERVICE HOURS</p>
+
+        <div class="form-warning" id="schedule-error"></div>
+
+        <p class="schedule-hint" id="schedule-hint">
+          Times are local (<span id="schedule-tz">…</span>). A day with no periods is not in service.
+          A period must end after it starts, so an overnight run needs a row on each day.
+        </p>
+
+        <!-- Rows injected by js/admin.js -->
+        <div class="schedule-days" id="schedule-days"></div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-primary" id="btn-schedule-save">Save schedule</button>
+          <button type="button" class="btn-outline" id="btn-schedule-reset">Discard changes</button>
+          <span class="schedule-status" id="schedule-status"></span>
+        </div>
+      </div>
+    </div>
+
     <!-- ---- Snapshots (S16, S17): not yet implemented ---- -->
     <div class="admin-panel" id="tab-snapshots" hidden>
       <h1 class="admin-section-title">Daily snapshots</h1>
@@ -224,7 +275,32 @@
   </main>
 </div>
 
+<!-- ============ Full calendar, opened from the mini month ============
+     Titled just "Calendar". Opens on the week, with a 3 day option.
+     AUTH (S13): view only for everyone; editing the roster is the tab above. -->
+<div class="cal-overlay" id="cal-overlay" role="dialog" aria-modal="true" aria-labelledby="cal-overlay-title" hidden>
+  <div class="cal-overlay-panel">
+    <div class="cal-overlay-head">
+      <h2 class="cal-overlay-title" id="cal-overlay-title">Calendar</h2>
+      <button type="button" class="btn-outline" id="cal-overlay-close" aria-label="Close calendar">Close</button>
+    </div>
+    <div class="cal-overlay-body" id="cal-overlay-body"></div>
+  </div>
+</div>
+
+<!-- api.js first: calendar.js calls its getSchedule/getVehicles/getDowntime
+     wrappers, and the Figures tab reuses them with the dashboard's Perth time
+     formatting and GMG figure definitions. -->
+<script src="js/api.js"></script>
+<script src="js/calendar.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/format.js"></script>
+<script src="js/tum.js"></script>
+<script src="js/vehicle-chips.js"></script>
 <script src="js/admin.js"></script>
 <script src="js/operator.js"></script>
+<script src="js/figures.js"></script>
+<!-- Last: the calendar picks the Figures tab's period. -->
+<script src="js/admin-calendar.js"></script>
 </body>
 </html>

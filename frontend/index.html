@@ -12,6 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/calendar.css">
   <link rel="stylesheet" href="css/dashboard.css">
   <!-- For the map's 3D views (js/campus3d.js, js/earth3d.js), which are only
        loaded when someone switches to them. three.js is pinned to the version
@@ -46,11 +47,20 @@
         <button type="button" class="app-tab" data-view="utilisation">Utilisation</button>
       </nav>
       <div class="app-header-spacer"></div>
+      <!-- The period: the calendar's month bar, here in the header, and the
+           month and time sliders it opens as an overlay below. Drag across
+           days to choose the dates; the expand button opens the full calendar.
+           Closed, nothing covers the map. Driven by js/calendar.js, mounted in
+           js/main.js. AUTH (S13): view only, and the reads behind it stay public. -->
+      <div class="period-picker">
+        <div class="period-bar" id="dashboard-mini-head"></div>
+        <div class="period-panel" id="period-panel" hidden>
+          <div id="dashboard-mini" aria-label="Service calendar, drag across days to choose the period"></div>
+          <div id="timeline-container"></div>
+        </div>
+      </div>
       <a href="/admin" class="admin-link">Admin</a>
     </header>
-
-    <!-- ============ Date/time range control ============ -->
-    <div id="timeline-container"></div>
 
     <!-- ============ Vehicle filter chips, rendered by js/vehicles.js ============ -->
     <!-- The label is a button: js/panels.js makes it fold the chip row away,
@@ -401,8 +411,22 @@
 
         <div class="util-table" id="util-table"></div>
       </section>
+
     </main>
   </div>
+
+<!-- ============ Full calendar, opened from the mini month ============
+     Titled just "Calendar". Opens on the week, with a 3 day option.
+     AUTH (S13): view only, over reads that stay public. -->
+<div class="cal-overlay" id="cal-overlay" role="dialog" aria-modal="true" aria-labelledby="cal-overlay-title" hidden>
+  <div class="cal-overlay-panel">
+    <div class="cal-overlay-head">
+      <h2 class="cal-overlay-title" id="cal-overlay-title">Calendar</h2>
+      <button type="button" class="btn-outline" id="cal-overlay-close" aria-label="Close calendar">Close</button>
+    </div>
+    <div class="cal-overlay-body" id="cal-overlay-body"></div>
+  </div>
+</div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="js/api.js"></script>
@@ -411,8 +435,11 @@
   <script src="js/area.js"></script>
   <script src="js/timeline.js"></script>
   <script src="js/format.js"></script>
+  <script src="js/vehicle-chips.js"></script>
   <script src="js/vehicles.js"></script>
+  <script src="js/tum.js"></script>
   <script src="js/utilisation.js"></script>
+  <script src="js/calendar.js"></script>
   <script src="js/view3d.js"></script>
   <script src="js/main.js"></script>
   <script src="js/panels.js"></script>

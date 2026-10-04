@@ -10,15 +10,15 @@
 //
 // Clearing the filter restores the whole fleet.
 //
-// The selection is any set of vehicles, or the whole fleet. A chip or a fleet
-// row adds that vehicle to the selection, or takes it out again if it was
-// already in; "All vehicles" clears it. Taking out the last one, or picking
-// every vehicle, is the whole fleet again.
+// The selection is one or more vehicles, or the whole fleet. A chip or a
+// fleet row turns its vehicle on or off; "All vehicles" clears back to the
+// whole fleet. The chips are js/vehicle-chips.js, shared with the admin
+// Figures tab.
 
 (function () {
-  let fleet = [];
   let freshnessRule = null;
-  let selected = new Set(); // empty means the whole fleet
+  let chips = null;
+  let fleet = [];
   let onChange = null;
   let latestRefresh = 0;
   let refreshError = null;
@@ -27,30 +27,15 @@
     return fleet.find((vehicle) => vehicle.id === id)?.name ?? `Vehicle ${id}`;
   }
 
-  // The selected ids in fleet order, or null for the whole fleet. Fleet order,
-  // so picking 2 then 1 asks for the same as 1 then 2, and the map is not
-  // refitted for a selection that has not changed.
-  function getSelection() {
-    if (selected.size === 0) return null;
-    const order = fleet.map((vehicle) => vehicle.id);
-    return [...selected].sort((a, b) => order.indexOf(a) - order.indexOf(b));
-  }
-
-  // Replace the selection: one id, a list of ids, or null for the whole fleet.
-  function select(ids) {
-    const next = new Set(ids === null ? [] : [].concat(ids));
-    if (fleet.length && fleet.every((vehicle) => next.has(vehicle.id))) next.clear();
-    if (next.size === selected.size && [...next].every((id) => selected.has(id))) return;
-    selected = next;
-    render();
-    onChange?.(getSelection());
-  }
-
-  // Add a vehicle to the selection, or take it out if it is already in.
-  function toggle(id) {
-    const next = new Set(selected);
-    if (!next.delete(id)) next.add(id);
-    select([...next]);
+  // Set the selection from outside, announcing it as a click would:
+  //   select('2')     just that vehicle, as a row of the utilisation table;
+  //   select('1,2')   several, as getSelection() returned them, so a saved
+  //                   selection can be put back (the Rider tab, js/panels.js);
+  //   select(null)    the whole fleet.
+  function select(selection) {
+    const ids = selection ? String(selection).split(',').filter(Boolean) : [];
+    if (ids.length === 1) chips.only(ids[0]);
+    else chips.choose(ids);
   }
 
   // Refetch liveness. Called on every load, so it keeps pace with live polling.
@@ -111,7 +96,8 @@
 
   function rowHtml(vehicle) {
     const active = vehicle.status === 'active';
-    const classes = ['vehicle-row', active ? '' : 'is-offline', selected.has(vehicle.id) ? 'is-selected' : '']
+    const picked = chips.get().includes(vehicle.id);
+    const classes = ['vehicle-row', active ? '' : 'is-offline', picked ? 'is-selected' : '']
       .filter(Boolean)
       .join(' ');
     return `
@@ -136,12 +122,7 @@
       ? 'Vehicles unavailable'
       : `${active} of ${fleet.length} active`;
 
-    const chip = (id, label, isActive) =>
-      `<button type="button" class="chip${isActive ? ' is-active' : ''}" data-vehicle="${escapeHtml(id)}">${escapeHtml(label)}</button>`;
-    document.getElementById('vehicle-filter-chips').innerHTML = [
-      chip('all', 'All vehicles', selected.size === 0),
-      ...fleet.map((vehicle) => chip(vehicle.id, nameOf(vehicle.id), selected.has(vehicle.id))),
-    ].join('');
+    chips.setFleet(fleet);
 
     document.getElementById('vehicle-list').innerHTML = fleet.length
       ? fleet.map(rowHtml).join('')
@@ -160,18 +141,26 @@
   function init(options = {}) {
     onChange = options.onChange ?? null;
 
-    document.getElementById('vehicle-filter-chips').addEventListener('click', (event) => {
-      const chip = event.target.closest('.chip');
-      if (!chip) return;
-      if (chip.dataset.vehicle === 'all') select(null);
-      else toggle(chip.dataset.vehicle);
+    chips = VehicleChips.create(document.getElementById('vehicle-filter-chips'), {
+      onChange: () => {
+        render();
+        onChange?.(chips.query());
+      },
     });
 
+    // A fleet row works like its chip: on, or off again.
     document.getElementById('vehicle-list').addEventListener('click', (event) => {
       const row = event.target.closest('.vehicle-row');
-      if (row) toggle(row.dataset.vehicleRow);
+      if (row) chips.toggle(row.dataset.vehicleRow);
     });
   }
 
-  window.Vehicles = { init, refresh, select, toggle, nameOf, getSelection };
+  window.Vehicles = {
+    init,
+    refresh,
+    select,
+    nameOf,
+    // As the API's `vehicles` parameter: "1,2", or null for the whole fleet.
+    getSelection: () => chips.query(),
+  };
 })();
