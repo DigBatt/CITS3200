@@ -263,3 +263,58 @@ def test_picked_up_clears_the_stop(page, server):
     page.locator('.operator-stop[data-stop-id="shared"] .operator-stop-waiting').filter(has_text="0").wait_for(timeout=5_000)
     assert button.count() == 0
     assert page.locator("#operator-empty").is_visible()
+
+
+def test_picked_up_sends_the_chosen_vehicle_and_route(page, server):
+    """
+    S15 follow-up: a review is attributed to whichever vehicle/route the
+    operator said they were running, so the collect call must carry them.
+    """
+    post_request(server, "shared")
+    button = page.locator('.operator-stop[data-stop-id="shared"] .operator-collect')
+    button.wait_for(timeout=30_000)
+
+    with page.expect_request("**/api/stops/shared/collect") as collect_request:
+        button.click()
+    assert json.loads(collect_request.value.post_data) == {"vehicle_id": "1", "route_id": "loop"}
+
+
+# ---- S15 follow-up: both vehicle and route are required to mark picked up ----
+
+
+@pytest.fixture
+def page_without_vehicle(browser, server):
+    context = browser.new_context()
+    page = context.new_page()
+    page.goto(f"{server}/admin?route=loop")
+    page.fill("#login-username", ADMIN_USERNAME)
+    page.fill("#login-password", ADMIN_PASSWORD)
+    page.click("#btn-login")
+    page.wait_for_url(f"{server}/admin?route=loop")
+    page.wait_for_selector("#operator-stops .operator-stop")
+    yield page
+    context.close()
+
+
+def test_picked_up_is_disabled_without_a_vehicle_chosen(page_without_vehicle, server):
+    page = page_without_vehicle
+    post_request(server, "shared")
+
+    button = page.locator('.operator-stop[data-stop-id="shared"] .operator-collect')
+    button.wait_for(timeout=30_000)
+
+    assert button.is_disabled()
+    assert page.locator("#operator-vehicle-notice").is_visible()
+
+
+def test_picked_up_enables_once_a_vehicle_is_chosen(page_without_vehicle, server):
+    page = page_without_vehicle
+    post_request(server, "shared")
+    button = page.locator('.operator-stop[data-stop-id="shared"] .operator-collect')
+    button.wait_for(timeout=30_000)
+
+    page.select_option("#vehicle-selector", "1")
+
+    button.wait_for(state="attached")
+    assert not button.is_disabled()
+    assert page.locator("#operator-vehicle-notice").is_hidden()

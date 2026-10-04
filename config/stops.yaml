@@ -57,7 +57,7 @@ routes:
     name: Campus loop
     colour: "#D4741F"
     loop: true
-    stops: [reid-library, ezone-central, civ-mech, guild-village, barry-marshall, sports-science, business-school, bilya-marlee, marine-research]
+    stops: [reid-library, ezone-central, civ-mech, law-library, guild-village, barry-marshall, sports-science, business-school, bilya-marlee, marine-research]
 
   - id: eng-business-loop
     name: Engineering to Business School loop
@@ -75,7 +75,7 @@ routes:
     name: Loop around James oval
     colour: "#C2185B"
     loop: true
-    stops: [civ-mech, ezone-central, reid-library, guild-village]
+    stops: [civ-mech, ezone-central, reid-library, law-library, guild-village]
 
   - id: library-service
     name: Direct service to 3 highest use libraries

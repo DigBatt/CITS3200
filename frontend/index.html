@@ -35,7 +35,7 @@
 <body>
   <div class="app-shell">
 
-    <!-- ============ Header: brand, view tabs, live clock ============ -->
+    <!-- ============ Header: brand, view tabs, admin link ============ -->
     <header class="app-header">
       <div class="app-header-brand">
         <span class="app-header-brand-name">nuway</span>
@@ -43,7 +43,6 @@
       </div>
       <nav class="app-tabs" id="app-tabs" aria-label="Dashboard view">
         <button type="button" class="app-tab is-active" data-view="fleet">Fleet</button>
-        <button type="button" class="app-tab" data-view="operator">Operator</button>
         <button type="button" class="app-tab" data-view="rider">Rider</button>
         <button type="button" class="app-tab" data-view="utilisation">Utilisation</button>
       </nav>
@@ -60,15 +59,7 @@
           <div id="timeline-container"></div>
         </div>
       </div>
-      <!-- STUB: wire to a real liveness/heartbeat signal -->
-      <div class="app-live-indicator" data-stub="connection-status">
-        <span class="app-live-dot"></span>
-        <span>Live</span>
-        <span class="app-live-clock" id="app-clock"></span>
-      </div>
-      <!-- STUB: wire to signed-in operator -->
       <a href="/admin" class="admin-link">Admin</a>
-      <div class="app-avatar" data-stub="current-user">JD</div>
     </header>
 
     <!-- ============ Vehicle filter chips, rendered by js/vehicles.js ============ -->
@@ -87,6 +78,15 @@
       <div class="chip-row" id="route-filter-chips"></div>
     </div>
 
+    <!-- ============ Area filter chips, rendered by js/area.js ============ -->
+    <!-- Pins the map to one named area (UWA Campus or Eglinton), overriding
+         the normal fit-to-every-vehicle framing -- useful since nUWAy 2 runs
+         in Eglinton, far from the rest of the fleet. -->
+    <div class="filter-bar" id="area-filter">
+      <button type="button" class="filter-bar-label" aria-expanded="true" aria-controls="area-filter-chips">AREA</button>
+      <div class="chip-row" id="area-filter-chips"></div>
+    </div>
+
     <main>
       <!-- ============ Fleet / Operator / Rider share the map ============ -->
       <div class="dashboard-view" id="view-map">
@@ -101,26 +101,9 @@
 
             <div class="vehicle-list" id="vehicle-list"></div>
 
-            <!-- STUB: the toggles are visual only, apart from Stops, which
-                 js/stops.js wires to the map's stop layer. -->
-            <div class="layer-toggles" data-stub="map-layer-toggles">
+            <!-- js/stops.js wires the Stops toggle to the map's stop layer. -->
+            <div class="layer-toggles">
               <span class="layer-toggles-label">MAP LAYERS</span>
-              <label class="layer-toggle-row">
-                <span>Live positions</span>
-                <span class="toggle-switch">
-                  <input type="checkbox" checked>
-                  <span class="toggle-track"></span>
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
-              <label class="layer-toggle-row">
-                <span>Engage / disengage</span>
-                <span class="toggle-switch">
-                  <input type="checkbox" checked>
-                  <span class="toggle-track"></span>
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
               <label class="layer-toggle-row">
                 <span>Stops</span>
                 <span class="toggle-switch">
@@ -129,32 +112,9 @@
                   <span class="toggle-knob"></span>
                 </span>
               </label>
-              <label class="layer-toggle-row">
-                <span>Today's trail</span>
-                <span class="toggle-switch">
-                  <input type="checkbox">
-                  <span class="toggle-track"></span>
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
             </div>
 
             <div class="kpi-mini-grid" id="fleet-kpis"></div>
-          </div>
-
-          <!-- ---- Operator panel: empty until /api/events exists ---- -->
-          <div class="panel" id="panel-operator" hidden>
-            <div class="panel-header">
-              <span class="panel-title">Operator</span>
-            </div>
-            <p class="empty-state">Engage/disengage state and the autonomy timeline need vehicle events, which the API does not provide yet.</p>
-
-            <div class="event-log">
-              <div class="event-log-header">
-                <span class="panel-title">Event log</span>
-              </div>
-              <p class="empty-state">No events to show.</p>
-            </div>
           </div>
 
           <!-- ---- Rider panel: stop picker and pickup request (S08, S15) ---- -->
@@ -194,14 +154,165 @@
             </div>
 
             <!-- ---- Collected: shown once the operator marks the stop
-                 picked up (S15). Clicking the review button is a stub: there
-                 is no review feature yet, it only confirms the trigger and
-                 returns the rider to the picker. ---- -->
+                 picked up (S15). "Leave a review" reveals the form below;
+                 submitting or skipping either one returns to the picker. ---- -->
             <div class="rider-collected" id="rider-collected" hidden>
               <p class="rider-collected-title">You're on board!</p>
-              <button type="button" class="request-button" id="rider-review-button" data-stub="rider-review">
+              <button type="button" class="request-button" id="rider-review-button">
                 <span class="request-button-title">Leave a review</span>
               </button>
+
+              <!-- vehicle_id/route_id/wait_minutes are not asked here: the
+                   server fills them in from the pickup request itself
+                   (backend/api/reviews.py), since that is the operator's own
+                   record of which vehicle and route it was. -->
+              <form class="review-form" id="rider-review-form" hidden>
+                <fieldset class="review-section">
+                  <legend>Safety &amp; comfort</legend>
+
+                  <div class="review-field">
+                    <span class="review-label">How safe did you feel? <span class="review-required">*</span></span>
+                    <div class="review-rating" data-rating-for="safety_rating">
+                      <label><input type="radio" name="safety_rating" value="1" required><span>1</span></label>
+                      <label><input type="radio" name="safety_rating" value="2"><span>2</span></label>
+                      <label><input type="radio" name="safety_rating" value="3"><span>3</span></label>
+                      <label><input type="radio" name="safety_rating" value="4"><span>4</span></label>
+                      <label><input type="radio" name="safety_rating" value="5"><span>5</span></label>
+                    </div>
+                  </div>
+
+                  <label class="review-field">
+                    <span class="review-label">How did the vehicle behave? (braking, speed, confidence around people)</span>
+                    <textarea class="review-text" name="vehicle_behaviour" rows="2"></textarea>
+                  </label>
+
+                  <label class="review-field">
+                    <span class="review-label">How well did it handle obstacles, pedestrians or other vehicles?</span>
+                    <textarea class="review-text" name="obstacle_interaction" rows="2"></textarea>
+                  </label>
+                </fieldset>
+
+                <fieldset class="review-section">
+                  <legend>Efficiency &amp; operations</legend>
+
+                  <label class="review-field">
+                    <span class="review-label">Was the shuttle on time?</span>
+                    <select class="review-select" name="punctuality">
+                      <option value="">Not sure</option>
+                      <option value="early">Early</option>
+                      <option value="on_time">On time</option>
+                      <option value="late">Late</option>
+                    </select>
+                  </label>
+
+                  <label class="review-field">
+                    <span class="review-label">Was the ride duration acceptable compared to walking?</span>
+                    <select class="review-select" name="ride_duration_ok">
+                      <option value="">Not sure</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  </label>
+
+                  <label class="review-field">
+                    <span class="review-label">What was this ride for?</span>
+                    <select class="review-select" name="purpose">
+                      <option value="">Prefer not to say</option>
+                      <option value="class">Class</option>
+                      <option value="work">Work / meeting</option>
+                      <option value="library">Library / study</option>
+                      <option value="social">Social</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                </fieldset>
+
+                <fieldset class="review-section">
+                  <legend>Route &amp; accessibility</legend>
+
+                  <label class="review-field">
+                    <span class="review-label">Were the stops in good, convenient locations?</span>
+                    <select class="review-select" name="stop_quality">
+                      <option value="">Not sure</option>
+                      <option value="good">Yes, good stops</option>
+                      <option value="could_be_better">Could be better</option>
+                    </select>
+                  </label>
+
+                  <label class="review-field">
+                    <span class="review-label">Did you need the accessibility ramp?</span>
+                    <select class="review-select" name="ramp_needed">
+                      <option value="">Prefer not to say</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  </label>
+                </fieldset>
+
+                <fieldset class="review-section">
+                  <legend>App experience</legend>
+
+                  <div class="review-field">
+                    <span class="review-label">Requesting a pickup and tracking the bus live <span class="review-required">*</span></span>
+                    <div class="review-rating" data-rating-for="app_rating">
+                      <label><input type="radio" name="app_rating" value="1" required><span>1</span></label>
+                      <label><input type="radio" name="app_rating" value="2"><span>2</span></label>
+                      <label><input type="radio" name="app_rating" value="3"><span>3</span></label>
+                      <label><input type="radio" name="app_rating" value="4"><span>4</span></label>
+                      <label><input type="radio" name="app_rating" value="5"><span>5</span></label>
+                    </div>
+                  </div>
+
+                  <label class="review-field">
+                    <span class="review-label">Anything about the app worth mentioning?</span>
+                    <textarea class="review-text" name="app_comment" rows="2"></textarea>
+                  </label>
+                </fieldset>
+
+                <!-- Remembered in a cookie so a returning rider does not have
+                     to answer these again (js/rider.js), within its expiry. -->
+                <fieldset class="review-section">
+                  <legend>About you</legend>
+
+                  <label class="review-field">
+                    <span class="review-label">You are a...</span>
+                    <select class="review-select" name="role">
+                      <option value="">Prefer not to say</option>
+                      <option value="undergrad">UWA undergraduate</option>
+                      <option value="postgrad">UWA postgraduate</option>
+                      <option value="staff">UWA staff</option>
+                      <option value="visitor">Visitor</option>
+                    </select>
+                  </label>
+
+                  <label class="review-field">
+                    <span class="review-label">How often do you expect to use the shuttle?</span>
+                    <select class="review-select" name="usage_frequency">
+                      <option value="">Not sure yet</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">A few times a week</option>
+                      <option value="occasional">Occasionally</option>
+                      <option value="first_time">This was my first time</option>
+                    </select>
+                  </label>
+                </fieldset>
+
+                <fieldset class="review-section">
+                  <legend>Anything else?</legend>
+
+                  <label class="review-field">
+                    <span class="review-label">Recommendations or improvements</span>
+                    <textarea class="review-text" name="comments" rows="3"></textarea>
+                  </label>
+                </fieldset>
+
+                <div class="review-actions">
+                  <button type="submit" class="request-button" id="rider-review-submit">
+                    <span class="request-button-title">Submit review</span>
+                  </button>
+                  <button type="button" class="btn-outline" id="rider-review-skip">Not now</button>
+                </div>
+              </form>
             </div>
 
             <p class="rider-status" id="rider-status" role="status" hidden></p>
@@ -321,6 +432,7 @@
   <script src="js/api.js"></script>
   <script src="js/map.js"></script>
   <script src="js/stops.js"></script>
+  <script src="js/area.js"></script>
   <script src="js/timeline.js"></script>
   <script src="js/format.js"></script>
   <script src="js/vehicle-chips.js"></script>

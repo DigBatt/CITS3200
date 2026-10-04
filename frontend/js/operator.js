@@ -18,6 +18,7 @@ const operatorEls = {
   title: document.getElementById('operator-route-title'),
   updated: document.getElementById('operator-updated'),
   empty: document.getElementById('operator-empty'),
+  vehicleNotice: document.getElementById('operator-vehicle-notice'),
   error: document.getElementById('operator-error'),
   stops: document.getElementById('operator-stops'),
 };
@@ -156,6 +157,14 @@ function renderStops(data, hereStopId) {
   // S09.6: say so plainly rather than leave a column of zeros to read.
   operatorEls.empty.hidden = data.total_waiting > 0;
 
+  // S15 follow-up: a review is attributed to whichever vehicle the operator
+  // says is running (collectAtStop() below), so disable "Picked up" -- rather
+  // than hide it, so there is something visibly waiting to be unlocked --
+  // until one is chosen. Left hidden with nobody waiting either way, so it
+  // does not compete with .operator-empty above.
+  const vehicleChosen = Boolean(operatorEls.vehicle.value);
+  operatorEls.vehicleNotice.hidden = vehicleChosen || data.total_waiting === 0;
+
   // S09.3: stops in service order, as configured.
   operatorEls.stops.innerHTML = data.stops.map((stop, index) => `
     <li class="operator-stop ${stop.waiting ? 'has-waiting' : ''}" data-stop-id="${operatorEscape(stop.id)}">
@@ -167,7 +176,7 @@ function renderStops(data, hereStopId) {
         <strong class="operator-stop-waiting">${stop.waiting}</strong> waiting
         ${stop.waiting ? `<span class="operator-stop-age">oldest ${formatWait(stop.oldest_wait_seconds)}</span>` : ''}
       </span>
-      ${stop.waiting ? `<button type="button" class="operator-collect" data-stop-id="${operatorEscape(stop.id)}">Picked up</button>` : ''}
+      ${stop.waiting ? `<button type="button" class="operator-collect" data-stop-id="${operatorEscape(stop.id)}" ${vehicleChosen ? '' : 'disabled'}>Picked up</button>` : ''}
     </li>
   `).join('');
 }
@@ -180,10 +189,29 @@ function renderError(message) {
 
 // Closes every open request at the stop, then refreshes so it clears at once
 // rather than on the next tick.
+//
+// vehicle_id/route_id go with it: a review submitted against the pickup is
+// attributed to whichever vehicle and route this says it was
+// (backend/api/pickup_requests.py:collect_at_stop()). renderStops() disables
+// the button until both are chosen -- a disabled button fires no click, so
+// this re-check is a safety net (e.g. a stale render racing a fast click),
+// not the primary guard; the server enforces it regardless either way.
 async function collectAtStop(button) {
+  const vehicleId = operatorEls.vehicle.value;
+  const routeId = operatorEls.route.value;
+  if (!vehicleId || !routeId) {
+    operatorEls.error.hidden = false;
+    operatorEls.error.textContent = 'Select a vehicle and a route before marking a stop picked up.';
+    return;
+  }
+
   button.disabled = true;
   try {
-    const response = await fetch(`/api/stops/${encodeURIComponent(button.dataset.stopId)}/collect`, { method: 'POST' });
+    const response = await fetch(`/api/stops/${encodeURIComponent(button.dataset.stopId)}/collect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vehicle_id: vehicleId, route_id: routeId }),
+    });
     if (response.status === 401) redirectToSignIn();
     if (!response.ok) {
       const body = await response.json().catch(() => null);

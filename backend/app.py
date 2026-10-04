@@ -14,6 +14,7 @@ from backend.api.operating import bp as operating_bp
 from backend.api.pickup_requests import bp as pickup_requests_bp
 from backend.api.schedule import bp as schedule_bp
 from backend.api.positions import bp as positions_bp
+from backend.api.reviews import bp as reviews_bp
 from backend.api.stops import bp as stops_bp
 from backend.api.vehicles import bp as vehicles_bp
 from backend.auth import admin_required, load_secrets, signed_in
@@ -21,6 +22,7 @@ from backend.auth import bp as auth_bp
 from backend.config import DEFAULT_CONFIG_DIR, ConfigError, load_config
 from backend.downtime import DowntimeStore
 from backend.pickup_requests import PickupRequestStore
+from backend.reviews import ReviewStore
 from backend.repository import CsvRepository
 from backend.repository.base import RepositoryError
 
@@ -69,6 +71,10 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
     app.config["DOWNTIME_STORE"] = (
         DowntimeStore(config.storage_directory / "downtime.json") if config.storage_directory else None
     )
+    # Same storage.directory as downtime, its own file (if unset /api/reviews answers 500).
+    app.config["REVIEW_STORE"] = (
+        ReviewStore(config.storage_directory / "reviews.json") if config.storage_directory else None
+    )
 
     secrets = load_secrets(config_dir)
     if secrets is None:
@@ -90,6 +96,7 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
     app.register_blueprint(schedule_bp)
     app.register_blueprint(stops_bp)
     app.register_blueprint(pickup_requests_bp)
+    app.register_blueprint(reviews_bp)
     app.register_blueprint(earth_bp)
     app.register_blueprint(downtime_bp)
 

@@ -39,6 +39,8 @@ class Config:
     admin: Optional[dict[str, Any]]
     stops: StopNetwork
     storage_directory: Optional[Path] = None
+    green_within_weekdays: Optional[int] = None
+    red_after_days: Optional[int] = None
 
     def vehicle(self, vehicle_id: str) -> Optional[Vehicle]:
         return next((v for v in self.vehicles if v.id == vehicle_id), None)
@@ -102,6 +104,8 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
             admin=app.get("admin"),
             stops=_parse_stops(stops_raw, stops_path, bounds),
             storage_directory=PROJECT_ROOT / storage_directory if storage_directory else None,
+            green_within_weekdays=liveness.get("green_within_weekdays"),
+            red_after_days=liveness.get("red_after_days"),
         )
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
         raise ConfigError(f"Could not read the config in {config_dir}: {exc}") from exc

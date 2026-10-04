@@ -1,0 +1,15 @@
+# ngrok tunnel that puts the dashboard on a fixed public URL. See README.md.
+#
+#   ngrok start --all --config ~/.config/ngrok/ngrok.yml --config ngrok/ngrok.yml
+#
+# The first --config is your own, holding the authtoken; it is never
+# committed. The domain is reserved on the team's paid ngrok account.
+
+version: "3"
+
+endpoints:
+  # Leaflet dashboard and the JSON API it calls, both served by the Flask app.
+  - name: nuway-dashboard
+    url: https://nuway-dashboard.ngrok.app
+    upstream:
+      url: 5001

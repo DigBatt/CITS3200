@@ -197,7 +197,7 @@ def test_cancel_needs_no_login(client):
 
 def test_cancelling_an_already_collected_request_is_409(client):
     created = client.post("/api/pickup-requests", json={"stop_id": "reid-library"}).get_json()["request"]
-    client.post("/api/stops/reid-library/collect")
+    client.post("/api/stops/reid-library/collect", json={"vehicle_id": "1", "route_id": "campus-loop"})
 
     response = client.post(f"/api/pickup-requests/{created['id']}/cancel")
     assert response.status_code == 409
