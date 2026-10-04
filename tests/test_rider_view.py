@@ -14,6 +14,7 @@ import threading
 from datetime import datetime, timezone
 
 import pytest
+import yaml
 
 from backend.app import create_app
 from backend.config import DEFAULT_CONFIG_DIR
@@ -63,6 +64,14 @@ def config_dir(tmp_path):
     for name in ("app.yaml", "vehicles.yaml"):
         shutil.copy(DEFAULT_CONFIG_DIR / name, tmp_path / name)
     (tmp_path / "stops.yaml").write_text(STOPS_YAML, encoding="utf-8")
+
+    # Reviews (S15 follow-up) are written here; point it at this test's own
+    # directory rather than the real storage.directory the copied app.yaml
+    # names, same as tests/test_downtime.py.
+    app_config = yaml.safe_load((tmp_path / "app.yaml").read_text(encoding="utf-8"))
+    app_config["storage"] = {"directory": str(tmp_path / "admin")}
+    (tmp_path / "app.yaml").write_text(yaml.safe_dump(app_config, sort_keys=False), encoding="utf-8")
+
     return tmp_path
 
 
@@ -160,28 +169,57 @@ def test_cancelling_returns_to_the_picker(page):
 # ---- S15.4: the review prompt appears once the operator collects the stop ----
 
 
-def test_review_button_appears_once_collected(page, app):
-    pick_stop(page, "reid-library")
-    page.click("#rider-request-button")
-    page.wait_for_selector("#rider-waiting:not([hidden])")
-
+def collect(app, stop_id):
     # Simulate the operator's "picked up" action (S10) directly on the same
     # in-process store the running server reads, rather than needing an admin
     # sign-in just to drive this browser test.
-    app.config["PICKUP_REQUEST_STORE"].collect("reid-library", datetime.now(timezone.utc))
+    app.config["PICKUP_REQUEST_STORE"].collect(stop_id, "1", "campus-loop", datetime.now(timezone.utc))
 
+
+def request_and_collect(page, app, stop_id="reid-library"):
+    pick_stop(page, stop_id)
+    page.click("#rider-request-button")
+    page.wait_for_selector("#rider-waiting:not([hidden])")
+    collect(app, stop_id)
     page.wait_for_selector("#rider-collected:not([hidden])", timeout=10_000)
+
+
+def test_review_button_appears_once_collected(page, app):
+    request_and_collect(page, app)
     assert page.locator("#rider-waiting").is_hidden()
 
 
-def test_leaving_a_review_returns_to_the_picker(page, app):
-    pick_stop(page, "reid-library")
-    page.click("#rider-request-button")
-    page.wait_for_selector("#rider-waiting:not([hidden])")
-    app.config["PICKUP_REQUEST_STORE"].collect("reid-library", datetime.now(timezone.utc))
-    page.wait_for_selector("#rider-collected:not([hidden])", timeout=10_000)
+def test_review_button_reveals_the_form(page, app):
+    request_and_collect(page, app)
 
     page.click("#rider-review-button")
 
+    assert page.locator("#rider-review-button").is_hidden()
+    assert page.locator("#rider-review-form").is_visible()
+
+
+def test_skipping_the_review_returns_to_the_picker(page, app):
+    request_and_collect(page, app)
+    page.click("#rider-review-button")
+
+    page.click("#rider-review-skip")
+
     page.wait_for_selector("#rider-picker:not([hidden])")
     assert page.locator("#rider-collected").is_hidden()
+
+
+def rate(page, field, value):
+    page.check(f'.review-rating[data-rating-for="{field}"] input[value="{value}"]')
+
+
+def test_submitting_a_review_returns_to_the_picker(page, app):
+    request_and_collect(page, app)
+    page.click("#rider-review-button")
+
+    rate(page, "safety_rating", 5)
+    rate(page, "app_rating", 4)
+    page.click("#rider-review-submit")
+
+    page.wait_for_selector("#rider-picker:not([hidden])", timeout=5_000)
+    assert page.locator("#rider-collected").is_hidden()
+    assert "Thanks" in page.locator("#rider-status").text_content()

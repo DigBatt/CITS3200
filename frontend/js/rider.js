@@ -1,5 +1,5 @@
 // Rider view: choose a stop, ask to be collected, and track that request
-// through to pickup or cancellation (S08, S15).
+// through to pickup, review or cancellation (S08, S15).
 //
 // Stops are read from /api/stops, so one added to config/stops.yaml appears
 // here after a restart with no code change. The request itself is anonymous:
@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelButton: document.getElementById('rider-cancel-button'),
     collected: document.getElementById('rider-collected'),
     reviewButton: document.getElementById('rider-review-button'),
+    reviewForm: document.getElementById('rider-review-form'),
+    reviewSkip: document.getElementById('rider-review-skip'),
     status: document.getElementById('rider-status'),
   };
 
@@ -57,6 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function showCollected(pickupRequest) {
     currentRequestId = pickupRequest.id;
+    // Fresh every time: the button offers the review again, the form (and
+    // whatever was typed into it) is reset and hidden until asked for.
+    els.reviewButton.hidden = false;
+    els.reviewForm.hidden = true;
+    els.reviewForm.reset();
+    prefillProfile();
     showView('collected');
     setActiveStop(pickupRequest.stop_id);
   }
@@ -172,12 +180,72 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ---- Review (S15): a stub. There is no review feature yet, only the
-  // trigger to show this button once a request is collected; dismissing it
-  // returns the rider to the picker for their next trip. ----
+  // ---- Review (S15 follow-up) ----
+  //
+  // "Leave a review" reveals the form in place of the button; "Not now" or a
+  // successful submit both return to the picker, ready for the next trip.
+  // vehicle_id, route_id and wait_minutes are not asked here -- the server
+  // reads them off the pickup request itself (backend/api/reviews.py).
+
+  // Demographics the rider answers once and this remembers for next time
+  // (within the cookie's lifetime, same as the rider_token cookie's), rather
+  // than asking again on every review.
+  const PROFILE_COOKIE = 'rider_profile';
+  const PROFILE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // ~1 year
+  const PROFILE_FIELDS = ['role', 'usage_frequency'];
+
+  function rememberProfile(form) {
+    try {
+      const profile = Object.fromEntries(PROFILE_FIELDS.map((field) => [field, form.elements[field].value]));
+      const value = encodeURIComponent(JSON.stringify(profile));
+      document.cookie = `${PROFILE_COOKIE}=${value}; max-age=${PROFILE_COOKIE_MAX_AGE}; path=/; samesite=lax`;
+    } catch (error) {
+      /* storage unavailable */
+    }
+  }
+
+  function recallProfile() {
+    try {
+      const match = document.cookie.match(new RegExp(`(?:^|; )${PROFILE_COOKIE}=([^;]*)`));
+      return match ? JSON.parse(decodeURIComponent(match[1])) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function prefillProfile() {
+    const profile = recallProfile();
+    if (!profile) return;
+    PROFILE_FIELDS.forEach((field) => {
+      if (profile[field]) els.reviewForm.elements[field].value = profile[field];
+    });
+  }
 
   els.reviewButton?.addEventListener('click', () => {
-    resetToPicker("Thanks for riding nuway! (We're not collecting reviews yet.)", 'ok');
+    els.reviewButton.hidden = true;
+    els.reviewForm.hidden = false;
+  });
+
+  els.reviewSkip?.addEventListener('click', () => {
+    resetToPicker('Thanks for riding nuway!', 'ok');
+  });
+
+  els.reviewForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!els.reviewForm.reportValidity() || !currentRequestId) return; // the two ratings are required
+
+    const submitButton = document.getElementById('rider-review-submit');
+    submitButton.disabled = true;
+    try {
+      const data = Object.fromEntries(new FormData(els.reviewForm).entries());
+      await submitReview({ pickup_request_id: currentRequestId, ...data });
+      rememberProfile(els.reviewForm);
+      resetToPicker('Thanks for the feedback!', 'ok');
+    } catch (error) {
+      showStatus(error.message, 'error'); // stay on the form: nothing typed is lost
+    } finally {
+      submitButton.disabled = false;
+    }
   });
 
   // ---- Poll the rider's own request (S15) ----

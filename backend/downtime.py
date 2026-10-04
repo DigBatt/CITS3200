@@ -208,3 +208,33 @@ class DowntimeStore:
 def _check_period(start: datetime, end: datetime) -> None:
     if end <= start:
         raise ValueError("end must be after start")
+
+def intervals_by_vehicle(
+    store: Optional[DowntimeStore], vehicle_ids: Sequence[str], start: datetime, end: datetime
+) -> Optional[dict[str, list[tuple[datetime, datetime]]]]:
+    """
+    Each vehicle's downtime over a window, as /api/metrics and /api/operating
+    take it (S19). Only the times: a record's reason stays admin only.
+
+    Parameters
+    ----------
+    store : DowntimeStore or None
+        None when `storage.directory` is unset.
+    vehicle_ids : sequence of str
+    start, end : datetime
+        The window, UTC.
+
+    Returns
+    -------
+    dict of {str: list of (datetime, datetime)} or None
+        Every vehicle in `vehicle_ids`, with `merged_intervals` of its
+        records, empty if it has none. None when there is no store, so there
+        is no downtime log at all, which is not the same as no downtime.
+    """
+    if store is None:
+        return None
+    records = store.list(vehicle_ids, start, end)
+    return {
+        vehicle_id: merged_intervals([r for r in records if r.vehicle_id == vehicle_id], start, end)
+        for vehicle_id in vehicle_ids
+    }

@@ -21,12 +21,36 @@ function getPositions(query) {
   return request('/api/positions', query);
 }
 
+// Just the first and last position in a period, for the calendar's slider.
+function getPositionsExtent(query) {
+  return request('/api/positions/extent', query);
+}
+
+// When each vehicle was operating, split by inside or outside its roster
+// (/api/operating), for the service calendar.
+function getOperating(query) {
+  return request('/api/operating', query);
+}
+
 function getMetrics(query) {
   return request('/api/metrics', query);
 }
 
 function getVehicles() {
   return request('/api/vehicles');
+}
+
+// The service schedule (S21). Public: the dashboard shows scheduled time to
+// anyone, so anyone may read the roster behind it. Editing it is the admin
+// page's PUT, which S13 will guard.
+function getSchedule() {
+  return request('/api/schedule');
+}
+
+// Operator reported downtime, for the service calendar. Reading is public;
+// the admin page's writes are what S13 will guard.
+function getDowntime(query) {
+  return request('/api/downtime', query);
 }
 
 function getRoutes() {
@@ -71,4 +95,22 @@ async function cancelPickupRequest(requestId) {
     throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
   }
   return body.request;
+}
+
+// POST /api/reviews. No auth: the rider_token cookie ties the review to the
+// rider's own completed pickup request server-side. Resolves to the stored
+// review, or throws with the API's message (e.g. the two ratings are
+// required).
+async function submitReview(payload) {
+  const response = await fetch('/api/reviews', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(body?.error?.message ?? `Request failed (${response.status})`);
+  }
+  return body.review;
 }

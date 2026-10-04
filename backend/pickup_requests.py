@@ -82,16 +82,18 @@ class PickupRequestStore:
             requests = [r for r in requests if r.status == status]
         return sorted(requests, key=lambda r: r.created_at)
 
-    def collect(self, stop_id: str, now: datetime) -> list[PickupRequest]:
+    def collect(self, stop_id: str, vehicle_id: str, route_id: str, now: datetime) -> list[PickupRequest]:
         """
         Close every open request at a stop as collected (S10). The records are
-        kept, with `cleared_at`, for the admin's review of the day.
+        kept, with `cleared_at`, for the admin's review of the day, and with
+        `vehicle_id`/`route_id` so a review submitted against one of them
+        (backend/api/reviews.py) can be attributed to this pickup.
 
         Returns the requests closed, empty if nobody was waiting.
         """
         with self._lock:
             closed = [
-                replace(r, status=PickupRequest.COLLECTED, cleared_at=now)
+                replace(r, status=PickupRequest.COLLECTED, cleared_at=now, vehicle_id=vehicle_id, route_id=route_id)
                 for r in self._requests.values()
                 if r.stop_id == stop_id and r.status == PickupRequest.OPEN
             ]

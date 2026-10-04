@@ -34,145 +34,13 @@ main {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
-.timeline-control {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.95);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.timeline-row {
-  flex-wrap: wrap;
-}
-
-.timeline-row[hidden] {
-  display: none;
-}
-
-.timeline-row-label {
-  width: 2.5rem;
-  flex-shrink: 0;
-  font-size: 0.875rem;
-  color: rgba(0, 0, 0, 0.6);
-}
-
-.timeline-row input[type='date'] {
-  width: 160px;
-  flex: 0 0 auto;
-}
-
-.timeline-live {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-}
-
-.timeline-switch {
-  position: relative;
-  display: inline-block;
-  width: 2.25rem;
-  height: 1.25rem;
-  flex-shrink: 0;
-}
-
-.timeline-switch input {
-  position: absolute;
-  inset: 0;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.timeline-switch-track {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.25);
-  transition: background 0.15s ease;
-}
-
-.timeline-switch-knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  transition: left 0.15s ease;
-}
-
-/* Colour matches nUWAy 2's vehicle marker (config/vehicles.yaml), reused
-   here as the app's one accent colour rather than introducing a new one. */
-.timeline-switch input:checked + .timeline-switch-track {
-  background: #2f7d8f;
-}
-
-.timeline-switch input:checked ~ .timeline-switch-knob {
-  left: 1.125rem;
-}
-
-.timeline-switch input:focus-visible + .timeline-switch-track {
-  outline: 2px solid #2f7d8f;
-  outline-offset: 2px;
-}
-
-.timeline-live-dot {
-  display: inline-block;
-  position: relative;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #c0392b; /* broadcast red -- distinct from any vehicle colour */
-}
-
-.timeline-live-dot[hidden] {
-  display: none;
-}
-
-.timeline-live-dot::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: #c0392b;
-  animation: timeline-pulse-ring 1.6s ease-out infinite;
-}
-
-@keyframes timeline-pulse-ring {
-  0% {
-    transform: scale(1);
-    opacity: 0.6;
-  }
-  100% {
-    transform: scale(2.4);
-    opacity: 0;
-  }
-}
-
-.timeline-summary {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: rgba(0, 0, 0, 0.6);
-}
-
-.timeline-status {
-  margin: 0;
-  min-height: 1rem;
-  font-size: 0.8125rem;
-  color: #a35b00;
-}
-
 /*
 Dashboard chrome carried over from drafts/kynan/Nuway Prototype.dc.html.
 
 Vehicle rows, the map legend and the utilisation view are rendered by
 js/vehicles.js and js/utilisation.js, the rider panel by js/rider.js. Layout
-only -- does not touch any `.timeline-*` rule above, which stays owned by the date-range picker.
+only. The period control's `.timeline-*` rules live in css/calendar.css,
+shared with the admin page.
 */
 
 .app-shell {
@@ -310,29 +178,6 @@ only -- does not touch any `.timeline-*` rule above, which stays owned by the da
   display: none;
 }
 
-.chip-row {
-  display: flex;
-  gap: 7px;
-  flex-wrap: wrap;
-}
-
-.chip {
-  flex: none;
-  padding: 6px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  font: 500 11.5px Sora, sans-serif;
-  background: #fff;
-  color: rgba(28, 25, 23, 0.6);
-  border: 1px solid rgba(28, 25, 23, 0.14);
-}
-
-.chip.is-active {
-  background: #1c1917;
-  color: #fff;
-  border-color: #1c1917;
-}
-
 /* ---- Main content: fleet/rider view vs. utilisation view ---- */
 
 .dashboard-view {
@@ -358,6 +203,13 @@ only -- does not touch any `.timeline-*` rule above, which stays owned by the da
   overflow-y: auto;
 }
 
+/* Cards keep their height and the view scrolls instead. Left to shrink, the
+   table (overflow: hidden) was squashed and its rows cut off once the cards
+   above it outgrew the screen. */
+.view-utilisation > * {
+  flex-shrink: 0;
+}
+
 /* Utilisation palette: one colour per time category, read by utilisation.js. */
 .view-utilisation {
   --util-ct: oklch(0.72 0.09 300);
@@ -365,6 +217,7 @@ only -- does not touch any `.timeline-*` rule above, which stays owned by the da
   --util-wt: oklch(0.44 0.16 300);
   --util-od: oklch(0.66 0.15 55);
   --util-sb: oklch(0.56 0.08 200);
+  --util-dt: oklch(0.55 0.17 25);
   --util-nr: oklch(0.6 0.01 60);
   --util-st: oklch(0.52 0.1 245);
   --util-ut: oklch(0.68 0.02 245);
@@ -796,6 +649,14 @@ only -- does not touch any `.timeline-*` rule above, which stays owned by the da
   width: 100%;
 }
 
+/* js/rider.js hides #rider-review-button once the review form is revealed;
+   same fix .rider-waiting[hidden]/.review-form[hidden] etc. already need,
+   `display: flex` above otherwise outranking the browser's own
+   `[hidden] { display: none }`. */
+.request-button[hidden] {
+  display: none;
+}
+
 .request-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -921,6 +782,131 @@ only -- does not touch any `.timeline-*` rule above, which stays owned by the da
 
 .rider-waiting .btn-outline {
   align-self: stretch;
+  text-align: center;
+}
+
+/* ---- Rider: the review form (S15 follow-up) ---- */
+
+.rider-collected {
+  align-items: stretch; /* overrides the flex-start above: the form needs the full card width */
+}
+
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+/* Same reason .rider-waiting[hidden]/.rider-collected[hidden] need this
+   above: `display: flex` here would otherwise outrank the browser's own
+   `[hidden] { display: none }`. */
+.review-form[hidden] {
+  display: none;
+}
+
+.review-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 12px 14px;
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-radius: 10px;
+}
+
+.review-section legend {
+  padding: 0 4px;
+  font: 600 11px Sora, sans-serif;
+  letter-spacing: 0.03em;
+  color: rgba(28, 25, 23, 0.6);
+}
+
+.review-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-label {
+  font: 400 12.5px/1.4 Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.8);
+}
+
+.review-required {
+  color: oklch(0.6 0.19 25);
+}
+
+.review-select,
+.review-text {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(28, 25, 23, 0.16);
+  border-radius: 7px;
+  background: #fff;
+  color: #1c1917;
+  font: 400 13px Sora, sans-serif;
+  resize: vertical;
+}
+
+.review-select:focus,
+.review-text:focus {
+  outline: 2px solid oklch(0.62 0.17 300);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+/* A row of radio inputs styled as rating buttons: the input is kept (for
+   real keyboard/screen-reader semantics) but visually hidden behind its
+   styled label. */
+.review-rating {
+  display: flex;
+  gap: 6px;
+}
+
+.review-rating label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(28, 25, 23, 0.16);
+  border-radius: 8px;
+  font: 600 13px 'IBM Plex Mono', monospace;
+  color: rgba(28, 25, 23, 0.65);
+  cursor: pointer;
+}
+
+.review-rating input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.review-rating input:checked + span {
+  color: #fff;
+}
+
+.review-rating label:has(input:checked) {
+  background: oklch(0.62 0.17 300);
+  border-color: oklch(0.62 0.17 300);
+}
+
+.review-rating label:has(input:focus-visible) {
+  outline: 2px solid oklch(0.62 0.17 300);
+  outline-offset: 2px;
+}
+
+.review-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-actions .btn-outline {
   text-align: center;
 }
 
@@ -1250,6 +1236,29 @@ only -- does not touch any `.timeline-*` rule above, which stays owned by the da
   display: none;
 }
 
+/* S19: how the downtime log was applied, one line per bus that has any */
+.util-downtime-note {
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-left: 3px solid var(--util-dt);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font: 400 12px/1.5 Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.75);
+}
+
+.util-downtime-note p {
+  margin: 0;
+}
+
+.util-downtime-note p + p {
+  margin-top: 4px;
+}
+
+.util-downtime-note[hidden] {
+  display: none;
+}
+
 .util-tum-rows {
   display: flex;
   flex-direction: column;
@@ -1366,6 +1375,7 @@ only -- does not touch any `.timeline-*` rule above, which stays owned by the da
 .admin-link:hover {
   color: #1c1917;
 }
+
 /* ---- Map pane: 2D / 3D toggle and the 3D view (js/view3d.js) ----
    The 3D view covers the Leaflet map rather than replacing it, so switching
    back is instant. Above Leaflet's panes and controls (up to 1000). */
@@ -1594,5 +1604,16 @@ only -- does not touch any `.timeline-*` rule above, which stays owned by the da
 
   .stop-select option {
     font-size: 17px;
+  }
+
+  /* The Utilisation table's six columns are wider than a phone: it scrolls
+     sideways on its own rather than cutting off NOT REPORTING. */
+  .util-table {
+    overflow-x: auto;
+  }
+
+  .util-table-header,
+  .util-table-row {
+    min-width: 560px;
   }
 }

@@ -11,8 +11,11 @@ from backend.api.downtime import bp as downtime_bp
 from backend.api.snapshot_settings import bp as snapshot_settings_bp
 from backend.api.earth import bp as earth_bp, load_google_maps_key
 from backend.api.metrics import bp as metrics_bp
+from backend.api.operating import bp as operating_bp
 from backend.api.pickup_requests import bp as pickup_requests_bp
+from backend.api.schedule import bp as schedule_bp
 from backend.api.positions import bp as positions_bp
+from backend.api.reviews import bp as reviews_bp
 from backend.api.stops import bp as stops_bp
 from backend.api.vehicles import bp as vehicles_bp
 from backend.auth import admin_required, load_secrets, signed_in
@@ -20,6 +23,7 @@ from backend.auth import bp as auth_bp
 from backend.config import DEFAULT_CONFIG_DIR, ConfigError, load_config
 from backend.downtime import DowntimeStore
 from backend.pickup_requests import PickupRequestStore
+from backend.reviews import ReviewStore
 from backend.repository import CsvRepository
 from backend.snapshot_settings import SnapshotSettingsStore
 from backend.repository.base import RepositoryError
@@ -30,21 +34,26 @@ DEFAULT_SESSION_HOURS = 12
 log = logging.getLogger(__name__)
 
 
-def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Flask:
+def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flask:
     """
     Build the configured application.
 
     Parameters
     ----------
-    config_dir
+    config_dir : Path or str, optional
         The directory holding app.yaml, vehicles.yaml and stops.yaml, and
-        the uncommitted secrets.yaml the admin sign-in reads (S13).
+        the uncommitted secrets.yaml the admin sign-in reads (S13). Also
+        where /api/schedule writes the service schedule back to, so a test
+        that edits it should copy config/ first.
+    config : backend.config.Config, optional
+        Already loaded config, for a test that needs its own paths. None
+        reads `config_dir` as usual. Pass it by name.
 
     Returns
     -------
     Flask
-        With the repository and the config on `app.config` under
-        `REPOSITORY` and `NUWAY_CONFIG`.
+        With the repository, the downtime store and the config on
+        `app.config` under `REPOSITORY`, `DOWNTIME_STORE` and `NUWAY_CONFIG`.
 
     Raises
     ------
@@ -53,13 +62,20 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Flask:
     """
     app = Flask(__name__, static_folder=str(FRONTEND), static_url_path="")
 
-    config = load_config(config_dir)
+    config_dir = Path(config_dir)
+    config = load_config(config_dir) if config is None else config
     app.config["NUWAY_CONFIG"] = config
+    app.config["NUWAY_CONFIG_DIR"] = config_dir
+    app.config["NUWAY_CONFIG_PATH"] = config_dir / "app.yaml"
     app.config["REPOSITORY"] = CsvRepository.from_config(config)
     app.config["PICKUP_REQUEST_STORE"] = PickupRequestStore()
     # if storage is unset /api/downtime then answers 500.
     app.config["DOWNTIME_STORE"] = (
         DowntimeStore(config.storage_directory / "downtime.json") if config.storage_directory else None
+    )
+    # Same storage.directory as downtime, its own file (if unset /api/reviews answers 500).
+    app.config["REVIEW_STORE"] = (
+        ReviewStore(config.storage_directory / "reviews.json") if config.storage_directory else None
     )
 
     # S16: Persistent snapshot metric selection.
@@ -91,8 +107,11 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Flask:
     app.register_blueprint(positions_bp)
     app.register_blueprint(vehicles_bp)
     app.register_blueprint(metrics_bp)
+    app.register_blueprint(operating_bp)
+    app.register_blueprint(schedule_bp)
     app.register_blueprint(stops_bp)
     app.register_blueprint(pickup_requests_bp)
+    app.register_blueprint(reviews_bp)
     app.register_blueprint(earth_bp)
     app.register_blueprint(downtime_bp)
     app.register_blueprint(snapshot_settings_bp)

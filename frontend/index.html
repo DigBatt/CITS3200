@@ -12,6 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/calendar.css">
   <link rel="stylesheet" href="css/dashboard.css">
   <!-- For the map's 3D views (js/campus3d.js, js/earth3d.js), which are only
        loaded when someone switches to them. three.js is pinned to the version
@@ -46,11 +47,20 @@
         <button type="button" class="app-tab" data-view="utilisation">Utilisation</button>
       </nav>
       <div class="app-header-spacer"></div>
+      <!-- The period: the calendar's month bar, here in the header, and the
+           month and time sliders it opens as an overlay below. Drag across
+           days to choose the dates; the expand button opens the full calendar.
+           Closed, nothing covers the map. Driven by js/calendar.js, mounted in
+           js/main.js. AUTH (S13): view only, and the reads behind it stay public. -->
+      <div class="period-picker">
+        <div class="period-bar" id="dashboard-mini-head"></div>
+        <div class="period-panel" id="period-panel" hidden>
+          <div id="dashboard-mini" aria-label="Service calendar, drag across days to choose the period"></div>
+          <div id="timeline-container"></div>
+        </div>
+      </div>
       <a href="/admin" class="admin-link">Admin</a>
     </header>
-
-    <!-- ============ Date/time range control ============ -->
-    <div id="timeline-container"></div>
 
     <!-- ============ Vehicle filter chips, rendered by js/vehicles.js ============ -->
     <!-- The label is a button: js/panels.js makes it fold the chip row away,
@@ -66,6 +76,15 @@
     <div class="filter-bar" id="route-filter" hidden>
       <button type="button" class="filter-bar-label" aria-expanded="true" aria-controls="route-filter-chips">ROUTE</button>
       <div class="chip-row" id="route-filter-chips"></div>
+    </div>
+
+    <!-- ============ Area filter chips, rendered by js/area.js ============ -->
+    <!-- Pins the map to one named area (UWA Campus or Eglinton), overriding
+         the normal fit-to-every-vehicle framing -- useful since nUWAy 2 runs
+         in Eglinton, far from the rest of the fleet. -->
+    <div class="filter-bar" id="area-filter">
+      <button type="button" class="filter-bar-label" aria-expanded="true" aria-controls="area-filter-chips">AREA</button>
+      <div class="chip-row" id="area-filter-chips"></div>
     </div>
 
     <main>
@@ -135,14 +154,165 @@
             </div>
 
             <!-- ---- Collected: shown once the operator marks the stop
-                 picked up (S15). Clicking the review button is a stub: there
-                 is no review feature yet, it only confirms the trigger and
-                 returns the rider to the picker. ---- -->
+                 picked up (S15). "Leave a review" reveals the form below;
+                 submitting or skipping either one returns to the picker. ---- -->
             <div class="rider-collected" id="rider-collected" hidden>
               <p class="rider-collected-title">You're on board!</p>
-              <button type="button" class="request-button" id="rider-review-button" data-stub="rider-review">
+              <button type="button" class="request-button" id="rider-review-button">
                 <span class="request-button-title">Leave a review</span>
               </button>
+
+              <!-- vehicle_id/route_id/wait_minutes are not asked here: the
+                   server fills them in from the pickup request itself
+                   (backend/api/reviews.py), since that is the operator's own
+                   record of which vehicle and route it was. -->
+              <form class="review-form" id="rider-review-form" hidden>
+                <fieldset class="review-section">
+                  <legend>Safety &amp; comfort</legend>
+
+                  <div class="review-field">
+                    <span class="review-label">How safe did you feel? <span class="review-required">*</span></span>
+                    <div class="review-rating" data-rating-for="safety_rating">
+                      <label><input type="radio" name="safety_rating" value="1" required><span>1</span></label>
+                      <label><input type="radio" name="safety_rating" value="2"><span>2</span></label>
+                      <label><input type="radio" name="safety_rating" value="3"><span>3</span></label>
+                      <label><input type="radio" name="safety_rating" value="4"><span>4</span></label>
+                      <label><input type="radio" name="safety_rating" value="5"><span>5</span></label>
+                    </div>
+                  </div>
+
+                  <label class="review-field">
+                    <span class="review-label">How did the vehicle behave? (braking, speed, confidence around people)</span>
+                    <textarea class="review-text" name="vehicle_behaviour" rows="2"></textarea>
+                  </label>
+
+                  <label class="review-field">
+                    <span class="review-label">How well did it handle obstacles, pedestrians or other vehicles?</span>
+                    <textarea class="review-text" name="obstacle_interaction" rows="2"></textarea>
+                  </label>
+                </fieldset>
+
+                <fieldset class="review-section">
+                  <legend>Efficiency &amp; operations</legend>
+
+                  <label class="review-field">
+                    <span class="review-label">Was the shuttle on time?</span>
+                    <select class="review-select" name="punctuality">
+                      <option value="">Not sure</option>
+                      <option value="early">Early</option>
+                      <option value="on_time">On time</option>
+                      <option value="late">Late</option>
+                    </select>
+                  </label>
+
+                  <label class="review-field">
+                    <span class="review-label">Was the ride duration acceptable compared to walking?</span>
+                    <select class="review-select" name="ride_duration_ok">
+                      <option value="">Not sure</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  </label>
+
+                  <label class="review-field">
+                    <span class="review-label">What was this ride for?</span>
+                    <select class="review-select" name="purpose">
+                      <option value="">Prefer not to say</option>
+                      <option value="class">Class</option>
+                      <option value="work">Work / meeting</option>
+                      <option value="library">Library / study</option>
+                      <option value="social">Social</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                </fieldset>
+
+                <fieldset class="review-section">
+                  <legend>Route &amp; accessibility</legend>
+
+                  <label class="review-field">
+                    <span class="review-label">Were the stops in good, convenient locations?</span>
+                    <select class="review-select" name="stop_quality">
+                      <option value="">Not sure</option>
+                      <option value="good">Yes, good stops</option>
+                      <option value="could_be_better">Could be better</option>
+                    </select>
+                  </label>
+
+                  <label class="review-field">
+                    <span class="review-label">Did you need the accessibility ramp?</span>
+                    <select class="review-select" name="ramp_needed">
+                      <option value="">Prefer not to say</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  </label>
+                </fieldset>
+
+                <fieldset class="review-section">
+                  <legend>App experience</legend>
+
+                  <div class="review-field">
+                    <span class="review-label">Requesting a pickup and tracking the bus live <span class="review-required">*</span></span>
+                    <div class="review-rating" data-rating-for="app_rating">
+                      <label><input type="radio" name="app_rating" value="1" required><span>1</span></label>
+                      <label><input type="radio" name="app_rating" value="2"><span>2</span></label>
+                      <label><input type="radio" name="app_rating" value="3"><span>3</span></label>
+                      <label><input type="radio" name="app_rating" value="4"><span>4</span></label>
+                      <label><input type="radio" name="app_rating" value="5"><span>5</span></label>
+                    </div>
+                  </div>
+
+                  <label class="review-field">
+                    <span class="review-label">Anything about the app worth mentioning?</span>
+                    <textarea class="review-text" name="app_comment" rows="2"></textarea>
+                  </label>
+                </fieldset>
+
+                <!-- Remembered in a cookie so a returning rider does not have
+                     to answer these again (js/rider.js), within its expiry. -->
+                <fieldset class="review-section">
+                  <legend>About you</legend>
+
+                  <label class="review-field">
+                    <span class="review-label">You are a...</span>
+                    <select class="review-select" name="role">
+                      <option value="">Prefer not to say</option>
+                      <option value="undergrad">UWA undergraduate</option>
+                      <option value="postgrad">UWA postgraduate</option>
+                      <option value="staff">UWA staff</option>
+                      <option value="visitor">Visitor</option>
+                    </select>
+                  </label>
+
+                  <label class="review-field">
+                    <span class="review-label">How often do you expect to use the shuttle?</span>
+                    <select class="review-select" name="usage_frequency">
+                      <option value="">Not sure yet</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">A few times a week</option>
+                      <option value="occasional">Occasionally</option>
+                      <option value="first_time">This was my first time</option>
+                    </select>
+                  </label>
+                </fieldset>
+
+                <fieldset class="review-section">
+                  <legend>Anything else?</legend>
+
+                  <label class="review-field">
+                    <span class="review-label">Recommendations or improvements</span>
+                    <textarea class="review-text" name="comments" rows="3"></textarea>
+                  </label>
+                </fieldset>
+
+                <div class="review-actions">
+                  <button type="submit" class="request-button" id="rider-review-submit">
+                    <span class="request-button-title">Submit review</span>
+                  </button>
+                  <button type="button" class="btn-outline" id="rider-review-skip">Not now</button>
+                </div>
+              </form>
             </div>
 
             <p class="rider-status" id="rider-status" role="status" hidden></p>
@@ -239,19 +409,40 @@
           <div class="util-tum-legend" id="util-tum-legend"></div>
         </div>
 
+        <!-- S19: how much downtime was recorded and how it was treated -->
+        <div class="util-downtime-note" id="util-downtime-note" hidden></div>
+
         <div class="util-table" id="util-table"></div>
       </section>
+
     </main>
   </div>
+
+<!-- ============ Full calendar, opened from the mini month ============
+     Titled just "Calendar". Opens on the week, with a 3 day option.
+     AUTH (S13): view only, over reads that stay public. -->
+<div class="cal-overlay" id="cal-overlay" role="dialog" aria-modal="true" aria-labelledby="cal-overlay-title" hidden>
+  <div class="cal-overlay-panel">
+    <div class="cal-overlay-head">
+      <h2 class="cal-overlay-title" id="cal-overlay-title">Calendar</h2>
+      <button type="button" class="btn-outline" id="cal-overlay-close" aria-label="Close calendar">Close</button>
+    </div>
+    <div class="cal-overlay-body" id="cal-overlay-body"></div>
+  </div>
+</div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="js/api.js"></script>
   <script src="js/map.js"></script>
   <script src="js/stops.js"></script>
+  <script src="js/area.js"></script>
   <script src="js/timeline.js"></script>
   <script src="js/format.js"></script>
+  <script src="js/vehicle-chips.js"></script>
   <script src="js/vehicles.js"></script>
+  <script src="js/tum.js"></script>
   <script src="js/utilisation.js"></script>
+  <script src="js/calendar.js"></script>
   <script src="js/view3d.js"></script>
   <script src="js/main.js"></script>
   <script src="js/panels.js"></script>
