@@ -8,6 +8,8 @@
     { key: 'working_seconds', code: 'WT', colour: 'wt', label: 'Working — moving' },
     { key: 'operating_delay_seconds', code: 'OD', colour: 'od', label: 'Operating delay — stopped away from depot, or no fix' },
     { key: 'standby_seconds', code: 'SB', colour: 'sb', label: 'Standby — stopped at depot' },
+    // S19: from the admin page's log, in place of whatever the telemetry said.
+    { key: 'downtime_seconds', code: 'DT', colour: 'dt', label: 'Downtime — not fit to run' },
     { key: 'not_reporting_seconds', code: 'NR', colour: 'nr', label: 'Not reporting — no telemetry' },
   ];
 
@@ -99,12 +101,14 @@
       row([
         segment('ot', b.operating_seconds, 'Operating time', 'OT'),
         segment('sb', b.standby_seconds, 'Standby', 'SB'),
+        segment('dt', b.downtime_seconds, 'Downtime', 'DT'),
         segment('nr', b.not_reporting_seconds, 'Not reporting', 'NR'),
       ]),
       row([
         segment('wt', b.working_seconds, 'Working time', 'WT'),
         segment('od', b.operating_delay_seconds, 'Operating delay', 'OD'),
         ghost(b.standby_seconds),
+        ghost(b.downtime_seconds),
         ghost(b.not_reporting_seconds),
       ]),
       `<span class="util-tum-caption">${escapeHtml(rosterCaption(figures))}</span>`,
@@ -156,10 +160,22 @@
     ].join('');
   }
 
+  // S19: each bus's own account of its downtime, under both the pie and the
+  // time model. Only buses with any recorded; hidden when none have.
+  function renderDowntimeNote(entries) {
+    const note = document.getElementById('util-downtime-note');
+    const lines = entries
+      .filter((entry) => entry.downtime?.recorded_seconds)
+      .map((entry) => (entries.length > 1 ? `${Vehicles.nameOf(entry.vehicle_id)}: ` : '') + entry.downtime.summary);
+    note.innerHTML = lines.map((line) => `<p>${escapeHtml(line)}</p>`).join('');
+    note.hidden = !lines.length;
+  }
+
   function draw(figures, entries, pooled, totalLabel) {
     renderKpis(figures);
     renderPie(figures);
     renderTimeModel(figures, pooled);
+    renderDowntimeNote(entries);
     renderTable(entries, pooled ? figures : null, totalLabel);
   }
 

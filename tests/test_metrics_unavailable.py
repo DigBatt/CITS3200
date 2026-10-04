@@ -23,20 +23,36 @@ def make_client(config_dir):
     return app.test_client()
 
 
+def copy_config(tmp_path):
+    """
+    The real config, with storage in this test's directory, so downtime
+    entered on someone's admin page does not change the figures (S19).
+    Returns the copy's directory and its parsed app.yaml.
+    """
+    config_dir = tmp_path / "config"
+    shutil.copytree(DEFAULT_CONFIG_DIR, config_dir)
+    config = yaml.safe_load((config_dir / "app.yaml").read_text(encoding="utf-8"))
+    config["storage"] = {"directory": str(tmp_path / "admin")}
+    return config_dir, config
+
+
+def write_config(config_dir, config):
+    (config_dir / "app.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
+
+
 @pytest.fixture
-def client():
-    with make_client(DEFAULT_CONFIG_DIR) as test_client:
+def client(tmp_path):
+    config_dir, config = copy_config(tmp_path)
+    write_config(config_dir, config)
+    with make_client(config_dir) as test_client:
         yield test_client
 
 
 @pytest.fixture
 def client_without_a_schedule(tmp_path):
-    config_dir = tmp_path / "config"
-    shutil.copytree(DEFAULT_CONFIG_DIR, config_dir)
-    app_yaml = config_dir / "app.yaml"
-    config = yaml.safe_load(app_yaml.read_text(encoding="utf-8"))
+    config_dir, config = copy_config(tmp_path)
     del config["utilisation"]["service_hours"]
-    app_yaml.write_text(yaml.safe_dump(config), encoding="utf-8")
+    write_config(config_dir, config)
     with make_client(config_dir) as test_client:
         yield test_client
 
@@ -84,14 +100,10 @@ def test_a_day_with_no_service_leaves_effective_utilisation_unavailable_not_zero
 
 
 def test_figures_the_telemetry_cannot_give_are_unavailable(client):
+    # Downtime and the KPIs that need it come from the admin page's log
+    # (S19, tests/test_tum.py), so only passenger counts are still missing.
     blocked = [
-        "uptime",
-        "mechanical_availability",
-        "physical_availability",
-        "use_of_availability",
         "production_effectiveness",
-        "downtime_seconds",
-        "available_seconds",
         "productive_seconds",
     ]
     for entry in vehicles(client, THURSDAY):

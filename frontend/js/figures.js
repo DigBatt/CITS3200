@@ -78,18 +78,33 @@
     }).join('');
   }
 
-  function renderTime(figures) {
+  // A figure that is real but needs explaining, e.g. scheduled time with no
+  // roster, or how the downtime log was applied (S19). The downtime summary
+  // is one bus's own, so a pool lists each vehicle's that has any.
+  function notesFor(key, figures, entries) {
+    if (key === 'downtime_seconds' && entries.length > 1) {
+      return entries
+        .filter((entry) => entry.downtime?.recorded_seconds)
+        .map((entry) => `${chips.nameOf(entry.vehicle_id)}: ${entry.downtime.summary}`);
+    }
+    const note = figures.notes?.[key];
+    return note ? [note] : [];
+  }
+
+  function renderTime(figures, entries) {
     const calendar = figures.buckets.calendar_seconds;
     els.time.innerHTML = TUM.TIME.map((category) => {
       const { value, reason } = TUM.read(figures, 'buckets', category.key);
       const cells = reason
         ? `<td colspan="2">${unavailable(reason)}</td>`
         : `<td class="mono">${formatDuration(value)}</td><td class="mono">${formatPercent(TUM.ratio(value, calendar))}</td>`;
+      const notes = reason ? [] : notesFor(category.key, figures, entries);
       return `
         <tr class="${reason ? 'is-unavailable' : ''}">
           <td class="figures-time-category" style="--depth: ${category.depth}">
             <span class="figures-time-name">${escapeHtml(category.name)} <span class="figure-formula">${category.code}</span></span>
             <span class="figures-time-definition">${escapeHtml(category.definition)}</span>
+            ${notes.map((note) => `<span class="figures-time-note">${escapeHtml(note)}</span>`).join('')}
           </td>
           ${cells}
         </tr>`;
@@ -118,7 +133,7 @@
 
     const figures = TUM.pool(entries);
     renderKpis(figures);
-    renderTime(figures);
+    renderTime(figures, entries);
   }
 
   async function load() {

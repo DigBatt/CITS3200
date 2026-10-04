@@ -26,7 +26,7 @@
 ### Downtime
 * The operation wants the asset but it isn't in a condition to perform its function.
 * Left as one undivided bucket in the 2020 guideline; no industry consensus on splitting planned from unplanned maintenance, so that detail belongs in a CMMS.
-* **Not derivable from datasets as need fault/maintenance log**
+* **Not in the telemetry; comes from the downtime log entered on the admin page.** Only downtime inside the vehicle's roster counts, and it replaces whatever the telemetry said over the same time. See `GET /api/metrics` in [api.md](api.md).
 
 ### Operating Time
 * Available and under the control of a human _or a system_. `OT = AT − SB`.

@@ -38,9 +38,9 @@ main {
 Dashboard chrome carried over from drafts/kynan/Nuway Prototype.dc.html.
 
 Vehicle rows, the map legend and the utilisation view are rendered by
-js/vehicles.js and js/utilisation.js; the operator and rider panels stay
-empty until the API has events and stops. Layout only. The period control's
-`.timeline-*` rules live in css/calendar.css, shared with the admin page.
+js/vehicles.js and js/utilisation.js, the rider panel by js/rider.js. Layout
+only. The period control's `.timeline-*` rules live in css/calendar.css,
+shared with the admin page.
 */
 
 .app-shell {
@@ -178,7 +178,7 @@ empty until the API has events and stops. Layout only. The period control's
   display: none;
 }
 
-/* ---- Main content: fleet/operator/rider view vs. utilisation view ---- */
+/* ---- Main content: fleet/rider view vs. utilisation view ---- */
 
 .dashboard-view {
   height: 100%;
@@ -203,6 +203,13 @@ empty until the API has events and stops. Layout only. The period control's
   overflow-y: auto;
 }
 
+/* Cards keep their height and the view scrolls instead. Left to shrink, the
+   table (overflow: hidden) was squashed and its rows cut off once the cards
+   above it outgrew the screen. */
+.view-utilisation > * {
+  flex-shrink: 0;
+}
+
 /* Utilisation palette: one colour per time category, read by utilisation.js. */
 .view-utilisation {
   --util-ct: oklch(0.72 0.09 300);
@@ -210,6 +217,7 @@ empty until the API has events and stops. Layout only. The period control's
   --util-wt: oklch(0.44 0.16 300);
   --util-od: oklch(0.66 0.15 55);
   --util-sb: oklch(0.56 0.08 200);
+  --util-dt: oklch(0.55 0.17 25);
   --util-nr: oklch(0.6 0.01 60);
   --util-st: oklch(0.52 0.1 245);
   --util-ut: oklch(0.68 0.02 245);
@@ -1228,6 +1236,29 @@ empty until the API has events and stops. Layout only. The period control's
   display: none;
 }
 
+/* S19: how the downtime log was applied, one line per bus that has any */
+.util-downtime-note {
+  background: #fff;
+  border: 1px solid rgba(28, 25, 23, 0.1);
+  border-left: 3px solid var(--util-dt);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font: 400 12px/1.5 Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.75);
+}
+
+.util-downtime-note p {
+  margin: 0;
+}
+
+.util-downtime-note p + p {
+  margin-top: 4px;
+}
+
+.util-downtime-note[hidden] {
+  display: none;
+}
+
 .util-tum-rows {
   display: flex;
   flex-direction: column;
@@ -1573,5 +1604,16 @@ empty until the API has events and stops. Layout only. The period control's
 
   .stop-select option {
     font-size: 17px;
+  }
+
+  /* The Utilisation table's six columns are wider than a phone: it scrolls
+     sideways on its own rather than cutting off NOT REPORTING. */
+  .util-table {
+    overflow-x: auto;
+  }
+
+  .util-table-header,
+  .util-table-row {
+    min-width: 560px;
   }
 }
