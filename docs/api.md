@@ -836,8 +836,9 @@ anything beyond what is in the body.
 `not_your_request` if it is not this rider's own. `409`
 `request_not_collected` if it was never marked collected -- only a completed
 pickup can be reviewed. `400` `bad_rating` if either rating is missing or
-outside 1-5. Otherwise `201` with the stored review, shaped as the body
-above plus `id`, `stop_id`, `vehicle_id`, `route_id`, `wait_minutes` and
+outside 1-5. `409` `already_reviewed` if the pickup already has a review:
+one review per pickup, and the first one stands. Otherwise `201` with the
+stored review, shaped as the body above plus `id`, `stop_id`, `vehicle_id`, `route_id`, `wait_minutes` and
 `created_at`.
 
 ### `GET /api/reviews`

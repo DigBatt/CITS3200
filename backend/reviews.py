@@ -25,6 +25,12 @@ from backend.repository.base import RepositoryError
 FILE_VERSION = 1
 
 
+class DuplicateReview(Exception):
+    """
+    The pickup request already has a review: one review per pickup.
+    """
+
+
 class ReviewStore:
     """
     Reviews in one JSON file: `{"version": 1, "reviews": [...]}`. A missing
@@ -44,9 +50,17 @@ class ReviewStore:
     def add(self, review: Review) -> Review:
         """
         Store a new review.
+
+        Raises
+        ------
+        DuplicateReview
+            If its pickup request already has one. Checked under the lock,
+            so two submits of the same form in the same instant store one.
         """
         with self._lock:
             reviews = self._read()
+            if any(r.pickup_request_id == review.pickup_request_id for r in reviews):
+                raise DuplicateReview(review.pickup_request_id)
             reviews.append(review)
             self._write(reviews)
         return review
