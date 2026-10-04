@@ -856,6 +856,18 @@ shared with the admin page.
   border-color: transparent;
 }
 
+/* Characters used in a comment box (js/rider.js), red once it is full. */
+.review-count {
+  align-self: flex-end;
+  font: 400 11px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.5);
+}
+
+.review-count.is-full {
+  color: oklch(0.5 0.18 25);
+  font-weight: 500;
+}
+
 /* A row of radio inputs styled as rating buttons: the input is kept (for
    real keyboard/screen-reader semantics) but visually hidden behind its
    styled label. */

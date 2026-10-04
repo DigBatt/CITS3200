@@ -40,6 +40,12 @@ OPTIONAL_TEXT_FIELDS = (
     "comments",
 )
 
+#: The free text fields, as against the choices; each is held to
+#: MAX_COMMENT_LENGTH characters once surrounding space is stripped. The
+#: rider form's textareas carry the same limit as `maxlength`.
+COMMENT_FIELDS = ("vehicle_behaviour", "obstacle_interaction", "app_comment", "comments")
+MAX_COMMENT_LENGTH = 1000
+
 
 def _store() -> ReviewStore:
     store = current_app.config["REVIEW_STORE"]
@@ -88,9 +94,10 @@ def create_review():
         `not_your_request` if it is not this rider's own. `409`
         `request_not_collected` if it was never marked collected -- only a
         completed pickup can be reviewed. `400` `bad_rating` if either rating
-        is missing or out of range. `409` `already_reviewed` if this pickup
-        already has a review: one per pickup. Otherwise `201` with the
-        stored review.
+        is missing or out of range. `400` `comment_too_long` if a free text
+        field is over MAX_COMMENT_LENGTH characters. `409`
+        `already_reviewed` if this pickup already has a review: one per
+        pickup. Otherwise `201` with the stored review.
     """
     body = request.get_json(silent=True) or {}
 
@@ -115,6 +122,11 @@ def create_review():
         app_rating = _rating(body, "app_rating")
     except ValueError as exc:
         return jsonify({"error": {"code": "bad_rating", "message": str(exc)}}), 400
+
+    for field in COMMENT_FIELDS:
+        if len(_text(body, field)) > MAX_COMMENT_LENGTH:
+            message = f"'{field}' must be {MAX_COMMENT_LENGTH} characters or fewer."
+            return jsonify({"error": {"code": "comment_too_long", "message": message}}), 400
 
     wait_minutes = None
     if pickup_request.cleared_at is not None:

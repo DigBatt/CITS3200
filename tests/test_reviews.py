@@ -231,6 +231,38 @@ def test_reviewing_a_cancelled_request_is_409(client):
     assert response.get_json()["error"]["code"] == "request_not_collected"
 
 
+# ---- Comment length ----
+
+
+@pytest.mark.parametrize("field", ["vehicle_behaviour", "obstacle_interaction", "app_comment", "comments"])
+def test_a_comment_over_the_limit_is_400(client, field):
+    pickup_request = collected_request(client)
+    response = client.post("/api/reviews", json=minimal_review_body(pickup_request["id"], **{field: "a" * 1001}))
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "comment_too_long"
+
+
+def test_a_comment_at_the_limit_is_saved(client):
+    pickup_request = collected_request(client)
+    response = client.post("/api/reviews", json=minimal_review_body(pickup_request["id"], comments="a" * 1000))
+    assert response.status_code == 201
+    assert len(response.get_json()["review"]["comments"]) == 1000
+
+
+def test_surrounding_space_does_not_count_towards_the_limit(client):
+    pickup_request = collected_request(client)
+    body = minimal_review_body(pickup_request["id"], comments="  " + "a" * 1000 + "\n")
+    assert client.post("/api/reviews", json=body).status_code == 201
+
+
+def test_a_refused_long_comment_does_not_use_up_the_pickups_review(client):
+    pickup_request = collected_request(client)
+    client.post("/api/reviews", json=minimal_review_body(pickup_request["id"], comments="a" * 1001))
+
+    response = client.post("/api/reviews", json=minimal_review_body(pickup_request["id"], comments="shorter"))
+    assert response.status_code == 201
+
+
 # ---- One review per pickup ----
 
 

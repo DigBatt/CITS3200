@@ -221,6 +221,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // A "120 / 1000" counter under each comment box, red once the box is full.
+  // The limit is the textarea's own maxlength, which matches the server's
+  // MAX_COMMENT_LENGTH (backend/api/reviews.py).
+  els.reviewForm?.querySelectorAll('textarea[maxlength]').forEach((textarea, index) => {
+    const counter = document.createElement('span');
+    counter.className = 'review-count';
+    counter.id = `review-count-${index}`;
+    textarea.setAttribute('aria-describedby', counter.id);
+    textarea.after(counter);
+
+    const update = () => {
+      const full = textarea.value.length >= textarea.maxLength;
+      counter.textContent = full
+        ? `${textarea.maxLength} character limit reached`
+        : `${textarea.value.length} / ${textarea.maxLength}`;
+      counter.classList.toggle('is-full', full);
+    };
+    textarea.addEventListener('input', update);
+    // reset fires before the fields clear, so count once they have.
+    els.reviewForm.addEventListener('reset', () => setTimeout(update));
+    update();
+  });
+
   els.reviewButton?.addEventListener('click', () => {
     els.reviewButton.hidden = true;
     els.reviewForm.hidden = false;
