@@ -8,6 +8,7 @@ from datetime import timedelta
 from pathlib import Path
 from flask import Flask, jsonify, redirect, send_from_directory
 from backend.api.downtime import bp as downtime_bp
+from backend.api.snapshot_settings import bp as snapshot_settings_bp
 from backend.api.earth import bp as earth_bp, load_google_maps_key
 from backend.api.metrics import bp as metrics_bp
 from backend.api.operating import bp as operating_bp
@@ -24,6 +25,7 @@ from backend.downtime import DowntimeStore
 from backend.pickup_requests import PickupRequestStore
 from backend.reviews import ReviewStore
 from backend.repository import CsvRepository
+from backend.snapshot_settings import SnapshotSettingsStore
 from backend.repository.base import RepositoryError
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
@@ -76,6 +78,19 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
         ReviewStore(config.storage_directory / "reviews.json") if config.storage_directory else None
     )
 
+    # S16: Persistent snapshot metric selection.
+    app.config["SNAPSHOT_SETTINGS_STORE"] = (
+        SnapshotSettingsStore(
+            config.storage_directory,
+            config.snapshot_default_metrics or [
+                "asset_utilisation",
+                "operating_efficiency",
+                "effective_utilisation",
+            ],
+        )
+        if config.storage_directory else None
+    )
+
     secrets = load_secrets(config_dir)
     if secrets is None:
         log.warning("No %s/secrets.yaml: admin sign-in is disabled.", config_dir)
@@ -99,6 +114,7 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
     app.register_blueprint(reviews_bp)
     app.register_blueprint(earth_bp)
     app.register_blueprint(downtime_bp)
+    app.register_blueprint(snapshot_settings_bp)
 
     @app.get("/")
     def index():

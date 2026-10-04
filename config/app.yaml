@@ -9,6 +9,13 @@ storage:
   # Downtime records, snapshot settings and daily snapshots.
   directory: data/admin
 
+snapshots:
+  # Default metrics used when no saved selection exists (S16).
+  default_metrics:
+    - asset_utilisation
+    - operating_efficiency
+    - effective_utilisation
+
 liveness:
   inactivity_threshold_seconds: 300 # when data is to be rendered as grey.
   expected_poll_interval_seconds: 6

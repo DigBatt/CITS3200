@@ -853,6 +853,40 @@ identifies the rider, but is still the client's data, not public.
 
 ---
 
+## Snapshot settings
+
+S16. Which metrics go into the daily snapshots, chosen on the admin page's
+Snapshots tab. Kept in `snapshot_settings.json` under `storage.directory`
+(`config/app.yaml`); until a selection is saved, it is
+`snapshots.default_metrics` from the same file. Generating and downloading the
+snapshots themselves is S17.
+
+*Admin only.* `401` if not signed in; `500` `data_unavailable` if
+`storage.directory` is not set or the saved file cannot be read.
+
+The metrics that can be chosen are KPIs of `/api/metrics`:
+`asset_utilisation`, `operating_efficiency`, `effective_utilisation`, `uptime`,
+`mechanical_availability`, `physical_availability` and `use_of_availability`.
+
+### `GET /api/snapshot-settings`
+
+The saved selection, or the configured defaults.
+
+```json
+{ "metrics": ["asset_utilisation", "operating_efficiency", "effective_utilisation"] }
+```
+
+### `PUT /api/snapshot-settings`
+
+Replaces the selection. Body as the `GET` response; `200` with the saved
+selection in the same shape.
+
+`400` `invalid_request` if the body is not a JSON object. `400`
+`invalid_metrics` if `metrics` is not a list, is empty, repeats a metric or
+names one not listed above; the saved selection is left as it was.
+
+---
+
 ## Administrator sign-in
 
 S13. One shared account, set in a `config/secrets.yaml` (copy

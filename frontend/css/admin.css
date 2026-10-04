@@ -705,6 +705,32 @@
   text-align: center;
 }
 
+/* S16: Snapshot metric selection */
+
+#snapshot-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.snapshot-metric {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.snapshot-metric input {
+  cursor: pointer;
+}
+
+#snapshot-status {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
 
 /* Service schedule (S21).
    The old layout put day name, times and buttons on one grid row, which ran
