@@ -971,3 +971,76 @@
   .review-answers { grid-template-columns: 1fr; }
   .review-answers dd { margin-bottom: 6px; }
 }
+
+/* Filters above the reviews summary */
+.review-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.review-filters .form-select { width: auto; min-width: 160px; }
+
+.review-filter-low {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 400 12.5px Sora, sans-serif;
+  cursor: pointer;
+}
+
+/* A long answer is cut to three lines until "Read more". The rider's own
+   line breaks are kept on the text, not on the markup around it. */
+.review-answers dd.review-long { white-space: normal; }
+
+.review-long-text {
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+.review-long.is-open .review-long-text {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+
+.review-read-more {
+  padding: 0;
+  margin-top: 2px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: 500 12px Sora, sans-serif;
+  color: #1c1917;
+  text-decoration: underline;
+}
+
+/* Previous / Next under the reviews list */
+.review-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(28, 25, 23, 0.07);
+}
+
+.review-pager[hidden] { display: none; }
+
+.review-pager-label {
+  font: 400 12px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.6);
+  text-align: center;
+}
+
+.review-pager .btn-outline:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

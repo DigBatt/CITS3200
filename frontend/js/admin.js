@@ -716,25 +716,79 @@ function average(values) {
   return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 }
 
+// How many reviews a page of the list holds, and how long an answer can be
+// before it is cut to a few lines with "Read more".
+const REVIEW_PAGE_SIZE = 10;
+const REVIEW_LONG_ANSWER = 240;
+
+let allReviews = []; // newest first
+let reviewPage = 0; // zero based
+
+const reviewFilters = {
+  vehicle: document.getElementById('review-filter-vehicle'),
+  stop: document.getElementById('review-filter-stop'),
+  low: document.getElementById('review-filter-low'),
+};
+
+function isLowReview(review) {
+  return review.safety_rating <= 2 || review.app_rating <= 2;
+}
+
+function filteredReviews() {
+  const vehicle = reviewFilters.vehicle.value;
+  const stop = reviewFilters.stop.value;
+  return allReviews.filter(r =>
+    (!vehicle || r.vehicle_id === vehicle) &&
+    (!stop || r.stop_id === stop) &&
+    (!reviewFilters.low.checked || isLowReview(r)));
+}
+
+// Options for the vehicles and stops that have reviews, keeping the current
+// choice if it still has any.
+function fillReviewFilter(select, ids, names, allLabel, fallback) {
+  const current = select.value;
+  const options = [...new Set(ids.filter(Boolean))]
+    .map(id => [id, names[id] ?? fallback(id)])
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  select.innerHTML = `<option value="">${allLabel}</option>` + options
+    .map(([id, name]) => `<option value="${escHtml(id)}">${escHtml(name)}</option>`)
+    .join('');
+  select.value = options.some(([id]) => id === current) ? current : '';
+}
+
 function renderReviewSummary(reviews) {
   const summary = document.getElementById('review-summary');
   const avg = (field) => average(reviews.map(r => r[field]).filter(v => v != null));
   const rating = (value) => (value == null ? '—' : `${value.toFixed(1)} / 5`);
   const wait = avg('wait_minutes');
-  const low = reviews.filter(r => r.safety_rating <= 2 || r.app_rating <= 2).length;
+
+  const filtered = reviews.length !== allReviews.length;
+  document.getElementById('review-summary-title').textContent = filtered
+    ? `SUMMARY · ${reviews.length} OF ${allReviews.length} REVIEWS`
+    : 'SUMMARY';
 
   summary.innerHTML = [
     ['Reviews', String(reviews.length)],
     ['Average safety', rating(avg('safety_rating'))],
     ['Average app', rating(avg('app_rating'))],
     ['Average wait', wait == null ? '—' : `${wait.toFixed(1)} min`],
-    ['Rated 2 or lower', String(low)],
+    ['Rated 2 or lower', String(reviews.filter(isLowReview).length)],
   ].map(([label, value]) => `
     <div class="review-stat">
       <span class="review-stat-value">${escHtml(value)}</span>
       <span class="review-stat-label">${escHtml(label)}</span>
     </div>
   `).join('');
+}
+
+function renderAnswer(text) {
+  if (text.length <= REVIEW_LONG_ANSWER) return `<dd>${escHtml(text)}</dd>`;
+  return `
+    <dd class="review-long">
+      <span class="review-long-text">${escHtml(text)}</span>
+      <button type="button" class="review-read-more" aria-expanded="false">Read more</button>
+    </dd>
+  `;
 }
 
 function renderReview(review) {
@@ -750,7 +804,7 @@ function renderReview(review) {
     .filter(([field]) => review[field])
     .map(([field, label, choices]) => `
       <dt>${escHtml(label)}</dt>
-      <dd>${escHtml(choices ? choices[review[field]] ?? review[field] : review[field])}</dd>
+      ${choices ? `<dd>${escHtml(choices[review[field]] ?? review[field])}</dd>` : renderAnswer(review[field])}
     `).join('');
 
   const score = (label, value) =>
@@ -771,6 +825,39 @@ function renderReview(review) {
   `;
 }
 
+function renderReviews() {
+  const list = document.getElementById('review-list');
+  const reviews = filteredReviews();
+  renderReviewSummary(reviews);
+
+  const pages = Math.max(1, Math.ceil(reviews.length / REVIEW_PAGE_SIZE));
+  reviewPage = Math.min(reviewPage, pages - 1);
+  const first = reviewPage * REVIEW_PAGE_SIZE;
+  const shown = reviews.slice(first, first + REVIEW_PAGE_SIZE);
+
+  if (!allReviews.length) {
+    list.innerHTML = '<p class="empty-state">No reviews yet. They appear here once riders review a completed pickup.</p>';
+  } else if (!reviews.length) {
+    list.innerHTML = '<p class="empty-state">No reviews match these filters.</p>';
+  } else {
+    list.innerHTML = shown.map(renderReview).join('');
+  }
+
+  // "21–40 of 67 · Page 2 of 4", only when there is more than one page.
+  document.getElementById('review-pager').hidden = pages <= 1;
+  document.getElementById('review-pager-label').textContent =
+    `${first + 1}–${first + shown.length} of ${reviews.length} · Page ${reviewPage + 1} of ${pages}`;
+  document.getElementById('btn-reviews-prev').disabled = reviewPage === 0;
+  document.getElementById('btn-reviews-next').disabled = reviewPage >= pages - 1;
+}
+
+function turnReviewPage(step) {
+  reviewPage += step;
+  renderReviews();
+  // Back to the top of the list, not left at the bottom of the last page.
+  document.getElementById('review-list').scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
 async function loadReviews() {
   const list = document.getElementById('review-list');
   try {
@@ -778,16 +865,38 @@ async function loadReviews() {
     const { ok, status, data } = await downtimeRequest('GET', '/api/reviews');
     if (!ok) throw new Error(data?.error?.message ?? `Could not load reviews (${status}).`);
 
-    const reviews = [...data.reviews].reverse(); // the API is oldest first
-    renderReviewSummary(reviews);
-    list.innerHTML = reviews.length
-      ? reviews.map(renderReview).join('')
-      : '<p class="empty-state">No reviews yet. They appear here once riders review a completed pickup.</p>';
+    allReviews = [...data.reviews].reverse(); // the API is oldest first
+    fillReviewFilter(reviewFilters.vehicle, allReviews.map(r => r.vehicle_id), reviewNames.vehicles,
+      'All vehicles', id => `Vehicle ${id}`);
+    fillReviewFilter(reviewFilters.stop, allReviews.map(r => r.stop_id), reviewNames.stops,
+      'All stops', id => id);
+    reviewPage = 0;
+    renderReviews();
   } catch (err) {
     document.getElementById('review-summary').innerHTML = '';
+    document.getElementById('review-pager').hidden = true;
     list.innerHTML = `<p class="empty-state">${escHtml(err.message)}</p>`;
   }
 }
+
+Object.values(reviewFilters).forEach(control => {
+  control.addEventListener('change', () => {
+    reviewPage = 0; // a new filter starts from the first page
+    renderReviews();
+  });
+});
+
+document.getElementById('btn-reviews-prev').addEventListener('click', () => turnReviewPage(-1));
+document.getElementById('btn-reviews-next').addEventListener('click', () => turnReviewPage(1));
+
+// One listener for every "Read more" in the list, however often it is redrawn.
+document.getElementById('review-list').addEventListener('click', (event) => {
+  const button = event.target.closest('.review-read-more');
+  if (!button) return;
+  const open = button.closest('.review-long').classList.toggle('is-open');
+  button.textContent = open ? 'Show less' : 'Read more';
+  button.setAttribute('aria-expanded', String(open));
+});
 
 // Fetched when the tab is opened, so new reviews show without a page reload.
 document.querySelector('.app-tab[data-tab="reviews"]').addEventListener('click', loadReviews);
