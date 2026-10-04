@@ -890,3 +890,84 @@
 .sched-remove-label { opacity: 0.7; }
 .sched-remove input[type="date"] { font-size: 0.72rem; padding: 0.15rem 0.3rem; width: auto; }
 
+
+/* ---- Rider reviews tab (S15 follow-up) ---- */
+.review-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.review-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(28, 25, 23, 0.03);
+}
+
+.review-stat-value { font: 600 18px Sora, sans-serif; letter-spacing: -0.02em; }
+.review-stat-label { font: 400 11px Sora, sans-serif; color: rgba(28, 25, 23, 0.55); }
+
+.review-list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.review-item {
+  padding: 14px 0;
+  border-top: 1px solid rgba(28, 25, 23, 0.07);
+}
+
+.review-item:first-child { border-top: none; padding-top: 0; }
+
+.review-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.review-item-where { font: 600 13px Sora, sans-serif; }
+.review-item-when { color: rgba(28, 25, 23, 0.55); }
+
+.review-scores {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.review-score {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font: 400 11.5px Sora, sans-serif;
+  background: rgba(28, 25, 23, 0.05);
+}
+
+.review-score.is-low {
+  color: oklch(0.45 0.16 25);
+  background: oklch(0.75 0.1 25 / 14%);
+}
+
+.review-answers {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: 6px 14px;
+  margin: 0;
+  font: 400 12.5px/1.45 Sora, sans-serif;
+}
+
+.review-answers dt { color: rgba(28, 25, 23, 0.55); }
+
+.review-answers dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+@media (max-width: 560px) {
+  .review-answers { grid-template-columns: 1fr; }
+  .review-answers dd { margin-bottom: 6px; }
+}

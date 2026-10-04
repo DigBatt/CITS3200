@@ -33,6 +33,7 @@
       <button type="button" class="app-tab" data-tab="downtime">Downtime</button>
       <button type="button" class="app-tab" data-tab="schedule">Schedule</button>
       <button type="button" class="app-tab" data-tab="snapshots">Snapshots</button>
+      <button type="button" class="app-tab" data-tab="reviews">Reviews</button>
     </nav>
 
     <div class="app-header-spacer"></div>
@@ -323,6 +324,28 @@
     </p>
   </div>
 </div>
+
+    <!-- ---- Rider reviews (S15 follow-up): read from GET /api/reviews, admin only ---- -->
+    <div class="admin-panel" id="tab-reviews" hidden>
+      <h1 class="admin-section-title">Rider reviews</h1>
+      <p class="admin-section-sub">What riders said after a completed pickup, newest first. One review per pickup.</p>
+
+      <div class="admin-card">
+        <p class="admin-card-title">SUMMARY</p>
+        <!-- Filled by js/admin.js -->
+        <div class="review-summary" id="review-summary"></div>
+      </div>
+
+      <div class="admin-card">
+        <div class="review-list-head">
+          <p class="admin-card-title">REVIEWS</p>
+          <button type="button" class="btn-xs" id="btn-reviews-refresh">Refresh</button>
+        </div>
+        <div id="review-list">
+          <p class="empty-state">Loading reviews…</p>
+        </div>
+      </div>
+    </div>
 
 
   </main>

@@ -667,3 +667,128 @@ snapshotSaveButton.addEventListener('click', async () => {
 });
 
 loadSnapshotSettings();
+
+// ---- Rider reviews (S15 follow-up) ----
+//
+// Read only: GET /api/reviews is admin only and reviews are never edited.
+// Stop, route and vehicle ids are shown by name where the network knows them.
+
+const REVIEW_QUESTIONS = [
+  ['vehicle_behaviour', 'How the vehicle behaved'],
+  ['obstacle_interaction', 'Obstacles, pedestrians and other vehicles'],
+  ['punctuality', 'On time?', { early: 'Early', on_time: 'On time', late: 'Late' }],
+  ['ride_duration_ok', 'Ride time acceptable vs walking?', { yes: 'Yes', no: 'No' }],
+  ['purpose', 'Ride was for', { class: 'Class', work: 'Work / meeting', library: 'Library / study', social: 'Social', other: 'Other' }],
+  ['stop_quality', 'Stops well placed?', { good: 'Yes, good stops', could_be_better: 'Could be better' }],
+  ['ramp_needed', 'Needed the ramp?', { yes: 'Yes', no: 'No' }],
+  ['app_comment', 'About the app'],
+  ['role', 'Rider', { undergrad: 'UWA undergraduate', postgrad: 'UWA postgraduate', staff: 'UWA staff', visitor: 'Visitor' }],
+  ['usage_frequency', 'Expects to ride', { daily: 'Daily', weekly: 'A few times a week', occasional: 'Occasionally', first_time: 'First time' }],
+  ['comments', 'Recommendations or improvements'],
+];
+
+let reviewNames = null; // { stops, routes, vehicles }: id -> name
+
+async function loadReviewNames() {
+  const names = { stops: {}, routes: {}, vehicles: {} };
+  const read = async (path, key, target) => {
+    try {
+      const data = await fetch(path).then(r => r.json());
+      (data[key] ?? []).forEach(item => { if (item.name) target[item.id] = item.name; });
+    } catch {
+      /* fall back to the ids */
+    }
+  };
+  await Promise.all([
+    read('/api/stops', 'stops', names.stops),
+    read('/api/routes', 'routes', names.routes),
+    read('/api/vehicles', 'vehicles', names.vehicles),
+  ]);
+  return names;
+}
+
+function fmtWait(minutes) {
+  if (minutes == null) return '';
+  return minutes < 1 ? 'waited under a minute' : `waited ${Math.round(minutes)} min`;
+}
+
+function average(values) {
+  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+}
+
+function renderReviewSummary(reviews) {
+  const summary = document.getElementById('review-summary');
+  const avg = (field) => average(reviews.map(r => r[field]).filter(v => v != null));
+  const rating = (value) => (value == null ? '—' : `${value.toFixed(1)} / 5`);
+  const wait = avg('wait_minutes');
+  const low = reviews.filter(r => r.safety_rating <= 2 || r.app_rating <= 2).length;
+
+  summary.innerHTML = [
+    ['Reviews', String(reviews.length)],
+    ['Average safety', rating(avg('safety_rating'))],
+    ['Average app', rating(avg('app_rating'))],
+    ['Average wait', wait == null ? '—' : `${wait.toFixed(1)} min`],
+    ['Rated 2 or lower', String(low)],
+  ].map(([label, value]) => `
+    <div class="review-stat">
+      <span class="review-stat-value">${escHtml(value)}</span>
+      <span class="review-stat-label">${escHtml(label)}</span>
+    </div>
+  `).join('');
+}
+
+function renderReview(review) {
+  const { stops, routes, vehicles } = reviewNames;
+  const where = [
+    stops[review.stop_id] ?? review.stop_id,
+    review.vehicle_id ? vehicles[review.vehicle_id] ?? `Vehicle ${review.vehicle_id}` : null,
+    review.route_id ? routes[review.route_id] ?? review.route_id : null,
+  ].filter(Boolean);
+  const when = [fmtLocal(review.created_at), fmtWait(review.wait_minutes)].filter(Boolean).join(' · ');
+
+  const answers = REVIEW_QUESTIONS
+    .filter(([field]) => review[field])
+    .map(([field, label, choices]) => `
+      <dt>${escHtml(label)}</dt>
+      <dd>${escHtml(choices ? choices[review[field]] ?? review[field] : review[field])}</dd>
+    `).join('');
+
+  const score = (label, value) =>
+    `<span class="review-score${value <= 2 ? ' is-low' : ''}">${label} <b>${value}</b>/5</span>`;
+
+  return `
+    <article class="review-item">
+      <div class="review-item-head">
+        <span class="review-item-where">${escHtml(where.join(' · '))}</span>
+        <span class="review-item-when mono">${escHtml(when)}</span>
+      </div>
+      <div class="review-scores">
+        ${score('Safety', review.safety_rating)}
+        ${score('App', review.app_rating)}
+      </div>
+      ${answers ? `<dl class="review-answers">${answers}</dl>` : '<p class="empty-state">Ratings only, no other answers.</p>'}
+    </article>
+  `;
+}
+
+async function loadReviews() {
+  const list = document.getElementById('review-list');
+  try {
+    if (!reviewNames) reviewNames = await loadReviewNames();
+    const { ok, status, data } = await downtimeRequest('GET', '/api/reviews');
+    if (!ok) throw new Error(data?.error?.message ?? `Could not load reviews (${status}).`);
+
+    const reviews = [...data.reviews].reverse(); // the API is oldest first
+    renderReviewSummary(reviews);
+    list.innerHTML = reviews.length
+      ? reviews.map(renderReview).join('')
+      : '<p class="empty-state">No reviews yet. They appear here once riders review a completed pickup.</p>';
+  } catch (err) {
+    document.getElementById('review-summary').innerHTML = '';
+    list.innerHTML = `<p class="empty-state">${escHtml(err.message)}</p>`;
+  }
+}
+
+// Fetched when the tab is opened, so new reviews show without a page reload.
+document.querySelector('.app-tab[data-tab="reviews"]').addEventListener('click', loadReviews);
+document.getElementById('btn-reviews-refresh').addEventListener('click', loadReviews);
