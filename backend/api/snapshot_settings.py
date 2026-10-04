@@ -4,13 +4,17 @@
 from flask import Blueprint, current_app, jsonify, request
 
 from backend.auth import admin_required
+from backend.config import ConfigError
 
 bp = Blueprint("snapshot_settings", __name__)
 
 
 def get_store():
     """Return the snapshot settings store configured by the application."""
-    return current_app.config["SNAPSHOT_SETTINGS_STORE"]
+    store = current_app.config["SNAPSHOT_SETTINGS_STORE"]
+    if store is None:
+        raise ConfigError("storage.directory is not set in config/app.yaml, so snapshot settings cannot be stored.")
+    return store
 
 
 @bp.get("/api/snapshot-settings")

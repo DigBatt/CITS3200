@@ -6,14 +6,20 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from backend.config import ConfigError
 from backend.files import write_json_atomic
 
 
-# Metrics currently supported by the TUM calculation.
+# Metrics currently supported by the TUM calculation. The availability KPIs
+# need the downtime log (S19).
 AVAILABLE_METRICS = {
     "asset_utilisation": "Asset utilisation",
     "operating_efficiency": "Operating efficiency",
     "effective_utilisation": "Effective utilisation",
+    "uptime": "Uptime",
+    "mechanical_availability": "Mechanical availability",
+    "physical_availability": "Physical availability",
+    "use_of_availability": "Use of availability",
 }
 
 
@@ -22,7 +28,10 @@ class SnapshotSettingsStore:
 
     def __init__(self, storage_directory: Path, default_metrics: list[str]):
         self.path = Path(storage_directory) / "snapshot_settings.json"
-        self.default_metrics = self.validate(default_metrics)
+        try:
+            self.default_metrics = self.validate(default_metrics)
+        except ValueError as exc:
+            raise ConfigError(f"snapshots.default_metrics in config/app.yaml: {exc}") from exc
 
     @staticmethod
     def validate(metrics: list[str]) -> list[str]:

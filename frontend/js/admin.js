@@ -586,10 +586,11 @@ function updateSnapshotSaveButton() {
   const selected = selectedSnapshotMetrics();
 
   // Only enable Save when at least one metric is selected
-  // and the selection differs from the saved settings.
+  // and the selection differs from the saved settings, in any order.
+  const sorted = (metrics) => JSON.stringify([...metrics].sort());
   snapshotSaveButton.disabled =
     selected.length === 0 ||
-    JSON.stringify(selected) === JSON.stringify(savedSnapshotMetrics);
+    sorted(selected) === sorted(savedSnapshotMetrics);
 }
 
 snapshotCheckboxes.forEach(checkbox => {

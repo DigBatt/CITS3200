@@ -10,7 +10,7 @@ import pytest
 import yaml
 
 from backend.app import create_app
-from backend.config import DEFAULT_CONFIG_DIR
+from backend.config import DEFAULT_CONFIG_DIR, ConfigError
 from backend.snapshot_settings import SnapshotSettingsStore
 from tests.admin_support import sign_in, write_admin_secrets
 
@@ -226,3 +226,46 @@ def test_corrupt_file_returns_500(client, settings_file):
 
     assert response.status_code == 500
     assert response.get_json()["error"]["code"] == "data_unavailable"
+
+
+def test_availability_metrics_can_be_selected(client):
+    selected = ["uptime", "physical_availability"]
+
+    response = client.put(
+        "/api/snapshot-settings",
+        json={"metrics": selected},
+    )
+
+    assert response.status_code == 200
+    assert client.get("/api/snapshot-settings").get_json() == {
+        "metrics": selected
+    }
+
+
+def _rewrite_app_config(config_dir, change):
+    path = config_dir / "app.yaml"
+    app_config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    change(app_config)
+    path.write_text(yaml.safe_dump(app_config, sort_keys=False), encoding="utf-8")
+
+
+def test_no_storage_directory_returns_500(config_dir):
+    _rewrite_app_config(config_dir, lambda app_config: app_config.pop("storage"))
+    client = sign_in(create_app(config_dir).test_client())
+
+    for response in (
+        client.get("/api/snapshot-settings"),
+        client.put("/api/snapshot-settings", json={"metrics": ["asset_utilisation"]}),
+    ):
+        assert response.status_code == 500
+        assert response.get_json()["error"]["code"] == "data_unavailable"
+
+
+def test_unsupported_default_metric_is_a_config_error(config_dir):
+    _rewrite_app_config(
+        config_dir,
+        lambda app_config: app_config.update(snapshots={"default_metrics": ["unknown_metric"]}),
+    )
+
+    with pytest.raises(ConfigError):
+        create_app(config_dir)
