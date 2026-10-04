@@ -418,8 +418,8 @@ so anyone may read the roster behind it. Only the `PUT` below is privileged.
   "vehicles": [{ "id": "1", "name": "nUWAy 1", "colour": "#d4741f" }],
   "schedule": {
     "monday": [
-      { "start": "08:00", "end": "12:00", "vehicles": null, "starts_on": null, "ends_on": null },
-      { "start": "13:00", "end": "17:00", "vehicles": ["1", "2"], "starts_on": "2026-10-01", "ends_on": null }
+      { "start": "08:00", "end": "12:00", "vehicles": null, "starts_on": null, "ends_on": null, "operator": null },
+      { "start": "13:00", "end": "17:00", "vehicles": ["1", "2"], "starts_on": "2026-10-01", "ends_on": null, "operator": "Jeremy" }
     ],
     "saturday": [{ "start": "09:00", "end": "13:00", "vehicles": ["3"] }],
     "sunday": []
@@ -444,6 +444,11 @@ its scheduled time twice.
 `/api/metrics` follows the same rule: `scheduled_seconds` is computed from the
 periods that apply to that vehicle, so two buses over one window can have
 different scheduled time.
+
+**A period may name its operator.** `operator` is who drives that shift, or
+`null`. It is a label only: the calendar shows it on the scheduled block, and
+no figure depends on it. Whitespace is tidied, a blank name is `null`, and a
+name longer than 80 characters is a 400.
 
 **Changes can be booked ahead.** `starts_on` is the first day a period counts
 and `ends_on` the first day it no longer does, so a period runs up to but not

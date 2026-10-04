@@ -28,6 +28,14 @@ roster can be booked ahead rather than applied the moment someone saves it.
 does, so the period runs up to but not including that date. Both are optional
 and a period without them is simply always in force.
 
+A period may name its `operator`, who drives that shift, so the calendar can
+say who is on. It is a label only and changes no figure:
+
+    tuesday:
+      - hours: ["13:00", "15:00"]
+        vehicles: ["4"]
+        operator: Jeremy
+
 A day that is absent or empty is simply not in service. That is not an error:
 a fleet that does not run on Sundays is a normal schedule, and time outside
 service counts as unscheduled. The same holds per vehicle, so a bus nobody
@@ -39,6 +47,7 @@ crosses midnight cannot yet be expressed; it would need two rows on two days.
 """
 
 from __future__ import annotations
+import json
 import logging
 import os
 import re
@@ -61,6 +70,9 @@ LEGACY_WEEKDAY = "weekday"
 LEGACY_WEEKEND = "weekend"
 
 _INDENT = "  "
+
+#: Longest operator name kept, so a pasted paragraph cannot fill the calendar.
+MAX_OPERATOR_LENGTH = 80
 
 
 class ScheduleError(Exception):
@@ -125,6 +137,25 @@ def _ranges_overlap(a: "ServicePeriod", b: "ServicePeriod") -> bool:
     )
 
 
+def _parse_operator(value: Any, day: str) -> Optional[str]:
+    """
+    Read a period's optional operator name.
+
+    Raises
+    ------
+    ScheduleError
+        If it is not text, or is longer than `MAX_OPERATOR_LENGTH`.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ScheduleError(f"{day} operator: {value!r} is not a name")
+    name = " ".join(value.split())
+    if len(name) > MAX_OPERATOR_LENGTH:
+        raise ScheduleError(f"{day} operator: longer than {MAX_OPERATOR_LENGTH} characters")
+    return name or None
+
+
 def _parse_vehicles(value: Any) -> Optional[frozenset[str]]:
     """
     Read a period's vehicle scope.
@@ -162,6 +193,8 @@ class ServicePeriod:
     ends_on : date, optional
         First day it no longer counts, so the period runs up to but not
         including it. None means it has no end.
+    operator : str, optional
+        Who drives it, for display only.
     """
 
     start: time
@@ -169,6 +202,7 @@ class ServicePeriod:
     vehicles: Optional[frozenset[str]] = None
     starts_on: Optional[date] = None
     ends_on: Optional[date] = None
+    operator: Optional[str] = None
 
     def applies_on(self, day: date) -> bool:
         """
@@ -216,6 +250,7 @@ class ServicePeriod:
             "vehicles": None if self.vehicles is None else sorted(self.vehicles),
             "starts_on": self.starts_on.isoformat() if self.starts_on else None,
             "ends_on": self.ends_on.isoformat() if self.ends_on else None,
+            "operator": self.operator,
         }
 
     @property
@@ -226,6 +261,7 @@ class ServicePeriod:
             self.starts_on or date.min,
             self.ends_on or date.max,
             tuple(sorted(self.vehicles or ())),
+            self.operator or "",
         )
 
 
@@ -378,6 +414,7 @@ class Schedule:
                         _parse_vehicles(entry.get("vehicles")),
                         _parse_date(entry.get("starts_on"), f"{day} starts_on"),
                         _parse_date(entry.get("ends_on"), f"{day} ends_on"),
+                        _parse_operator(entry.get("operator"), day),
                     )
                 )
             elif isinstance(entry, (list, tuple)) and len(entry) == 2:
@@ -432,6 +469,10 @@ class Schedule:
                     lines.append(f"{indent}{_INDENT}  starts_on: {period.starts_on.isoformat()}")
                 if period.ends_on is not None:
                     lines.append(f"{indent}{_INDENT}  ends_on: {period.ends_on.isoformat()}")
+                if period.operator is not None:
+                    # A JSON string is a valid YAML double quoted scalar, so
+                    # any name round trips, colons and quotes included.
+                    lines.append(f"{indent}{_INDENT}  operator: {json.dumps(period.operator, ensure_ascii=False)}")
         return "\n".join(lines)
 
 
