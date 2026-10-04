@@ -125,3 +125,27 @@ Allowed, with a warning in the log:
 2. Restart the application.
 
 ---
+## 7. Planned dotted paths
+
+The five existing route buttons draw their planned paths in the route colour.
+`frontend/js/route-paths.js` holds shared straight sections and sampled curves
+traced from the October 4 route sketches. Stop vertices are resolved from the
+API's actual stop coordinates, not copied from screenshot pixels. Separate
+branches prevent unwanted diagonal closing lines across campus.
+
+`frontend/js/map.js` draws these paths in a pane below stop markers and GPS
+trails. Selecting another route replaces the path; All routes clears it.
+The Stops toggle hides and restores both the path and its markers. Selection
+continues to survive reloads. Route names, IDs, stop memberships and service
+order in `config/stops.yaml` are unchanged.
+
+Two differences between the sketches and this configuration are retained:
+Law Library is configured on Campus loop and James Oval, so these include a
+short spur to it. Business School is configured at the Underwood car park,
+north of the sketch's marker; the southern connections meet that configured
+location. There are no Demo routes in this configuration.
+
+After changing the JavaScript, refresh the browser (hard refresh if it has an
+older cached copy). Run `python -m pytest tests/test_route_paths.py` to check
+that every route reaches all its stops and all path parts connect; this check
+uses Node.js alongside the normal Python test dependencies.

@@ -112,7 +112,7 @@
             ${stats(vehicle).map((value) => `<span>${escapeHtml(value)}</span>`).join('')}
           </div>
         </div>
-        <div class="vehicle-chip-num" style="box-shadow: inset 0 -3px 0 ${escapeHtml(vehicle.colour ?? 'transparent')}">${escapeHtml(vehicle.id.padStart(2, '0'))}</div>
+        <div class="vehicle-chip-num" style="background-color: ${escapeHtml(vehicle.colour ?? '#57534e')}">${escapeHtml(String(vehicle.id).replace(/^0+(?=\d)/, ''))}</div>
       </div>`;
   }
 

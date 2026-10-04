@@ -289,8 +289,12 @@ shared with the admin page.
 }
 
 .vehicle-row.is-offline {
-  opacity: 0.62;
   background: repeating-linear-gradient(135deg, rgba(28, 25, 23, 0.03) 0 6px, transparent 6px 12px);
+}
+
+/* Keep vehicle number boxes fully coloured even when telemetry is offline. */
+.vehicle-row.is-offline .vehicle-row-main {
+  opacity: 0.62;
 }
 
 .vehicle-row-main {
@@ -370,12 +374,12 @@ shared with the admin page.
   width: 44px;
   height: 44px;
   border-radius: 8px;
-  background: rgba(28, 25, 23, 0.06);
+  background: #57534e;
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 600 11px 'IBM Plex Mono', monospace;
-  color: rgba(28, 25, 23, 0.5);
+  font: 700 20px 'IBM Plex Mono', monospace;
+  color: #ffffff;
   flex: none;
 }
 

@@ -36,6 +36,7 @@
     remember(routeId);
     render();
     highlightRoute(stops, selected, routeOf(selected)?.colour);
+    drawRoutePath(routeOf(selected), stops);
     onChange?.(selected);
   }
 
@@ -109,6 +110,7 @@
     render();
     drawStops(stops, { popupHtml });
     highlightRoute(stops, selected, routeOf(selected)?.colour);
+    drawRoutePath(routeOf(selected), stops);
     setCampusBounds(stops); // js/map.js: what the Rider tab frames instead of the fleet's extent
   }
 
