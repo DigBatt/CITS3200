@@ -913,4 +913,49 @@
 .schedule-sync[hidden] { display: none; }
 .schedule-sync.has-error { border-color: rgba(245, 158, 11, 0.7); }
 .schedule-sync-text { margin: 0; flex: 1; line-height: 1.45; }
-.schedule-sync .btn-xs { flex: none; }
+.schedule-sync-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex: none;
+}
+.schedule-sync-past {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.schedule-sync-past input { margin: 0; }
+
+/* A weekday's drives synced from calendar.online: read only, so plainer than
+   the editable rows above them, with a dashed edge to say it. */
+.sched-synced {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px dashed var(--border, rgba(128, 128, 128, 0.35));
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+.sched-synced-head {
+  margin: 0;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.sched-synced-row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  column-gap: 0.6rem;
+  row-gap: 0.1rem;
+}
+.sched-synced-time { font-variant-numeric: tabular-nums; }
+.sched-synced-dates {
+  grid-column: 2;
+  opacity: 0.65;
+  overflow-wrap: anywhere;
+}
