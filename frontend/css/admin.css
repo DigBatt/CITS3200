@@ -705,6 +705,22 @@
   text-align: center;
 }
 
+/* Secondary to Sign in: a quiet link back to the public dashboard */
+.login-back {
+  align-self: center;
+  margin-top: -10px; /* sit closer to Sign in than the card's 22px gap */
+  font: 500 12.5px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.8);
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.login-back:hover,
+.login-back:focus-visible {
+  color: #1c1917;
+  text-decoration: underline;
+}
+
 /* S16: Snapshot metric selection */
 
 #snapshot-metrics {
