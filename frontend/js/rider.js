@@ -248,6 +248,45 @@ document.addEventListener('DOMContentLoaded', () => {
     update();
   });
 
+  // The required ratings say what is missing in red under each one, rather
+  // than the browser's own one-at-a-time bubble (the form is novalidate; the
+  // radios keep `required` so assistive tech still announces them as such).
+  const ratingGroups = [...(els.reviewForm?.querySelectorAll('.review-rating') ?? [])].map((group, index) => {
+    const field = group.closest('.review-field');
+    const error = document.createElement('span');
+    error.className = 'review-error';
+    error.id = `review-error-${index}`;
+    error.textContent = 'Please choose a rating from 1 to 5.';
+    error.setAttribute('aria-live', 'polite');
+    error.hidden = true;
+    group.after(error);
+
+    const inputs = [...group.querySelectorAll('input[type="radio"]')];
+    inputs.forEach((input) => input.setAttribute('aria-describedby', error.id));
+
+    const setInvalid = (invalid) => {
+      field.classList.toggle('is-invalid', invalid);
+      error.hidden = !invalid;
+      inputs.forEach((input) => input.setAttribute('aria-invalid', String(invalid)));
+    };
+    group.addEventListener('change', () => setInvalid(false));
+    return { inputs, setInvalid };
+  });
+
+  // Marks every unanswered rating at once and moves to the first. True when
+  // nothing required is missing.
+  function checkRatings() {
+    const missing = ratingGroups.filter(({ inputs }) => !inputs.some((input) => input.checked));
+    ratingGroups.forEach((group) => group.setInvalid(missing.includes(group)));
+    if (missing.length) {
+      missing[0].inputs[0].focus({ preventScroll: true });
+      missing[0].inputs[0].closest('.review-field').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    return missing.length === 0;
+  }
+
+  els.reviewForm?.addEventListener('reset', () => ratingGroups.forEach((group) => group.setInvalid(false)));
+
   // Pickups this browser is done with -- reviewed, or the review declined --
   // so a reload does not offer the review again. Only the latest few are
   // kept, since only the rider's most recent pickup is ever shown. The
@@ -289,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   els.reviewForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!els.reviewForm.reportValidity() || !currentRequestId) return; // the two ratings are required
+    if (!checkRatings() || !currentRequestId) return; // the two ratings are required
 
     const submitButton = document.getElementById('rider-review-submit');
     submitButton.disabled = true;

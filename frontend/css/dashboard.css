@@ -912,6 +912,18 @@ shared with the admin page.
   outline-offset: 2px;
 }
 
+/* A required rating left unanswered on submit (js/rider.js: checkRatings). */
+.review-field.is-invalid .review-rating label {
+  border-color: oklch(0.5 0.18 25);
+}
+
+.review-error {
+  font: 500 12px Sora, sans-serif;
+  color: oklch(0.5 0.18 25);
+}
+
+.review-error[hidden] { display: none; }
+
 .review-actions {
   display: flex;
   flex-direction: column;

@@ -236,6 +236,51 @@ def test_submitting_a_review_returns_to_the_picker(page, app):
     assert "Thanks" in page.locator("#rider-status").text_content()
 
 
+# ---- Missing ratings are shown in red under each one ----
+
+
+def rating_error(page, field):
+    return page.locator(f'.review-rating[data-rating-for="{field}"] + .review-error')
+
+
+def test_submitting_without_ratings_marks_both_and_sends_nothing(page, app):
+    request_and_collect(page, app)
+    page.click("#rider-review-button")
+    sent = []
+    page.on("request", lambda r: sent.append(r.url) if "/api/reviews" in r.url else None)
+
+    page.click("#rider-review-submit")
+
+    assert rating_error(page, "safety_rating").is_visible()
+    assert rating_error(page, "app_rating").is_visible()
+    assert page.locator("#rider-review-form").is_visible()
+    assert sent == []
+
+
+def test_choosing_a_rating_clears_its_error_only(page, app):
+    request_and_collect(page, app)
+    page.click("#rider-review-button")
+    page.click("#rider-review-submit")
+
+    rate(page, "safety_rating", 4)
+
+    assert rating_error(page, "safety_rating").is_hidden()
+    assert rating_error(page, "app_rating").is_visible()
+
+
+def test_review_submits_once_both_ratings_are_chosen_after_an_error(page, app):
+    request_and_collect(page, app)
+    page.click("#rider-review-button")
+    page.click("#rider-review-submit")
+
+    rate(page, "safety_rating", 4)
+    rate(page, "app_rating", 5)
+    page.click("#rider-review-submit")
+
+    page.wait_for_selector("#rider-picker:not([hidden])", timeout=5_000)
+    assert "Thanks" in page.locator("#rider-status").text_content()
+
+
 # ---- "Not today", and not asking again on reload ----
 
 
