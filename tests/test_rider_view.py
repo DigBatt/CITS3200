@@ -189,6 +189,17 @@ def test_review_button_appears_once_collected(page, app):
     assert page.locator("#rider-waiting").is_hidden()
 
 
+def test_waiting_message_is_cleared_once_collected(page, app):
+    pick_stop(page, "reid-library")
+    page.click("#rider-request-button")
+    page.wait_for_selector("#rider-waiting:not([hidden])")
+    assert "waiting" in page.locator("#rider-status").text_content()
+
+    collect(app, "reid-library")
+    page.wait_for_selector("#rider-collected:not([hidden])", timeout=10_000)
+    assert page.locator("#rider-status").is_hidden()
+
+
 def test_review_button_reveals_the_form(page, app):
     request_and_collect(page, app)
 

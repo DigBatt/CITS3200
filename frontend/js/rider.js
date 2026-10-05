@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     els.reviewForm.hidden = true;
     els.reviewForm.reset();
     prefillProfile();
+    clearStatus(); // "The shuttle knows you're waiting..." no longer applies
     showView('collected');
     setActiveStop(pickupRequest.stop_id);
   }
