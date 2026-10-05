@@ -170,8 +170,11 @@
                    (backend/api/reviews.py), since that is the operator's own
                    record of which vehicle and route it was. -->
               <form class="review-form" id="rider-review-form" hidden>
+                <!-- The two required ratings come first, so a rider who only
+                     wants to tap two numbers sees everything required at once.
+                     Every section below is optional. -->
                 <fieldset class="review-section">
-                  <legend>Safety &amp; comfort</legend>
+                  <legend>Quick rating</legend>
 
                   <div class="review-field">
                     <span class="review-label">How safe did you feel? <span class="review-required">*</span></span>
@@ -183,6 +186,21 @@
                       <label><input type="radio" name="safety_rating" value="5"><span>5</span></label>
                     </div>
                   </div>
+
+                  <div class="review-field">
+                    <span class="review-label">How easy was the app to use? (requesting a pickup, tracking the bus) <span class="review-required">*</span></span>
+                    <div class="review-rating" data-rating-for="app_rating">
+                      <label><input type="radio" name="app_rating" value="1" required><span>1</span></label>
+                      <label><input type="radio" name="app_rating" value="2"><span>2</span></label>
+                      <label><input type="radio" name="app_rating" value="3"><span>3</span></label>
+                      <label><input type="radio" name="app_rating" value="4"><span>4</span></label>
+                      <label><input type="radio" name="app_rating" value="5"><span>5</span></label>
+                    </div>
+                  </div>
+                </fieldset>
+
+                <fieldset class="review-section">
+                  <legend>Safety &amp; comfort</legend>
 
                   <label class="review-field">
                     <span class="review-label">How did the vehicle behave? (braking, speed, confidence around people)</span>
@@ -254,17 +272,6 @@
 
                 <fieldset class="review-section">
                   <legend>App experience</legend>
-
-                  <div class="review-field">
-                    <span class="review-label">Requesting a pickup and tracking the bus live <span class="review-required">*</span></span>
-                    <div class="review-rating" data-rating-for="app_rating">
-                      <label><input type="radio" name="app_rating" value="1" required><span>1</span></label>
-                      <label><input type="radio" name="app_rating" value="2"><span>2</span></label>
-                      <label><input type="radio" name="app_rating" value="3"><span>3</span></label>
-                      <label><input type="radio" name="app_rating" value="4"><span>4</span></label>
-                      <label><input type="radio" name="app_rating" value="5"><span>5</span></label>
-                    </div>
-                  </div>
 
                   <label class="review-field">
                     <span class="review-label">Anything about the app worth mentioning?</span>
