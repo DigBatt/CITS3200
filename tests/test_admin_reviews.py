@@ -7,6 +7,7 @@ filters and paging.
 from __future__ import annotations
 import shutil
 import threading
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import yaml
@@ -194,6 +195,38 @@ def test_the_stop_filter_narrows_the_list_and_summary(signed_in, store):
 
     assert signed_in.locator(".review-item").count() == 2
     assert "2 OF 3" in signed_in.locator("#review-summary-title").inner_text()
+
+
+def days_ago(days):
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+
+def test_the_date_filter_keeps_only_recent_reviews(signed_in, store):
+    store.add(review(1, created_at=days_ago(0)))
+    store.add(review(2, created_at=days_ago(3)))
+    store.add(review(3, created_at=days_ago(20)))
+    store.add(review(4, created_at=days_ago(60)))
+    open_reviews(signed_in)
+    assert signed_in.locator(".review-item").count() == 4
+
+    counts = {}
+    for option in ("7", "30", ""):
+        signed_in.select_option("#review-filter-when", option)
+        counts[option] = signed_in.locator(".review-item").count()
+    assert counts == {"7": 2, "30": 3, "": 4}
+
+    signed_in.select_option("#review-filter-when", "30")
+    assert "3 OF 4" in signed_in.locator("#review-summary-title").inner_text()
+
+
+def test_today_starts_at_midnight(signed_in, store):
+    store.add(review(1, created_at=days_ago(0)))
+    store.add(review(2, created_at=days_ago(1.5)))  # always before today's midnight
+    open_reviews(signed_in)
+
+    signed_in.select_option("#review-filter-when", "today")
+
+    assert signed_in.locator(".review-item").count() == 1
 
 
 def test_more_than_a_page_of_reviews_is_paged(signed_in, store):

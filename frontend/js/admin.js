@@ -728,8 +728,21 @@ let reviewsExpanded = false; // "Expand all": open every review's answers
 const reviewFilters = {
   vehicle: document.getElementById('review-filter-vehicle'),
   stop: document.getElementById('review-filter-stop'),
+  when: document.getElementById('review-filter-when'),
   low: document.getElementById('review-filter-low'),
 };
+
+// The earliest submission time the "When" filter keeps, or null for all
+// time. "Today" starts at midnight on the admin's own clock.
+function reviewCutoff(when) {
+  if (!when) return null;
+  if (when === 'today') {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    return midnight;
+  }
+  return new Date(Date.now() - Number(when) * 24 * 60 * 60 * 1000);
+}
 
 function isLowReview(review) {
   return review.safety_rating <= 2 || review.app_rating <= 2;
@@ -738,9 +751,11 @@ function isLowReview(review) {
 function filteredReviews() {
   const vehicle = reviewFilters.vehicle.value;
   const stop = reviewFilters.stop.value;
+  const cutoff = reviewCutoff(reviewFilters.when.value);
   return allReviews.filter(r =>
     (!vehicle || r.vehicle_id === vehicle) &&
     (!stop || r.stop_id === stop) &&
+    (!cutoff || new Date(r.created_at) >= cutoff) &&
     (!reviewFilters.low.checked || isLowReview(r)));
 }
 
