@@ -15,6 +15,7 @@ from backend.config import ConfigError
 from backend.downtime import intervals_by_vehicle
 from backend.metrics.tum import Settings, summarise
 from backend.models import format_timestamp
+from backend.roster_sync import with_synced_roster
 
 bp = Blueprint("metrics", __name__)
 
@@ -57,7 +58,8 @@ def metrics():
         }.get(str(code), "Invalid request.")
         return jsonify({"error": {"code": str(code), "message": message}}), 400
 
-    settings = Settings.from_config(config)
+    # The hand kept roster plus the drives synced from the calendar.
+    settings = with_synced_roster(Settings.from_config(config), current_app.config.get("ROSTER_SYNC_STORE"))
     tracks = repo.get_positions(vehicle_ids, start, end)
     # S19: the admin page's downtime log. Without storage there is no log at
     # all, which leaves the downtime KPIs unavailable rather than at 100%.

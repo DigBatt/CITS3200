@@ -42,6 +42,7 @@ class Config:
     snapshot_default_metrics: Optional[list[str]] = None
     green_within_weekdays: Optional[int] = None
     red_after_days: Optional[int] = None
+    roster_sync: Optional[dict[str, Any]] = None
 
     def vehicle(self, vehicle_id: str) -> Optional[Vehicle]:
         return next((v for v in self.vehicles if v.id == vehicle_id), None)
@@ -108,6 +109,7 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
             snapshot_default_metrics=(app.get("snapshots") or {}).get("default_metrics"),
             green_within_weekdays=liveness.get("green_within_weekdays"),
             red_after_days=liveness.get("red_after_days"),
+            roster_sync=app.get("roster_sync"),
         )
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
         raise ConfigError(f"Could not read the config in {config_dir}: {exc}") from exc

@@ -242,6 +242,18 @@
           A period must end after it starts, so an overnight run needs a row on each day.
         </p>
 
+        <!-- The drives synced from calendar.online (backend/roster_sync.py),
+             hidden when no calendar is configured. Filled by js/admin.js. -->
+        <div class="schedule-sync" id="schedule-sync" hidden>
+          <p class="schedule-sync-text" id="schedule-sync-text"></p>
+          <div class="schedule-sync-actions">
+            <button type="button" class="btn-xs" id="btn-schedule-sync">Sync now</button>
+            <label class="schedule-sync-past">
+              <input type="checkbox" id="schedule-sync-past"> Show past drives
+            </label>
+          </div>
+        </div>
+
         <!-- Rows injected by js/admin.js -->
         <div class="schedule-days" id="schedule-days"></div>
 
