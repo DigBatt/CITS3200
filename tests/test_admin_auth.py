@@ -113,6 +113,12 @@ def test_sign_in_page_sends_a_signed_in_admin_to_the_admin_page(client):
     assert response.headers["Location"] == "/admin"
 
 
+def test_sign_in_page_links_back_to_the_dashboard(client):
+    page = client.get("/admin-login").get_data(as_text=True)
+    assert '<a href="/" class="login-back"' in page
+    assert "Back to dashboard" in page
+
+
 def test_logout_ends_the_session(client):
     sign_in(client)
     client.post("/api/admin/logout")

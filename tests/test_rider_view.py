@@ -18,6 +18,7 @@ import yaml
 
 from backend.app import create_app
 from backend.config import DEFAULT_CONFIG_DIR
+from backend.models import Review
 
 sync_playwright = pytest.importorskip("playwright.sync_api").sync_playwright
 werkzeug_serving = pytest.importorskip("werkzeug.serving")
@@ -334,3 +335,70 @@ def test_submitted_review_is_not_offered_again_on_reload(page, app):
 
     reload_rider_view(page)
     assert page.locator("#rider-collected").is_hidden()
+
+
+# ---- The comment boxes: 1000 characters, with a counter ----
+
+COMMENT_BOXES = ("vehicle_behaviour", "obstacle_interaction", "app_comment", "comments")
+
+
+def counter(page, field):
+    return page.locator(f'textarea[name="{field}"] + .review-count')
+
+
+def test_every_comment_box_is_limited_to_1000_characters(page, app):
+    request_and_collect(page, app)
+    page.click("#rider-review-button")
+    for field in COMMENT_BOXES:
+        assert page.locator(f'textarea[name="{field}"]').get_attribute("maxlength") == "1000"
+        assert counter(page, field).inner_text() == "0 / 1000"
+
+
+def test_the_counter_counts_and_turns_red_at_the_limit(page, app):
+    request_and_collect(page, app)
+    page.click("#rider-review-button")
+    box = page.locator('textarea[name="comments"]')
+
+    box.fill("hello")
+    assert counter(page, "comments").inner_text() == "5 / 1000"
+    assert "is-full" not in counter(page, "comments").get_attribute("class")
+
+    box.fill("a" * 1000)
+    assert counter(page, "comments").inner_text() == "1000 character limit reached"
+    assert "is-full" in counter(page, "comments").get_attribute("class")
+
+
+def test_the_counter_starts_again_at_0_for_the_next_review(page, app):
+    request_and_collect(page, app)
+    page.click("#rider-review-button")
+    page.locator('textarea[name="comments"]').fill("first trip")
+    rate(page, "safety_rating", 5)
+    rate(page, "app_rating", 5)
+    page.click("#rider-review-submit")
+    page.wait_for_selector("#rider-picker:not([hidden])", timeout=5_000)
+
+    request_and_collect(page, app)
+    page.click("#rider-review-button")
+    assert counter(page, "comments").inner_text() == "0 / 1000"
+
+
+# ---- A pickup already reviewed elsewhere (another tab or device) ----
+
+
+def test_a_second_review_of_the_same_pickup_shows_why_it_was_refused(page, app):
+    request_and_collect(page, app)
+    pickup_id = page.evaluate("fetch('/api/pickup-requests/mine').then(r => r.json()).then(b => b.request.id)")
+    # The same pickup reviewed from another tab in the meantime.
+    app.config["REVIEW_STORE"].add(Review.from_dict({
+        "id": "from-another-tab", "pickup_request_id": pickup_id, "stop_id": "reid-library",
+        "created_at": "2026-10-01T00:00:00Z", "safety_rating": 5, "app_rating": 5,
+    }))
+
+    page.click("#rider-review-button")
+    rate(page, "safety_rating", 3)
+    rate(page, "app_rating", 3)
+    page.click("#rider-review-submit")
+
+    page.wait_for_selector("#rider-status:has-text('already been reviewed')", timeout=5_000)
+    assert page.locator("#rider-review-form").is_visible()  # nothing typed is lost
+    assert [r.id for r in app.config["REVIEW_STORE"].list()] == ["from-another-tab"]

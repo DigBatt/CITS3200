@@ -244,3 +244,98 @@ def test_more_than_a_page_of_reviews_is_paged(signed_in, store):
     signed_in.click("#btn-reviews-next")
     assert pager.inner_text().startswith(f"{page_size + 1}–")
     assert not signed_in.locator("#btn-reviews-prev").is_disabled()
+
+
+# ---- Rider text is shown as text, never run as HTML ----
+
+
+def test_rider_text_cannot_inject_html_or_script(signed_in, store):
+    store.add(review(
+        1,
+        vehicle_behaviour='<img src="x" onerror="window.__injected = true">',
+        comments="<script>window.__injected = true</script><b>bold?</b>",
+    ))
+    open_reviews(signed_in)
+    signed_in.click(".review-details summary")
+
+    answers = signed_in.locator(".review-answers")
+    assert '<img src="x"' in answers.inner_text()
+    assert "<script>" in answers.inner_text()
+    assert answers.locator("img, script, b").count() == 0
+    assert signed_in.evaluate("window.__injected") is None
+
+
+# ---- Low ratings ----
+
+
+def test_a_rating_of_2_or_lower_is_marked_and_can_be_filtered_to(signed_in, store):
+    store.add(review(1, safety=5, app=5))
+    store.add(review(2, safety=2, app=4))
+    store.add(review(3, safety=4, app=1))
+    open_reviews(signed_in)
+
+    low_badges = signed_in.locator(".review-score.is-low").all_inner_texts()
+    assert sorted(t.replace(" ", "") for t in low_badges) == ["App1/5", "Safety2/5"]
+
+    signed_in.check("#review-filter-low")
+    assert signed_in.locator(".review-item").count() == 2
+    assert "2 OF 3" in signed_in.locator("#review-summary-title").inner_text()
+
+
+# ---- The vehicle filter ----
+
+
+def test_the_vehicle_filter_lists_reviewed_vehicles_by_name_and_narrows_the_list(signed_in, store):
+    store.add(review(1, vehicle_id="1"))
+    store.add(review(2, vehicle_id="2"))
+    store.add(review(3, vehicle_id="2"))
+    open_reviews(signed_in)
+
+    options = signed_in.locator("#review-filter-vehicle option").all_inner_texts()
+    assert options == ["All vehicles", "nUWAy 1", "nUWAy 2"]
+
+    signed_in.select_option("#review-filter-vehicle", "2")
+    assert signed_in.locator(".review-item").count() == 2
+
+
+# ---- The summary's numbers ----
+
+
+def stat(page, label):
+    tile = page.locator(".review-stat", has=page.locator(".review-stat-label", has_text=label))
+    return tile.locator(".review-stat-value").inner_text()
+
+
+def test_the_summary_averages_and_counts_what_is_shown(signed_in, store):
+    store.add(review(1, safety=5, app=4, wait_minutes=1))
+    store.add(review(2, safety=3, app=2, wait_minutes=2))
+    store.add(review(3, safety=4, app=4, wait_minutes=6))
+    open_reviews(signed_in)
+
+    assert stat(signed_in, "Reviews") == "3"
+    assert stat(signed_in, "Average safety") == "4.0 / 5"
+    assert stat(signed_in, "Average app") == "3.3 / 5"
+    assert stat(signed_in, "Average wait") == "3.0 min"
+    assert stat(signed_in, "Rated 2 or lower") == "1"
+
+
+# ---- Long answers ----
+
+
+def test_a_long_answer_is_cut_short_until_read_more(signed_in, store):
+    store.add(review(1, comments="word " * 100, vehicle_behaviour="Short answer"))
+    open_reviews(signed_in)
+    signed_in.click(".review-details summary")
+
+    long_answer = signed_in.locator(".review-long")
+    button = long_answer.locator(".review-read-more")
+    assert signed_in.locator(".review-read-more").count() == 1  # only the long one
+    assert button.inner_text() == "Read more"
+
+    button.click()
+    assert "is-open" in long_answer.get_attribute("class")
+    assert button.inner_text() == "Show less"
+    assert button.get_attribute("aria-expanded") == "true"
+
+    button.click()
+    assert button.inner_text() == "Read more"
