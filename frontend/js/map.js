@@ -153,10 +153,30 @@ function highlightRoute(stops, selectedRouteId, routeColour) {
   }
 }
 
+// A route's path as runs drawn once each. A route that goes out along a spur
+// and back passes the same stretch twice; drawn twice, the dots would land
+// out of step and the stretch would look denser than the rest.
+function uniqueRuns(path) {
+  const seen = new Set();
+  const key = (a, b) => [a, b].map(p => p.join(',')).sort().join('|');
+  const runs = [];
+  let run = null;
+  for (let i = 1; i < path.length; i++) {
+    const k = key(path[i - 1], path[i]);
+    if (seen.has(k)) { run = null; continue; }
+    seen.add(k);
+    if (!run) { run = [path[i - 1]]; runs.push(run); }
+    run.push(path[i]);
+  }
+  return runs;
+}
+
 // Draw only the selected planned route, below stop markers and GPS trails.
-function drawRoutePath(route, stops) {
+// Its path comes from /api/routes, set in config/stops.yaml by the admin
+// page's route editor.
+function drawRoutePath(route) {
   layers.routes.clearLayers();
-  for (const points of RoutePaths.pathsFor(route, stops)) {
+  for (const points of uniqueRuns(route?.path ?? [])) {
     L.polyline(points, {
       pane: 'routes',
       color: route.colour ?? '#D4741F',

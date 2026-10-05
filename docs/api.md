@@ -586,13 +586,21 @@ Every route, in file order, with its stop ids in service order.
       "name": "Campus loop",
       "colour": "#d4741f",
       "loop": true,
-      "stop_ids": ["reid-library", "civ-mech", "business-school"]
+      "stop_ids": ["reid-library", "civ-mech", "business-school"],
+      "points": [
+        { "stop_id": "reid-library", "straight": false, "path": [] },
+        { "latitude": -31.9805, "longitude": 115.8183, "straight": true, "path": [[-31.979012, 115.818355], [-31.9805, 115.8183]] }
+      ],
+      "path": [[-31.979012, 115.818355], [-31.9805, 115.8183]]
     }
   ]
 }
 ```
 
-`colour` is `null` when the config does not set one.
+`colour` is `null` when the config does not set one. `points` are the stops
+and guide points in order, each with the `path` of the leg arriving at it;
+`path` is the whole route as one line, closing a loop. See
+[stops-and-routes.md](stops-and-routes.md), 3.1.
 
 ### `GET /api/routes/<id>`
 
@@ -609,6 +617,72 @@ One route, with its stops in full and in service order.
   ]
 }
 ```
+
+---
+
+## Route editor
+
+*Admin only*, all of it: the admin page's Routes tab
+(`frontend/js/route-editor.js`). Riders and the dashboard read the network
+through `/api/stops` and `/api/routes`.
+
+### `GET /api/network`
+
+Every stop and route in full, as `/api/stops` and `/api/routes` give them,
+plus `paths`: whether the campus path network is available, its
+`attribution` and when it was `fetched_at`.
+
+### `GET /api/network/paths`
+
+The campus path network the legs follow, drawn under the editor and snapped
+to: `nodes` as `[lat, lon]` and `edges` as pairs of node indices. `404`
+`paths_unavailable` when there is no snapshot.
+
+### `POST /api/network/legs`
+
+The path of each leg of a route being edited, worked out as points move.
+
+```json
+{ "loop": false, "points": [
+  { "latitude": -31.980744, "longitude": 115.817205 },
+  { "latitude": -31.984881, "longitude": 115.820102, "straight": false }
+] }
+```
+
+`legs`, one per point: the leg arriving at it, `{ "path": [[lat, lon], ...],
+"routed": true }`, or `null` for the first point of a route that is not a
+loop. `routed` is `false` for a straight leg, or where the paths do not join
+the two ends. `400` `invalid_points` for a malformed body.
+
+### `PUT /api/network`
+
+Replaces every stop and route and rewrites `config/stops.yaml`. Applies at
+once.
+
+```json
+{
+  "stops": [
+    { "id": "reid-library", "name": "Reid Library", "latitude": -31.979012, "longitude": 115.818355 },
+    { "id": null, "key": "new-1", "name": "Pharmacy Lawn", "latitude": -31.9815, "longitude": 115.818 }
+  ],
+  "routes": [
+    { "id": null, "name": "Lawn shuttle", "colour": "#00838F", "loop": false, "points": [
+      { "stop": "reid-library" },
+      { "latitude": -31.9805, "longitude": 115.8183, "straight": true },
+      { "stop": "new-1" }
+    ] }
+  ]
+}
+```
+
+A new stop has no `id`, and a `key` its routes use until it has one; a new
+stop or route gets its id from its name (`pharmacy-lawn`), and keeps it.
+Paths are worked out here rather than taken from the body.
+
+`200` with the network as `GET` gives it. `400` `invalid_network`, with
+`problems` listing everything wrong, as the file's validation would. `409`
+`stop_in_use`, with `stops`, when a removed stop has riders waiting at it.
+Nothing is written unless the whole save succeeds.
 
 ---
 

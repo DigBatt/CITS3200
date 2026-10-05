@@ -62,7 +62,8 @@ be added before the route that uses it.
 |---|---|---|---|
 | `id` | text | yes | Permanent identifier. Unique among routes. See 4. |
 | `name` | text | yes | Shown in the route selector and the operator view. |
-| `stops` | list of stop ids | yes | The stops in the order the shuttle serves them. At least one. |
+| `stops` | list of stop ids | yes, unless `points` is given | The stops in the order the shuttle serves them. At least one. With `points`, a summary of the stops in it, which must match. |
+| `points` | list of points | no | The route in full: its stops and the guide points between them, in order. See 3.1. |
 | `colour` | text, `#rrggbb` | no | Highlight colour on the map. The frontend picks one if absent. |
 | `loop` | boolean | no, default `false` | `true` if the shuttle returns from the last stop to the first. |
 
@@ -73,6 +74,40 @@ be added before the route that uses it.
   stop itself, so the two cannot disagree.
 - **A stop appears at most once in a route.** A loop is marked with
   `loop: true`, not by repeating the first stop at the end.
+
+### 3.1 Points: the path a route takes
+
+Stops are the network's nodes. A route is a path through them: its
+`points`, in order, each a stop or a **guide point** that only shapes the
+path and is never a stop.
+
+```yaml
+  - id: lawn-shuttle
+    name: Lawn shuttle
+    loop: false
+    stops: [reid-library, civ-mech]
+    points:
+      - stop: reid-library
+      - guide: [-31.9805, 115.8183]
+        straight: true
+        path: 'f_z~{@ev~{{EzM?'
+      - stop: civ-mech
+        path: 'bnz~{@ev~{{E?`_A...'
+```
+
+| Field | Meaning |
+|---|---|
+| `stop` | A stop id. Its position is the stop's. |
+| `guide` | `[latitude, longitude]` of a guide point. |
+| `straight` | The leg *arriving* at this point is a straight line, for a way the map does not have. Otherwise it follows the campus paths (section 8). On the first point of a loop, it is the closing leg's. |
+| `path` | The leg arriving at this point, as an encoded polyline (precision 6, `backend/polyline.py`). Worked out on save; absent on the first point of a route that is not a loop. |
+
+- A route that is not a loop must start and end at a stop.
+- `path` is derived. It is written so the dashboard draws exactly what the
+  editor showed, and is worked out again on load if missing or if its ends no
+  longer meet its points (a stop moved by hand).
+- A route given only as `stops` is those stops with every leg along the
+  paths, so a hand written route still draws.
 
 ---
 
@@ -110,6 +145,9 @@ Rejected:
   latitude and longitude written the wrong way round.
 - A route with no stops, naming a stop that is not configured, or naming the
   same stop twice.
+- A route with `points` and `stops` that disagree, a route that is not a loop
+  starting or ending at a guide point, a point that is neither or both of
+  `stop` and `guide`, and a `path` that is not an encoded polyline.
 - A `colour` that is not `#rrggbb`.
 - An unknown key, which is almost always a typo (`lat`, `stop`).
 
@@ -121,31 +159,70 @@ Allowed, with a warning in the log:
 
 ## 6. Changing stops and routes
 
-1. Edit `config/stops.yaml`.
-2. Restart the application.
+**From the admin page.** The **Routes** tab (`frontend/js/route-editor.js`)
+places stops and guide points on a map. Saving rewrites this file and applies
+at once, with no restart.
+
+- The bar at the top lists every route and stop. Open a route there, or start
+  a new one; rename or remove stops there.
+- The sidebar lists the open route's points in order. Drag a row (or use the
+  arrows) to reorder; switch a point between stop and guide point; switch the
+  leg arriving at it between following the paths and drawn straight.
+- On the map, a click adds a guide point or a stop (the toggle at the top
+  right), snapped onto the nearest path within 25 m. A click on a grey stop
+  adds that stop. A click on the route's line puts a guide point in that leg.
+  Drag any point to move it; moving a stop moves it on every route.
+- With no route open, a click on the map adds a stop on no route.
+- Double-click a guide point to remove it, or a stop to take it off the open
+  route (with no route open, to delete the stop). Double-clicking empty map
+  zooms as usual.
+- Every edit can be undone until Save: **Ctrl+Z** undoes, **Ctrl+R** (or
+  Ctrl+Shift+Z, Ctrl+Y) redoes, Cmd for Ctrl on a Mac, or the Undo and Redo
+  buttons on the map. In a text field Ctrl+Z undoes the typing instead. On
+  this tab Ctrl+R no longer reloads the page; F5 still does. Saving, Discard
+  and reloading start a fresh history.
+- A new stop or route gets its id from its name when first saved, and keeps
+  it after (section 4).
+- A stop riders are waiting at cannot be removed until they are collected.
+
+Saving rewrites the whole file, so comments inside it are lost; the comment
+block at the top is kept.
+
+**By hand.** Edit `config/stops.yaml` and restart. A route may be written as
+just `stops`; it gets its points and paths on load.
 
 ---
+
 ## 7. Planned dotted paths
 
-The five existing route buttons draw their planned paths in the route colour.
-`frontend/js/route-paths.js` holds shared straight sections and sampled curves
-traced from the October 4 route sketches. Stop vertices are resolved from the
-API's actual stop coordinates, not copied from screenshot pixels. Separate
-branches prevent unwanted diagonal closing lines across campus.
+Selecting a route on the dashboard draws its stored path in the route colour,
+dotted, in a pane below stop markers and GPS trails (`frontend/js/map.js`). A
+stretch the route passes twice, out along a spur and back, is drawn once.
+Selecting another route replaces the path; All routes clears it. The Stops
+toggle hides and restores both the path and its markers.
 
-`frontend/js/map.js` draws these paths in a pane below stop markers and GPS
-trails. Selecting another route replaces the path; All routes clears it.
-The Stops toggle hides and restores both the path and its markers. Selection
-continues to survive reloads. Route names, IDs, stop memberships and service
-order in `config/stops.yaml` are unchanged.
+The five original routes were traced from the October 4 route sketches. They
+are kept as guide points with straight legs, so they draw as they did; open
+one in the editor and switch its legs to follow the paths to re-route it.
 
-Two differences between the sketches and this configuration are retained:
-Law Library is configured on Campus loop and James Oval, so these include a
-short spur to it. Business School is configured at the Underwood car park,
-north of the sketch's marker; the southern connections meet that configured
-location. There are no Demo routes in this configuration.
+---
 
-After changing the JavaScript, refresh the browser (hard refresh if it has an
-older cached copy). Run `python -m pytest tests/test_route_paths.py` to check
-that every route reaches all its stops and all path parts connect; this check
-uses Node.js alongside the normal Python test dependencies.
+## 8. The campus path network
+
+`config/campus_paths.json` is a snapshot of the roads and paths around the
+stops from OpenStreetMap (`backend/path_network.py`). A leg that is not drawn
+straight takes the shortest way along it. It is kept in the repository so
+routing works offline and gives the same path every time.
+
+Refresh it when campus paths change, then re-save any route that should pick
+the change up:
+
+```sh
+python -m backend.path_network refresh
+```
+
+It takes footways, paths, cycleways and service and minor roads within 450 m
+of the stops, and never steps. Without the file every leg is drawn straight.
+
+Map data © OpenStreetMap contributors, under the Open Database Licence
+(https://www.openstreetmap.org/copyright).

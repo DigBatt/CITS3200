@@ -2,83 +2,539 @@
 
 stops:
   - id: reid-library
-    name: Reid Library ground floor entrance
+    name: "Reid Library ground floor entrance"
     latitude: -31.97901221771226
     longitude: 115.8183554056777
 
   - id: civ-mech
-    name: Outside Civil and Mechanical Engineering
+    name: "Outside Civil and Mechanical Engineering"
     latitude: -31.980743857374474
     longitude: 115.81720535774184
 
-  - id: business-school   # this is the actual business school car park and not the location on the current gps track the buses follow.
-    name: Business School carpark on Underwood Parade
+  - id: business-school
+    name: "Business School carpark on Underwood Parade"
     latitude: -31.9848813
     longitude: 115.8201024
 
   - id: guild-village
-    name: Intersection of Saw Promenade and Graduates walk
+    name: "Intersection of Saw Promenade and Graduates walk"
     latitude: -31.9806087
     longitude: 115.8187129
 
   - id: barry-marshall
-    name: Barry J Marshall Library entrance
+    name: "Barry J Marshall Library entrance"
     latitude: -31.9830579
     longitude: 115.8187461
 
   - id: ezone-central
-    name: Path to E-zone from James oval
+    name: "Path to E-zone from James oval"
     latitude: -31.9797545
     longitude: 115.8171536
 
   - id: bilya-marlee
-    name: Underwood parade outside Bilya Marlee
+    name: "Underwood parade outside Bilya Marlee"
     latitude: -31.9828347
-    longitude: 115.8201390
-  
+    longitude: 115.820139
+
   - id: sports-science
-    name: Saw promenade at Human movement lab/ UWA aquatic center 
+    name: "Saw promenade at Human movement lab/ UWA aquatic center"
     latitude: -31.9848357
     longitude: 115.8187636
 
   - id: marine-research
-    name: Between IOMRC and Civ & Mechanical Engineering 
+    name: "Between IOMRC and Civ & Mechanical Engineering"
     latitude: -31.9813149
     longitude: 115.8165538
 
   - id: law-library
-    name: North side of Law library 
+    name: "North side of Law library"
     latitude: -31.9793561
     longitude: 115.8194325
 
-
 routes:
   - id: full-campus-loop
-    name: Campus loop
+    name: "Campus loop"
     colour: "#D4741F"
     loop: true
     stops: [reid-library, ezone-central, civ-mech, law-library, guild-village, barry-marshall, sports-science, business-school, bilya-marlee, marine-research]
+    points:
+      - stop: reid-library
+        straight: true
+        path: 'bnz~{@ev~{{E{M?'
+      - guide: [-31.97925, 115.8183554]
+        straight: true
+        path: 'f_z~{@ev~{{EzM?'
+      - guide: [-31.97925, 115.81733]
+        straight: true
+        path: 'bnz~{@ev~{{E?`_A'
+      - guide: [-31.9793392, 115.8173224]
+        straight: true
+        path: 'bnz~{@cv|{{EpDN'
+      - guide: [-31.9794084, 115.8173024]
+        straight: true
+        path: 'tsz~{@su|{{EhCf@'
+      - guide: [-31.9794638, 115.8172742]
+        straight: true
+        path: '~wz~{@kt|{{EnBv@'
+      - guide: [-31.9796105, 115.8171812]
+        straight: true
+        path: 'n{z~{@sr|{{EbHxD'
+      - guide: [-31.9796737, 115.8171612]
+        straight: true
+        path: 'rd{~{@yl|{{E~Bf@'
+      - stop: ezone-central
+        straight: true
+        path: 'rh{~{@qk|{{E~CL'
+      - stop: civ-mech
+        straight: true
+        path: 'rm{~{@ck|{{Ez|@eB'
+      - guide: [-31.9797115, 115.8171556]
+        straight: true
+        path: 'nk}~{@in|{{Eo_A`B'
+      - guide: [-31.9796105, 115.8171812]
+        straight: true
+        path: '~j{~{@gk|{{EkEq@'
+      - guide: [-31.9794638, 115.8172742]
+        straight: true
+        path: 'rd{~{@yl|{{EcHyD'
+      - guide: [-31.9794084, 115.8173024]
+        straight: true
+        path: 'n{z~{@sr|{{EoBw@'
+      - guide: [-31.9793392, 115.8173224]
+        straight: true
+        path: '~wz~{@kt|{{EiCg@'
+      - guide: [-31.97925, 115.81733]
+        straight: true
+        path: 'tsz~{@su|{{EqDO'
+      - guide: [-31.97925, 115.8194325]
+        straight: true
+        path: 'bnz~{@cv|{{E?mbC'
+      - stop: law-library
+        straight: true
+        path: 'bnz~{@qy`|{ErE?'
+      - guide: [-31.97925, 115.8194325]
+        straight: true
+        path: 'vtz~{@qy`|{EsE?'
+      - guide: [-31.97925, 115.8183554]
+        straight: true
+        path: 'bnz~{@qy`|{E?jbA'
+      - guide: [-31.979283, 115.8183594]
+        straight: true
+        path: 'bnz~{@ev~{{E`AG'
+      - guide: [-31.9793452, 115.8183884]
+        straight: true
+        path: 'dpz~{@mv~{{EzBy@'
+      - guide: [-31.9794043, 115.8184383]
+        straight: true
+        path: '`tz~{@gx~{{EtBcB'
+      - guide: [-31.979587, 115.81863]
+        straight: true
+        path: 'vwz~{@k{~{{ElJ_K'
+      - guide: [-31.9796574, 115.8186799]
+        straight: true
+        path: 'dc{~{@kg_|{EjCcB'
+      - guide: [-31.9797365, 115.8187089]
+        straight: true
+        path: 'pg{~{@oj_|{E~Cy@'
+      - stop: guild-village
+        straight: true
+        path: 'pl{~{@il_|{Enu@G'
+      - stop: barry-marshall
+        straight: true
+        path: '`c}~{@ql_|{E`xCaA'
+      - stop: sports-science
+        straight: true
+        path: 'b|a_|@sn_|{EbnBc@'
+      - guide: [-31.9848357, 115.8201024]
+        straight: true
+        path: 'fke_|@wo_|{E?srA'
+      - stop: business-school
+        straight: true
+        path: 'fke_|@kcb|{ExA?'
+      - guide: [-31.9848813, 115.820139]
+        straight: true
+        path: '`ne_|@kcb|{E?iA'
+      - stop: bilya-marlee
+        straight: true
+        path: '`ne_|@ueb|{E{~B?'
+      - guide: [-31.9827, 115.820139]
+        straight: true
+        path: 'dna_|@ueb|{EmG?'
+      - guide: [-31.982695, 115.8201318]
+        straight: true
+        path: 'vea_|@ueb|{EIL'
+      - guide: [-31.9825887, 115.819802]
+        straight: true
+        path: 'lea_|@geb|{EsErS'
+      - guide: [-31.982506, 115.8196027]
+        straight: true
+        path: 'x~`_|@spa|{EeDlK'
+      - guide: [-31.9824388, 115.8194839]
+        straight: true
+        path: 'ry`_|@eda|{EeClF'
+      - guide: [-31.9824015, 115.8194337]
+        straight: true
+        path: 'lu`_|@w|`|{EiAbB'
+      - guide: [-31.982362, 115.8193918]
+        straight: true
+        path: 'bs`_|@sy`|{EoArA'
+      - guide: [-31.98232, 115.81936]
+        straight: true
+        path: 'rp`_|@_w`|{EsA~@'
+      - guide: [-31.98232, 115.8187361]
+        straight: true
+        path: '~m`_|@_u`|{E?~e@'
+      - guide: [-31.9806087, 115.8187129]
+        straight: true
+        path: '~m`_|@_n_|{E}iBl@'
+      - guide: [-31.9806993, 115.818696]
+        straight: true
+        path: '`c}~{@ql_|{ErD`@'
+      - guide: [-31.9807759, 115.8186481]
+        straight: true
+        path: 'th}~{@ok_|{ExC~A'
+      - guide: [-31.9808393, 115.8185738]
+        straight: true
+        path: 'nm}~{@oh_|{E|BrC'
+      - guide: [-31.98089, 115.8184773]
+        straight: true
+        path: 'lq}~{@{c_|{EdB`E'
+      - guide: [-31.9809287, 115.8183633]
+        straight: true
+        path: 'rt}~{@y}~{{ElAbF'
+      - guide: [-31.980956, 115.8182359]
+        straight: true
+        path: '`w}~{@uv~{{Et@|F'
+      - guide: [-31.9809726, 115.8180997]
+        straight: true
+        path: 'vx}~{@wn~{{E`@nG'
+      - guide: [-31.9809791, 115.8179591]
+        straight: true
+        path: 'xy}~{@gf~{{EJxG'
+      - guide: [-31.9809761, 115.8178185]
+        straight: true
+        path: 'dz}~{@m}}{{EEvG'
+      - guide: [-31.9809643, 115.8176824]
+        straight: true
+        path: '~y}~{@ut}{{EWpG'
+      - guide: [-31.9809443, 115.817555]
+        straight: true
+        path: 'fy}~{@cl}{{Eg@|F'
+      - guide: [-31.9809168, 115.8174409]
+        straight: true
+        path: '~w}~{@ed}{{Eu@bF'
+      - guide: [-31.9808823, 115.8173445]
+        straight: true
+        path: 'hv}~{@a}|{{EeA~D'
+      - guide: [-31.9808416, 115.8172701]
+        straight: true
+        path: 'bt}~{@aw|{{EoAtC'
+      - guide: [-31.9807952, 115.8172223]
+        straight: true
+        path: 'rq}~{@kr|{{E}A~A'
+      - guide: [-31.9807439, 115.8172054]
+        straight: true
+        path: 'tn}~{@ko|{{EeB`@'
+      - guide: [-31.9813149, 115.8172054]
+        straight: true
+        path: 'nk}~{@in|{{Etb@?'
+      - stop: marine-research
+        straight: true
+        path: 'do~~{@in|{{E?tg@'
+      - guide: [-31.9813149, 115.8172054]
+        straight: true
+        path: 'do~~{@se{{{E?ug@'
+      - guide: [-31.9807439, 115.8172054]
+        straight: true
+        path: 'do~~{@in|{{Eub@?'
+      - guide: [-31.9797115, 115.8171556]
+        straight: true
+        path: 'nk}~{@in|{{Eo_A`B'
+      - guide: [-31.9796105, 115.8171812]
+        straight: true
+        path: '~j{~{@gk|{{EkEq@'
+      - guide: [-31.9794638, 115.8172742]
+        straight: true
+        path: 'rd{~{@yl|{{EcHyD'
+      - guide: [-31.9794084, 115.8173024]
+        straight: true
+        path: 'n{z~{@sr|{{EoBw@'
+      - guide: [-31.9793392, 115.8173224]
+        straight: true
+        path: '~wz~{@kt|{{EiCg@'
+      - guide: [-31.97925, 115.81733]
+        straight: true
+        path: 'tsz~{@su|{{EqDO'
+      - guide: [-31.97925, 115.8183554]
+        straight: true
+        path: 'bnz~{@cv|{{E?a_A'
 
   - id: eng-business-loop
-    name: Engineering to Business School loop
+    name: "Engineering to Business School loop"
     colour: "#1F7FD4"
     loop: true
     stops: [civ-mech, guild-village, barry-marshall, sports-science, business-school, bilya-marlee]
-    
+    points:
+      - stop: civ-mech
+        straight: true
+        path: 'v|}~{@in|{{EgP?'
+      - guide: [-31.98102, 115.8172054]
+        straight: true
+        path: 'nk}~{@in|{{EfP?'
+      - guide: [-31.98102, 115.8187129]
+        straight: true
+        path: 'v|}~{@in|{{E?g}A'
+      - stop: guild-village
+        straight: true
+        path: 'v|}~{@ql_|{EuX?'
+      - stop: barry-marshall
+        straight: true
+        path: '`c}~{@ql_|{E`xCaA'
+      - stop: sports-science
+        straight: true
+        path: 'b|a_|@sn_|{EbnBc@'
+      - guide: [-31.9848357, 115.8201024]
+        straight: true
+        path: 'fke_|@wo_|{E?srA'
+      - stop: business-school
+        straight: true
+        path: 'fke_|@kcb|{ExA?'
+      - guide: [-31.9848813, 115.820139]
+        straight: true
+        path: '`ne_|@kcb|{E?iA'
+      - stop: bilya-marlee
+        straight: true
+        path: '`ne_|@ueb|{E{~B?'
+      - guide: [-31.9827, 115.820139]
+        straight: true
+        path: 'dna_|@ueb|{EmG?'
+      - guide: [-31.982695, 115.8201318]
+        straight: true
+        path: 'vea_|@ueb|{EIL'
+      - guide: [-31.9825887, 115.819802]
+        straight: true
+        path: 'lea_|@geb|{EsErS'
+      - guide: [-31.982506, 115.8196027]
+        straight: true
+        path: 'x~`_|@spa|{EeDlK'
+      - guide: [-31.9824388, 115.8194839]
+        straight: true
+        path: 'ry`_|@eda|{EeClF'
+      - guide: [-31.9824015, 115.8194337]
+        straight: true
+        path: 'lu`_|@w|`|{EiAbB'
+      - guide: [-31.982362, 115.8193918]
+        straight: true
+        path: 'bs`_|@sy`|{EoArA'
+      - guide: [-31.98232, 115.81936]
+        straight: true
+        path: 'rp`_|@_w`|{EsA~@'
+      - guide: [-31.98232, 115.8187361]
+        straight: true
+        path: '~m`_|@_u`|{E?~e@'
+      - guide: [-31.9806087, 115.8187129]
+        straight: true
+        path: '~m`_|@_n_|{E}iBl@'
+      - guide: [-31.98102, 115.8187129]
+        straight: true
+        path: '`c}~{@ql_|{EtX?'
+      - guide: [-31.98102, 115.8172054]
+        straight: true
+        path: 'v|}~{@ql_|{E?f}A'
+
   - id: nth-south
-    name: Full length of campus North - South and back
+    name: "Full length of campus North - South and back"
     colour: "#2E7D32"
     loop: false
     stops: [reid-library, guild-village, sports-science, barry-marshall]
-  
+    points:
+      - stop: reid-library
+        straight: true
+      - guide: [-31.97925, 115.8183554]
+        straight: true
+        path: 'f_z~{@ev~{{EzM?'
+      - guide: [-31.9793146, 115.8183708]
+        straight: true
+        path: 'bnz~{@ev~{{E`C_@'
+      - guide: [-31.9793452, 115.8183884]
+        straight: true
+        path: 'drz~{@ew~{{Ez@a@'
+      - guide: [-31.9794043, 115.8184383]
+        straight: true
+        path: '`tz~{@gx~{{EtBcB'
+      - guide: [-31.979587, 115.81863]
+        straight: true
+        path: 'vwz~{@k{~{{ElJ_K'
+      - guide: [-31.9796574, 115.8186799]
+        straight: true
+        path: 'dc{~{@kg_|{EjCcB'
+      - guide: [-31.9797365, 115.8187089]
+        straight: true
+        path: 'pg{~{@oj_|{E~Cy@'
+      - stop: guild-village
+        straight: true
+        path: 'pl{~{@il_|{Enu@G'
+      - stop: sports-science
+        straight: true
+        path: '`c}~{@ql_|{EdgGeB'
+      - stop: barry-marshall
+        straight: true
+        path: 'fke_|@wo_|{EcnBb@'
+
   - id: james-oval-loop
-    name: Loop around James oval
+    name: "Loop around James oval"
     colour: "#C2185B"
     loop: true
     stops: [civ-mech, ezone-central, reid-library, law-library, guild-village]
+    points:
+      - stop: civ-mech
+        straight: true
+        path: 'tn}~{@ko|{{EeB`@'
+      - stop: ezone-central
+        straight: true
+        path: 'nk}~{@in|{{E{|@dB'
+      - guide: [-31.9796737, 115.8171612]
+        straight: true
+        path: 'rm{~{@ck|{{E_DM'
+      - guide: [-31.9796105, 115.8171812]
+        straight: true
+        path: 'rh{~{@qk|{{E_Cg@'
+      - guide: [-31.9794638, 115.8172742]
+        straight: true
+        path: 'rd{~{@yl|{{EcHyD'
+      - guide: [-31.9794084, 115.8173024]
+        straight: true
+        path: 'n{z~{@sr|{{EoBw@'
+      - guide: [-31.9793392, 115.8173224]
+        straight: true
+        path: '~wz~{@kt|{{EiCg@'
+      - guide: [-31.97925, 115.81733]
+        straight: true
+        path: 'tsz~{@su|{{EqDO'
+      - guide: [-31.97925, 115.8183554]
+        straight: true
+        path: 'bnz~{@cv|{{E?a_A'
+      - stop: reid-library
+        straight: true
+        path: 'bnz~{@ev~{{E{M?'
+      - guide: [-31.97925, 115.8183554]
+        straight: true
+        path: 'f_z~{@ev~{{EzM?'
+      - guide: [-31.97925, 115.8194325]
+        straight: true
+        path: 'bnz~{@ev~{{E?kbA'
+      - stop: law-library
+        straight: true
+        path: 'bnz~{@qy`|{ErE?'
+      - guide: [-31.97925, 115.8194325]
+        straight: true
+        path: 'vtz~{@qy`|{EsE?'
+      - guide: [-31.97925, 115.8183554]
+        straight: true
+        path: 'bnz~{@qy`|{E?jbA'
+      - guide: [-31.979283, 115.8183594]
+        straight: true
+        path: 'bnz~{@ev~{{E`AG'
+      - guide: [-31.9793452, 115.8183884]
+        straight: true
+        path: 'dpz~{@mv~{{EzBy@'
+      - guide: [-31.9794043, 115.8184383]
+        straight: true
+        path: '`tz~{@gx~{{EtBcB'
+      - guide: [-31.979587, 115.81863]
+        straight: true
+        path: 'vwz~{@k{~{{ElJ_K'
+      - guide: [-31.9796574, 115.8186799]
+        straight: true
+        path: 'dc{~{@kg_|{EjCcB'
+      - guide: [-31.9797365, 115.8187089]
+        straight: true
+        path: 'pg{~{@oj_|{E~Cy@'
+      - stop: guild-village
+        straight: true
+        path: 'pl{~{@il_|{Enu@G'
+      - guide: [-31.9806993, 115.818696]
+        straight: true
+        path: '`c}~{@ql_|{ErD`@'
+      - guide: [-31.9807759, 115.8186481]
+        straight: true
+        path: 'th}~{@ok_|{ExC~A'
+      - guide: [-31.9808393, 115.8185738]
+        straight: true
+        path: 'nm}~{@oh_|{E|BrC'
+      - guide: [-31.98089, 115.8184773]
+        straight: true
+        path: 'lq}~{@{c_|{EdB`E'
+      - guide: [-31.9809287, 115.8183633]
+        straight: true
+        path: 'rt}~{@y}~{{ElAbF'
+      - guide: [-31.980956, 115.8182359]
+        straight: true
+        path: '`w}~{@uv~{{Et@|F'
+      - guide: [-31.9809726, 115.8180997]
+        straight: true
+        path: 'vx}~{@wn~{{E`@nG'
+      - guide: [-31.9809791, 115.8179591]
+        straight: true
+        path: 'xy}~{@gf~{{EJxG'
+      - guide: [-31.9809761, 115.8178185]
+        straight: true
+        path: 'dz}~{@m}}{{EEvG'
+      - guide: [-31.9809643, 115.8176824]
+        straight: true
+        path: '~y}~{@ut}{{EWpG'
+      - guide: [-31.9809443, 115.817555]
+        straight: true
+        path: 'fy}~{@cl}{{Eg@|F'
+      - guide: [-31.9809168, 115.8174409]
+        straight: true
+        path: '~w}~{@ed}{{Eu@bF'
+      - guide: [-31.9808823, 115.8173445]
+        straight: true
+        path: 'hv}~{@a}|{{EeA~D'
+      - guide: [-31.9808416, 115.8172701]
+        straight: true
+        path: 'bt}~{@aw|{{EoAtC'
+      - guide: [-31.9807952, 115.8172223]
+        straight: true
+        path: 'rq}~{@kr|{{E}A~A'
 
   - id: library-service
-    name: Direct service to 3 highest use libraries
+    name: "Direct service to 3 highest use libraries"
     colour: "#6A1B9A"
     loop: true
     stops: [reid-library, law-library, guild-village, barry-marshall]
+    points:
+      - stop: reid-library
+        straight: true
+        path: 'bnz~{@ev~{{E{M?'
+      - guide: [-31.97925, 115.8183554]
+        straight: true
+        path: 'f_z~{@ev~{{EzM?'
+      - guide: [-31.97925, 115.8194325]
+        straight: true
+        path: 'bnz~{@ev~{{E?kbA'
+      - stop: law-library
+        straight: true
+        path: 'bnz~{@qy`|{ErE?'
+      - guide: [-31.97925, 115.8194325]
+        straight: true
+        path: 'vtz~{@qy`|{EsE?'
+      - guide: [-31.97925, 115.8187129]
+        straight: true
+        path: 'bnz~{@qy`|{E?~k@'
+      - stop: guild-village
+        straight: true
+        path: 'bnz~{@ql_|{E|sA?'
+      - stop: barry-marshall
+        straight: true
+        path: '`c}~{@ql_|{E`xCaA'
+      - guide: [-31.9806087, 115.8187129]
+        straight: true
+        path: 'b|a_|@sn_|{EaxC`A'
+      - guide: [-31.97925, 115.8187129]
+        straight: true
+        path: '`c}~{@ql_|{E}sA?'
+      - guide: [-31.97925, 115.8183554]
+        straight: true
+        path: 'bnz~{@ql_|{E?jU'

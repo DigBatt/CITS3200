@@ -249,10 +249,14 @@ def test_unknown_stop_is_404(client):
 
 def test_list_routes(client):
     body = client.get("/api/routes").get_json()
-    assert body["routes"] == [
+    summary = [{k: r[k] for k in ("id", "name", "colour", "loop", "stop_ids")} for r in body["routes"]]
+    assert summary == [
         {"id": "north", "name": "North", "colour": None, "loop": False, "stop_ids": ["a", "b"]},
         {"id": "south", "name": "South", "colour": "#123abc", "loop": True, "stop_ids": ["d", "b"]},
     ]
+    # A route given as a stop list is those stops as its points, in order.
+    assert [point["stop_id"] for point in body["routes"][1]["points"]] == ["d", "b"]
+    assert all("path" in route for route in body["routes"])
 
 
 def test_get_route_returns_stops_in_order(client):
@@ -271,7 +275,10 @@ def test_unknown_route_is_404(client):
 def test_new_stop_appears_with_no_code_change(config_dir):
     raw = yaml.safe_load((config_dir / "stops.yaml").read_text(encoding="utf-8"))
     raw["stops"].append(stop("new-stop", name="New Stop"))
+    # A route written by the editor lists its stops twice, as `stops` and in
+    # `points`; a hand edit adds the stop to both, or the file is refused.
     raw["routes"][0]["stops"].append("new-stop")
+    raw["routes"][0].setdefault("points", []).append({"stop": "new-stop"})
     write_stops(config_dir, raw)
 
     client = create_app(config_dir).test_client()
