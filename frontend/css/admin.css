@@ -1044,3 +1044,54 @@
   opacity: 0.4;
   cursor: default;
 }
+
+/* Refresh / Expand all, and when the list was last fetched */
+.review-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.review-updated {
+  font: 400 11px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.5);
+  margin-right: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* A brief highlight when the time changes, so a refresh is noticed even when
+   no new reviews arrived. */
+.review-updated.is-fresh { animation: review-updated-flash 1.2s ease-out; }
+
+@keyframes review-updated-flash {
+  from { background: oklch(0.62 0.17 300 / 22%); color: #1c1917; }
+  to { background: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-updated.is-fresh { animation: none; }
+}
+
+.btn-xs:disabled { opacity: 0.5; cursor: default; }
+
+/* Each review collapses to its header and ratings */
+.review-details summary {
+  display: inline-block;
+  cursor: pointer;
+  font: 500 12px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.7);
+  list-style: none;
+}
+
+.review-details summary::-webkit-details-marker { display: none; }
+.review-details summary::after { content: ' ▾'; }
+.review-details[open] summary::after { content: ' ▴'; }
+.review-details summary:hover { color: #1c1917; text-decoration: underline; }
+
+.review-details[open] summary { margin-bottom: 8px; }
+
+.review-no-answers {
+  font: 400 12px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.45);
+}

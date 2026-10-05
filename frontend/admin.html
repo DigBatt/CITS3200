@@ -354,7 +354,11 @@
       <div class="admin-card">
         <div class="review-list-head">
           <p class="admin-card-title">REVIEWS</p>
-          <button type="button" class="btn-xs" id="btn-reviews-refresh">Refresh</button>
+          <div class="review-list-actions">
+            <span class="review-updated" id="review-updated" aria-live="polite"></span>
+            <button type="button" class="btn-xs" id="btn-reviews-expand">Expand all</button>
+            <button type="button" class="btn-xs" id="btn-reviews-refresh">Refresh</button>
+          </div>
         </div>
         <div id="review-list">
           <p class="empty-state">Loading reviews…</p>

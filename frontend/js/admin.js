@@ -723,6 +723,7 @@ const REVIEW_LONG_ANSWER = 240;
 
 let allReviews = []; // newest first
 let reviewPage = 0; // zero based
+let reviewsExpanded = false; // "Expand all": open every review's answers
 
 const reviewFilters = {
   vehicle: document.getElementById('review-filter-vehicle'),
@@ -810,6 +811,16 @@ function renderReview(review) {
   const score = (label, value) =>
     `<span class="review-score${value <= 2 ? ' is-low' : ''}">${label} <b>${value}</b>/5</span>`;
 
+  // Collapsed to the header and ratings; the answers open on request.
+  const answered = REVIEW_QUESTIONS.filter(([field]) => review[field]).length;
+  const details = answered
+    ? `
+      <details class="review-details"${reviewsExpanded ? ' open' : ''}>
+        <summary>${answered} ${answered === 1 ? 'answer' : 'answers'}</summary>
+        <dl class="review-answers">${answers}</dl>
+      </details>`
+    : '<span class="review-no-answers">Ratings only</span>';
+
   return `
     <article class="review-item">
       <div class="review-item-head">
@@ -820,7 +831,7 @@ function renderReview(review) {
         ${score('Safety', review.safety_rating)}
         ${score('App', review.app_rating)}
       </div>
-      ${answers ? `<dl class="review-answers">${answers}</dl>` : '<p class="empty-state">Ratings only, no other answers.</p>'}
+      ${details}
     </article>
   `;
 }
@@ -842,6 +853,7 @@ function renderReviews() {
   } else {
     list.innerHTML = shown.map(renderReview).join('');
   }
+  document.getElementById('btn-reviews-expand').textContent = reviewsExpanded ? 'Collapse all' : 'Expand all';
 
   // "21–40 of 67 · Page 2 of 4", only when there is more than one page.
   document.getElementById('review-pager').hidden = pages <= 1;
@@ -858,11 +870,23 @@ function turnReviewPage(step) {
   document.getElementById('review-list').scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
+// "Refreshing…" stays up at least this long: a local load takes a few
+// milliseconds, too quick to see that anything happened.
+const REVIEW_REFRESH_MIN_MS = 350;
+
 async function loadReviews() {
   const list = document.getElementById('review-list');
+  const refresh = document.getElementById('btn-reviews-refresh');
+  const updated = document.getElementById('review-updated');
+  // The button keeps its label, so its width does not jump; the time beside
+  // it says what is happening instead.
+  refresh.disabled = true;
+  updated.classList.remove('is-fresh');
+  updated.textContent = 'Refreshing…';
+  const shownFor = new Promise(resolve => setTimeout(resolve, REVIEW_REFRESH_MIN_MS));
   try {
     if (!reviewNames) reviewNames = await loadReviewNames();
-    const { ok, status, data } = await downtimeRequest('GET', '/api/reviews');
+    const [{ ok, status, data }] = await Promise.all([downtimeRequest('GET', '/api/reviews'), shownFor]);
     if (!ok) throw new Error(data?.error?.message ?? `Could not load reviews (${status}).`);
 
     allReviews = [...data.reviews].reverse(); // the API is oldest first
@@ -872,10 +896,16 @@ async function loadReviews() {
       'All stops', id => id);
     reviewPage = 0;
     renderReviews();
+    updated.textContent = `Updated ${new Date().toLocaleTimeString('en-AU')}`;
+    void updated.offsetWidth; // restart the highlight even if it just ran
+    updated.classList.add('is-fresh');
   } catch (err) {
     document.getElementById('review-summary').innerHTML = '';
     document.getElementById('review-pager').hidden = true;
     list.innerHTML = `<p class="empty-state">${escHtml(err.message)}</p>`;
+    updated.textContent = '';
+  } finally {
+    refresh.disabled = false;
   }
 }
 
@@ -898,6 +928,11 @@ document.getElementById('review-list').addEventListener('click', (event) => {
   button.setAttribute('aria-expanded', String(open));
 });
 
-// Fetched when the tab is opened, so new reviews show without a page reload.
+// Fetched each time the tab is opened or Refresh is pressed, so new reviews
+// show without a page reload; "Updated …" beside the list says when that was.
 document.querySelector('.app-tab[data-tab="reviews"]').addEventListener('click', loadReviews);
 document.getElementById('btn-reviews-refresh').addEventListener('click', loadReviews);
+document.getElementById('btn-reviews-expand').addEventListener('click', () => {
+  reviewsExpanded = !reviewsExpanded;
+  renderReviews();
+});
