@@ -55,9 +55,12 @@
 
   // The roster's periods in force on one day: its weekday, inside any
   // starts_on (first day it counts) and ends_on (first day it no longer does).
+  // Both the hand kept roster and the drives synced from calendar.online,
+  // which come as one-day periods under `synced`.
   function rosterOn(schedule, day) {
     const iso = isoDay(day);
-    return ((schedule?.schedule ?? {})[DAY_NAMES[day.getDay()]] ?? []).filter(
+    const name = DAY_NAMES[day.getDay()];
+    return [...((schedule?.schedule ?? {})[name] ?? []), ...((schedule?.synced ?? {})[name] ?? [])].filter(
       (period) => (!period.starts_on || period.starts_on <= iso) && (!period.ends_on || iso < period.ends_on),
     );
   }

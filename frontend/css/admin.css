@@ -898,3 +898,19 @@
 .sched-remove-label { opacity: 0.7; }
 .sched-remove input[type="date"] { font-size: 0.72rem; padding: 0.15rem 0.3rem; width: auto; }
 
+
+/* The synced roster's status, above the hand kept rows. */
+.schedule-sync {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 0 0 0.9rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+.schedule-sync[hidden] { display: none; }
+.schedule-sync.has-error { border-color: rgba(245, 158, 11, 0.7); }
+.schedule-sync-text { margin: 0; flex: 1; line-height: 1.45; }
+.schedule-sync .btn-xs { flex: none; }
