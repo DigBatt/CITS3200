@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelButton: document.getElementById('rider-cancel-button'),
     collected: document.getElementById('rider-collected'),
     reviewButton: document.getElementById('rider-review-button'),
+    reviewDecline: document.getElementById('rider-review-decline'),
     reviewForm: document.getElementById('rider-review-form'),
     reviewSkip: document.getElementById('rider-review-skip'),
     status: document.getElementById('rider-status'),
@@ -62,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fresh every time: the button offers the review again, the form (and
     // whatever was typed into it) is reset and hidden until asked for.
     els.reviewButton.hidden = false;
+    els.reviewDecline.hidden = false;
     els.reviewForm.hidden = true;
     els.reviewForm.reset();
     prefillProfile();
@@ -182,8 +184,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ---- Review (S15 follow-up) ----
   //
-  // "Leave a review" reveals the form in place of the button; "Not now" or a
-  // successful submit both return to the picker, ready for the next trip.
+  // "Leave a review" reveals the form in place of the buttons; "Not today",
+  // the form's "Not now" or a successful submit all return to the picker,
+  // ready for the next trip.
   // vehicle_id, route_id and wait_minutes are not asked here -- the server
   // reads them off the pickup request itself (backend/api/reviews.py).
 
@@ -244,14 +247,44 @@ document.addEventListener('DOMContentLoaded', () => {
     update();
   });
 
+  // Pickups this browser is done with -- reviewed, or the review declined --
+  // so a reload does not offer the review again. Only the latest few are
+  // kept, since only the rider's most recent pickup is ever shown. The
+  // server refuses a second review regardless (409 already_reviewed).
+  const FINISHED_KEY = 'rider_finished_pickups';
+  const FINISHED_KEEP = 20;
+
+  function finishedPickups() {
+    try {
+      return JSON.parse(localStorage.getItem(FINISHED_KEY) ?? '[]');
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function markFinished(requestId) {
+    try {
+      const ids = [...finishedPickups().filter((id) => id !== requestId), requestId].slice(-FINISHED_KEEP);
+      localStorage.setItem(FINISHED_KEY, JSON.stringify(ids));
+    } catch (error) {
+      /* storage unavailable: the review is just offered again on reload */
+    }
+  }
+
+  function declineReview(message) {
+    if (currentRequestId) markFinished(currentRequestId);
+    resetToPicker(message, 'ok');
+  }
+
   els.reviewButton?.addEventListener('click', () => {
     els.reviewButton.hidden = true;
+    els.reviewDecline.hidden = true;
     els.reviewForm.hidden = false;
   });
 
-  els.reviewSkip?.addEventListener('click', () => {
-    resetToPicker('Thanks for riding nuway!', 'ok');
-  });
+  els.reviewDecline?.addEventListener('click', () => declineReview('Thanks for riding nuway!'));
+
+  els.reviewSkip?.addEventListener('click', () => declineReview('Thanks for riding nuway!'));
 
   els.reviewForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -262,6 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const data = Object.fromEntries(new FormData(els.reviewForm).entries());
       await submitReview({ pickup_request_id: currentRequestId, ...data });
+      markFinished(currentRequestId);
       rememberProfile(els.reviewForm);
       resetToPicker('Thanks for the feedback!', 'ok');
     } catch (error) {
@@ -297,7 +331,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     stopPolling();
     if (pickupRequest.status === 'collected') {
-      showCollected(pickupRequest);
+      // Already reviewed or declined here: stay on the picker, quietly.
+      if (!finishedPickups().includes(pickupRequest.id)) showCollected(pickupRequest);
     } else {
       // expired, or cancelled from another tab or device mid-wait.
       resetToPicker(`Your request at ${pickupRequest.stop_id} ${pickupRequest.status}.`, 'error');

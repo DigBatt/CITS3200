@@ -223,3 +223,58 @@ def test_submitting_a_review_returns_to_the_picker(page, app):
     page.wait_for_selector("#rider-picker:not([hidden])", timeout=5_000)
     assert page.locator("#rider-collected").is_hidden()
     assert "Thanks" in page.locator("#rider-status").text_content()
+
+
+# ---- "Not today", and not asking again on reload ----
+
+
+def reload_rider_view(page):
+    # Reload and wait for the view's own check of the rider's latest request,
+    # which is what decides whether the review is offered again.
+    with page.expect_response("**/api/pickup-requests/mine"):
+        page.reload()
+    page.get_by_role("button", name="Rider", exact=True).click()
+    page.wait_for_timeout(300)  # let the response be acted on
+
+
+def test_not_today_returns_to_the_picker(page, app):
+    request_and_collect(page, app)
+
+    page.click("#rider-review-decline")
+
+    page.wait_for_selector("#rider-picker:not([hidden])")
+    assert page.locator("#rider-collected").is_hidden()
+
+
+def test_opening_the_form_hides_not_today(page, app):
+    request_and_collect(page, app)
+    page.click("#rider-review-button")
+    assert page.locator("#rider-review-decline").is_hidden()
+
+
+def test_review_is_offered_again_on_reload_if_neither_reviewed_nor_declined(page, app):
+    request_and_collect(page, app)
+    page.reload()
+    page.get_by_role("button", name="Rider", exact=True).click()
+    page.wait_for_selector("#rider-collected:not([hidden])", timeout=10_000)
+
+
+def test_declined_review_is_not_offered_again_on_reload(page, app):
+    request_and_collect(page, app)
+    page.click("#rider-review-decline")
+
+    reload_rider_view(page)
+    assert page.locator("#rider-collected").is_hidden()
+    assert page.locator("#rider-picker").is_visible()
+
+
+def test_submitted_review_is_not_offered_again_on_reload(page, app):
+    request_and_collect(page, app)
+    page.click("#rider-review-button")
+    rate(page, "safety_rating", 5)
+    rate(page, "app_rating", 4)
+    page.click("#rider-review-submit")
+    page.wait_for_selector("#rider-picker:not([hidden])", timeout=5_000)
+
+    reload_rider_view(page)
+    assert page.locator("#rider-collected").is_hidden()

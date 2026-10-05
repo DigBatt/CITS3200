@@ -161,6 +161,9 @@
               <button type="button" class="request-button" id="rider-review-button">
                 <span class="request-button-title">Leave a review</span>
               </button>
+              <!-- Declines the review for this pickup; js/rider.js remembers
+                   it so a reload does not ask again. -->
+              <button type="button" class="btn-outline" id="rider-review-decline">Not today</button>
 
               <!-- vehicle_id/route_id/wait_minutes are not asked here: the
                    server fills them in from the pickup request itself
