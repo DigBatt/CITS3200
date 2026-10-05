@@ -4,6 +4,7 @@ Run as `python -m backend.app`
 
 from __future__ import annotations
 import logging
+import os
 from datetime import timedelta
 from pathlib import Path
 from flask import Flask, jsonify, redirect, send_from_directory
@@ -24,6 +25,7 @@ from backend.config import DEFAULT_CONFIG_DIR, ConfigError, load_config
 from backend.downtime import DowntimeStore
 from backend.pickup_requests import PickupRequestStore
 from backend.reviews import ReviewStore
+from backend.roster_sync import FILE_NAME as ROSTER_SYNC_FILE, RosterSync, SyncError, SyncSettings, SyncStore
 from backend.repository import CsvRepository
 from backend.snapshot_settings import SnapshotSettingsStore
 from backend.repository.base import RepositoryError
@@ -91,6 +93,24 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
         if config.storage_directory else None
     )
 
+    # The driving roster synced from calendar.online (backend/roster_sync.py).
+    # Its last good copy lives beside the downtime records. Built here but
+    # only started by `start_roster_sync`, so a test app never touches the
+    # network.
+    try:
+        sync_settings = SyncSettings.load(config, config_dir)
+    except SyncError as exc:
+        raise ConfigError(str(exc)) from exc
+    if sync_settings and config.storage_directory:
+        store = SyncStore(config.storage_directory / ROSTER_SYNC_FILE)
+        app.config["ROSTER_SYNC_STORE"] = store
+        app.config["ROSTER_SYNC"] = RosterSync(sync_settings, store, [v.id for v in config.vehicles])
+    else:
+        if sync_settings:
+            log.warning("roster_sync is set but storage.directory is not: the roster will not sync.")
+        app.config["ROSTER_SYNC_STORE"] = None
+        app.config["ROSTER_SYNC"] = None
+
     secrets = load_secrets(config_dir)
     if secrets is None:
         log.warning("No %s/secrets.yaml: admin sign-in is disabled.", config_dir)
@@ -152,5 +172,25 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
 
     return app
 
+
+def start_roster_sync(app: Flask) -> None:
+    """
+    Start syncing the roster from calendar.online, when it is configured.
+
+    Under the debug reloader the app is built twice, once in a watcher
+    process that never serves; syncing only in the serving one keeps it to a
+    single poller.
+    """
+    sync = app.config.get("ROSTER_SYNC")
+    if sync is None:
+        return
+    if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        return
+    sync.start()
+
+
 if __name__ == "__main__":
-    create_app().run(debug=True)
+    app = create_app()
+    app.debug = True
+    start_roster_sync(app)
+    app.run(debug=True)

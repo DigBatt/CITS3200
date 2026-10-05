@@ -11,7 +11,14 @@ AUTHENTICATION (S13):
     anyone, so anyone may read the roster behind it.
 
     PUT is admin only, through the same `admin_required` guard as the
-    /api/downtime writes. It is the only write in this module.
+    /api/downtime writes, as is POST /api/schedule/sync, which only reads
+    the calendar again; it never writes to it.
+
+SYNCED DRIVES (backend/roster_sync.py):
+
+    When the roster syncs from calendar.online, its drives come back under
+    `synced`, apart from the hand kept `schedule`, so the editor only ever
+    sends back what it owns. The dashboard draws both.
 """
 
 from __future__ import annotations
@@ -19,6 +26,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from backend.auth import admin_required
 from backend.config import load_config
+from backend.roster_sync import SOURCE as SYNC_SOURCE, effective_schedule
 from backend.schedule import DAYS, Schedule, ScheduleError, load_schedule, save_schedule
 
 bp = Blueprint("schedule", __name__)
@@ -49,16 +57,44 @@ def _payload(schedule: Schedule):
         `schedule` as day to periods with every day present, `timezone` the
         roster is written in, and `configured`, false when nothing at all is
         rostered. An empty schedule is a valid state, not an error.
+        `synced` is day to the drives synced from the calendar, every day
+        present, and `sync` how that sync stands, null when it is off.
     """
     config = current_app.config["NUWAY_CONFIG"]
+    store = current_app.config.get("ROSTER_SYNC_STORE")
+    merged = effective_schedule(schedule, store)
     return {
         "days": list(DAYS),
         "timezone": config.timezone,
-        "configured": not schedule.is_empty,
+        "configured": not merged.schedule.is_empty,
         # The fleet a period may name, so the editor can offer it without a
         # second request. A period naming none is for all of them.
         "vehicles": [vehicle.to_dict() for vehicle in config.vehicles],
         "schedule": schedule.to_dict(),
+        "synced": {day: [period.to_dict() for period in merged.synced.get(day, [])] for day in DAYS},
+        "sync": _sync_status(store, merged) if store else None,
+    }
+
+
+def _sync_status(store, merged):
+    """
+    How the calendar sync stands, for the admin page's Schedule tab.
+    """
+    state = store.load()
+    stamp = lambda value: value.isoformat() if value else None  # noqa: E731
+    return {
+        "source": SYNC_SOURCE,
+        "synced_at": stamp(state.synced_at),
+        "error": state.error,
+        "error_at": stamp(state.error_at),
+        "drives": sum(len(rows) for rows in merged.synced.values()),
+        # Drives left out because they overlap a hand kept period for the
+        # same bus; the hand kept one wins.
+        "conflicts": [
+            {"start": d.start.isoformat(timespec="minutes"), "end": d.end.isoformat(timespec="minutes"),
+             "operator": d.operator, "vehicles": list(d.vehicles)}
+            for d in merged.conflicts
+        ],
     }
 
 
@@ -130,3 +166,28 @@ def replace_schedule():
     # would not move until the next restart.
     current_app.config["NUWAY_CONFIG"] = load_config(current_app.config["NUWAY_CONFIG_DIR"])
     return jsonify(_payload(load_schedule(_config_path())))
+
+
+@bp.post("/api/schedule/sync")
+@admin_required
+def sync_schedule():
+    """
+    Read the calendar again now, rather than waiting for the next sync.
+    Admin only (S13). Read only towards the calendar.
+
+    Returns
+    -------
+    flask.Response
+        200 with the schedule in the shape of `_payload`, its `sync.error`
+        set if the calendar could not be read; 404 `sync_off` when no
+        calendar is configured.
+    """
+    sync = current_app.config.get("ROSTER_SYNC")
+    if sync is None:
+        return _error("sync_off", "No calendar to sync from. Set roster_sync in app.yaml and calendar_online_id in secrets.yaml.", 404)
+    sync.sync_once()
+    try:
+        schedule = load_schedule(_config_path())
+    except ScheduleError as exc:
+        return _error("data_unavailable", str(exc), 500)
+    return jsonify(_payload(schedule))

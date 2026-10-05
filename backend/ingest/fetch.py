@@ -17,7 +17,7 @@ class FetchError(Exception):
     """
 
 
-def fetch_json(url: str, user_agent: str, timeout: float) -> Any:
+def fetch_json(url: str, user_agent: str, timeout: float, max_bytes: int = MAX_BODY_BYTES) -> Any:
     """
     GET a URL and decode its JSON body.
 
@@ -28,6 +28,9 @@ def fetch_json(url: str, user_agent: str, timeout: float) -> Any:
         Sent as-is. The REV server answers 406 to non-browser agents.
     timeout : float
         Seconds, for the connection and for each read.
+    max_bytes : int, optional
+        The largest body accepted. A position feed is tiny; a calendar of
+        events is not.
 
     Returns
     -------
@@ -38,13 +41,13 @@ def fetch_json(url: str, user_agent: str, timeout: float) -> Any:
     ------
     FetchError
         On any network failure, a non-2xx status, a body that is not
-        `application/json`, a body over MAX_BODY_BYTES, or invalid JSON.
+        `application/json`, a body over `max_bytes`, or invalid JSON.
     """
     request = Request(url, headers={"User-Agent": user_agent, "Accept": "application/json"})
     try:
         with urlopen(request, timeout=timeout) as response:
             content_type = response.headers.get_content_type()
-            body = response.read(MAX_BODY_BYTES + 1)
+            body = response.read(max_bytes + 1)
     except HTTPError as exc:
         raise FetchError(f"{url}: HTTP {exc.code}") from exc
     except (OSError, HTTPException) as exc:  # URLError, timeouts, resets, TLS
@@ -52,8 +55,8 @@ def fetch_json(url: str, user_agent: str, timeout: float) -> Any:
 
     if content_type != "application/json" and not content_type.endswith("+json"):
         raise FetchError(f"{url}: expected JSON, got {content_type}")
-    if len(body) > MAX_BODY_BYTES:
-        raise FetchError(f"{url}: response larger than {MAX_BODY_BYTES} bytes")
+    if len(body) > max_bytes:
+        raise FetchError(f"{url}: response larger than {max_bytes} bytes")
     try:
         return json.loads(body)
     except ValueError as exc:  # JSONDecodeError and UnicodeDecodeError both

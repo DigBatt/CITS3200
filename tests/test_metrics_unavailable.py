@@ -93,10 +93,16 @@ def test_without_a_schedule_scheduled_time_is_a_noted_zero(client_without_a_sche
 
 
 def test_a_day_with_no_service_leaves_effective_utilisation_unavailable_not_zero(client):
+    # nUWAy 4's roster syncs from calendar.online (backend/roster_sync.py),
+    # so with nothing synced here it has no roster at all, and says that.
     for entry in vehicles(client, SATURDAY):
         assert entry["buckets"]["scheduled_seconds"] == 0
         assert entry["kpis"]["effective_utilisation"] is None
-        assert entry["unavailable"]["effective_utilisation"] == "no scheduled service time in this window"
+        assert entry["unavailable"]["effective_utilisation"] == (
+            "needs scheduled time; no service schedule is in the system"
+            if entry["vehicle_id"] == "4"
+            else "no scheduled service time in this window"
+        )
 
 
 def test_figures_the_telemetry_cannot_give_are_unavailable(client):

@@ -313,6 +313,7 @@ async function loadSchedule() {
     scheduleFleet = data.vehicles ?? [];
     schedule = data.schedule;
     document.getElementById('schedule-tz').textContent = data.timezone ?? 'local time';
+    renderSync(data);
     renderSchedule();
     setScheduleStatus(data.configured ? '' : 'No service schedule is in the system yet.');
   } catch (err) {
@@ -438,6 +439,50 @@ function renderSchedule() {
   }).join('');
 }
 
+// The roster synced from calendar.online, read only: its drives are not rows
+// here and Save never sends them; they show on the calendar. This says where
+// they come from, whether the last sync worked, and lets an admin re-read the
+// calendar without waiting for the next one.
+function renderSync(data) {
+  const box = document.getElementById('schedule-sync');
+  const sync = data.sync;
+  box.hidden = !sync;
+  if (!sync) return;
+
+  const when = (iso) => new Date(iso).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const upcoming = Object.values(data.synced ?? {}).flat()
+    .filter(period => period.starts_on >= todayIso()).length;
+  const parts = [`Drives sync from ${sync.source}, read only, and show on the calendar with their operator.`];
+  parts.push(sync.synced_at
+    ? `Last synced ${when(sync.synced_at)}: ${sync.drives} drive${sync.drives === 1 ? '' : 's'}, ${upcoming} still to come.`
+    : 'Not synced yet.');
+  if (sync.error) parts.push(`⚠ The last attempt failed (${when(sync.error_at)}): ${sync.error} The last good copy is still in use.`);
+  if (sync.conflicts?.length) {
+    const list = sync.conflicts.map(c => `${when(c.start)} ${c.operator ?? ''}`.trim()).join('; ');
+    parts.push(`⚠ Left out, as they overlap a period below for the same bus: ${list}.`);
+  }
+  const text = document.getElementById('schedule-sync-text');
+  text.textContent = parts.join(' ');
+  box.classList.toggle('has-error', Boolean(sync.error || sync.conflicts?.length));
+}
+
+document.getElementById('btn-schedule-sync').addEventListener('click', async () => {
+  const button = document.getElementById('btn-schedule-sync');
+  button.disabled = true;
+  button.textContent = 'Syncing…';
+  try {
+    // Only the sync status is taken from the answer: unsaved edits to the
+    // rows below stay as they are.
+    renderSync(await api('/api/schedule/sync', { method: 'POST' }));
+    window.AdminCalendar?.refresh();
+  } catch (err) {
+    showScheduleError(`Could not sync: ${err.message}`);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Sync now';
+  }
+});
+
 function showScheduleError(message) {
   const box = document.getElementById('schedule-error');
   box.textContent = message ? `⚠ ${message}` : '';
@@ -549,6 +594,7 @@ document.getElementById('btn-schedule-save').addEventListener('click', async () 
     });
     schedule = saved.schedule;
     removeOpen = null;
+    renderSync(saved);
     renderSchedule();
     setScheduleStatus(saved.configured ? 'Saved.' : 'Saved. Nothing is rostered, so all time counts as unscheduled.');
     window.AdminCalendar?.refresh();
