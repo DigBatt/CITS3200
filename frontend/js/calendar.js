@@ -50,6 +50,21 @@
 
   const minutesInto = (day, moment) => (moment - day) / 60000;
 
+  // A local day as YYYY-MM-DD, to compare with a period's starts_on/ends_on.
+  const isoDay = (day) => `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+
+  // The roster's periods in force on one day: its weekday, inside any
+  // starts_on (first day it counts) and ends_on (first day it no longer does).
+  // Both the hand kept roster and the drives synced from calendar.online,
+  // which come as one-day periods under `synced`.
+  function rosterOn(schedule, day) {
+    const iso = isoDay(day);
+    const name = DAY_NAMES[day.getDay()];
+    return [...((schedule?.schedule ?? {})[name] ?? []), ...((schedule?.synced ?? {})[name] ?? [])].filter(
+      (period) => (!period.starts_on || period.starts_on <= iso) && (!period.ends_on || iso < period.ends_on),
+    );
+  }
+
   function clockMinutes(text) {
     const [hours, minutes] = String(text).split(':').map(Number);
     return hours * 60 + minutes;
@@ -163,13 +178,13 @@
     // This vehicle's rostered periods on one day. A period naming no vehicle
     // is fleet wide, so it applies to everyone.
     function periodsFor(day, vehicleId) {
-      const roster = schedule?.schedule ?? {};
-      return (roster[DAY_NAMES[day.getDay()]] ?? [])
+      return rosterOn(schedule, day)
         .filter((period) => !period.vehicles?.length || period.vehicles.includes(vehicleId))
         .map((period) => ({
           from: clockMinutes(period.start),
           to: clockMinutes(period.end),
           label: `${period.start}–${period.end}`,
+          operator: period.operator ?? null,
         }));
     }
 
@@ -230,7 +245,11 @@
         .map((vehicle, index) => {
           const scheduled = periodsFor(day, vehicle.id)
             .map((period) =>
-              band(period.from, period.to, 'cal-scheduled', `${vehicle.name ?? vehicle.id} scheduled ${period.label}`, wide ? period.label : '',
+              band(period.from, period.to, 'cal-scheduled',
+                `${vehicle.name ?? vehicle.id} scheduled ${period.label}${period.operator ? ` · operator ${period.operator}` : ''}`,
+                // The operator is who to ask about a block, so it is shown
+                // even in a narrow lane, where the times drop out.
+                period.operator ? (wide ? `${period.operator} · ${period.label}` : period.operator) : wide ? period.label : '',
                 { vehicle: vehicle.id, from: at(day, period.from), to: at(day, period.to) }),
             )
             .join('');
@@ -864,7 +883,7 @@
       render();
     }
 
-    const hasService = (day) => Boolean((schedule?.schedule ?? {})[DAY_NAMES[day.getDay()]]?.length);
+    const hasService = (day) => rosterOn(schedule, day).length > 0;
 
     const hasDowntime = (day) => {
       const next = new Date(day.getTime() + DAY_MS);

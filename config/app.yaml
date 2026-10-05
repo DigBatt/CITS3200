@@ -64,18 +64,42 @@ utilisation:
   #       vehicles: ["1", "2"]
   #       starts_on: 2026-10-01
   #
+  # `operator` names who drives a period, shown on the calendar.
+  #
   # Edited by hand or from the admin page, which rewrites only this block.
   service_hours:
     monday:
       - hours: ["08:00", "17:00"]
+        vehicles: ["1", "2", "3"]
     tuesday:
       - hours: ["08:00", "17:00"]
+        vehicles: ["1", "2", "3"]
     wednesday:
       - hours: ["08:00", "17:00"]
+        vehicles: ["1", "2", "3"]
     thursday:
       - hours: ["08:00", "17:00"]
+        vehicles: ["1", "2", "3"]
     friday:
       - hours: ["08:00", "17:00"]
+        vehicles: ["1", "2", "3"]
+
+# The driving roster, synced read only from the REV calendar on
+# calendar.online (backend/roster_sync.py). Each drive becomes a one-day
+# period of the schedule above, naming its operator, so nUWAy 4's roster is
+# kept there rather than here. Needs `calendar_online_id` in secrets.yaml and
+# storage.directory; without either, only the roster above applies.
+roster_sync:
+  # The bus a drive is for, unless its title names one ("nUWAy 2 drive").
+  vehicles: ["4"]
+  # Every timed event on these sub-calendars is a drive (the weekly drives).
+  sub_calendars: [4921495]
+  # And any timed event elsewhere whose title matches, e.g. a demo under Events.
+  title_pattern: "nUWAy"
+  interval_minutes: 15
+  # The window read on each sync. Older drives are kept from earlier syncs.
+  days_back: 56
+  days_ahead: 120
 
 admin:
   # S13: how long a sign in session lasts. 

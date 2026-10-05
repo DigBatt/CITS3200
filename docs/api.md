@@ -419,8 +419,8 @@ so anyone may read the roster behind it. Only the `PUT` below is privileged.
   "vehicles": [{ "id": "1", "name": "nUWAy 1", "colour": "#d4741f" }],
   "schedule": {
     "monday": [
-      { "start": "08:00", "end": "12:00", "vehicles": null, "starts_on": null, "ends_on": null },
-      { "start": "13:00", "end": "17:00", "vehicles": ["1", "2"], "starts_on": "2026-10-01", "ends_on": null }
+      { "start": "08:00", "end": "12:00", "vehicles": null, "starts_on": null, "ends_on": null, "operator": null },
+      { "start": "13:00", "end": "17:00", "vehicles": ["1", "2"], "starts_on": "2026-10-01", "ends_on": null, "operator": "Jeremy" }
     ],
     "saturday": [{ "start": "09:00", "end": "13:00", "vehicles": ["3"] }],
     "sunday": []
@@ -446,6 +446,11 @@ its scheduled time twice.
 periods that apply to that vehicle, so two buses over one window can have
 different scheduled time.
 
+**A period may name its operator.** `operator` is who drives that shift, or
+`null`. It is a label only: the calendar shows it on the scheduled block, and
+no figure depends on it. Whitespace is tidied, a blank name is `null`, and a
+name longer than 80 characters is a 400.
+
 **Changes can be booked ahead.** `starts_on` is the first day a period counts
 and `ends_on` the first day it no longer does, so a period runs up to but not
 including its end date. Both are optional; a period with neither is always in
@@ -470,6 +475,64 @@ booked change differ without anyone editing anything on the day.
 `configured` is false when no day has any period. That is a valid state, not an
 error: nothing rostered means no scheduled time, and `/api/metrics` reports the
 whole window as unscheduled with a note saying why. See **Empty schedules**.
+
+**Synced drives.** When the roster syncs from calendar.online (see
+**`POST /api/schedule/sync`**), each drive comes back under `synced`, a period
+in the same shape as `schedule`'s, in force on its one date and naming its
+`operator`. They are kept apart from `schedule`, which is only the hand kept
+roster in `app.yaml`, so an editor that sends `schedule` back through `PUT`
+never writes a synced drive into the config. The calendar draws both, and
+`/api/metrics` and `/api/operating` count both.
+
+```json
+"synced": {
+  "tuesday": [
+    { "start": "13:00", "end": "15:00", "vehicles": ["4"], "starts_on": "2026-10-06", "ends_on": "2026-10-07", "operator": "Jeremy" }
+  ]
+},
+"sync": {
+  "source": "calendar.online",
+  "synced_at": "2026-10-04T15:28:12+00:00",
+  "error": null,
+  "error_at": null,
+  "drives": 42,
+  "conflicts": []
+}
+```
+
+`sync` is `null` when no calendar is configured, and `synced` then has every
+day empty. `error` is why the last attempt failed, if it did; the last good
+drives stay in force meanwhile. `conflicts` lists drives left out because
+they overlap a hand kept period for the same bus: the hand kept one wins.
+Two drives of one bus that overlap each other are joined into one period
+naming both operators, e.g. `"Punit, Yuki"`.
+
+---
+
+## `POST /api/schedule/sync`
+
+*Admin only.* Reads the calendar again now rather than waiting for the next
+timed sync. Read only towards the calendar: it never writes to it. `200` with
+the schedule in the shape of `GET`, its `sync.error` set if the calendar could
+not be read; `404` with `sync_off` when no calendar is configured.
+
+The sync itself (`backend/roster_sync.py`) runs every
+`roster_sync.interval_minutes` while the server runs, started by
+`python -m backend.app`. It needs:
+
+- `roster_sync` in `app.yaml`: the bus a drive is for (`vehicles`, unless
+  the title names one, "nUWAy 2 …"), the `sub_calendars` whose timed events
+  are all drives, and an optional `title_pattern` for events elsewhere.
+- `calendar_online_id` in `secrets.yaml`: the id at the end of the
+  calendar's address. Anyone with it can open the calendar, so it is never
+  committed.
+- `storage.directory`, where the last good copy is kept in
+  `roster_sync.json`, so a restart or an outage keeps the roster.
+
+Whole day events (leave, holidays) are never drives. Each sync reads
+`days_back` to `days_ahead` around today and replaces the drives in that
+window, so a cancelled drive disappears; older drives are kept, so past
+figures keep their roster.
 
 ---
 
