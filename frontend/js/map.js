@@ -5,7 +5,7 @@
 // Owns: vehicle markers, position trails, event markers, stop markers.
 
 let map = null;
-const layers = { trails: null, stops: null };
+const layers = { trails: null, stops: null, routes: null };
 
 let pendingFit = null;
 
@@ -42,10 +42,6 @@ let campusBounds = null;
 function getCampusBounds() {
   return campusBounds;
 }
-
-// Every stop label drawn at once is unreadable when zoomed out past the
-// campus, so below this the names are hidden and the markers stay.
-const STOP_LABEL_MIN_ZOOM = 15;
 
 // Bus markers: a numbered circle, in px. Kept in step with .bus-marker in
 // css/dashboard.css.
@@ -96,6 +92,7 @@ function initMap() {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
+  map.createPane('routes').style.zIndex = 340;
   map.createPane('stops').style.zIndex = 350; // below overlayPane (400)
   stopRenderer = L.svg({ pane: 'stops' });
 
@@ -103,11 +100,10 @@ function initMap() {
   // waiting at a stop is not hidden under its name. Popups (700) stay on top.
   map.createPane('buses').style.zIndex = 660;
 
+  layers.routes = L.layerGroup().addTo(map);
   layers.stops = L.layerGroup().addTo(map);
   layers.trails = L.layerGroup().addTo(map);
 
-  map.on('zoomend', applyStopLabelZoom);
-  applyStopLabelZoom();
 }
 
 // Draw the configured stops. They come from config and change only on a
@@ -117,13 +113,16 @@ function drawStops(stops, { popupHtml = null } = {}) {
   stopMarkers.clear();
 
   for (const stop of stops) {
+    // Text content keeps configured names safe and shows them only on hover.
+    const label = document.createElement('span');
+    label.textContent = stop.name || stop.id;
     const marker = L.circleMarker([stop.latitude, stop.longitude], {
       renderer: stopRenderer,
       pane: 'stops',
       ...STOP_NEUTRAL,
     })
-      .bindTooltip(stop.id, {
-        permanent: true,
+      .bindTooltip(label, {
+        permanent: false,
         direction: 'top',
         offset: [0, -7],
         className: 'stop-label',
@@ -154,6 +153,45 @@ function highlightRoute(stops, selectedRouteId, routeColour) {
   }
 }
 
+// A route's path as runs drawn once each. A route that goes out along a spur
+// and back passes the same stretch twice; drawn twice, the dots would land
+// out of step and the stretch would look denser than the rest.
+function uniqueRuns(path) {
+  const seen = new Set();
+  const key = (a, b) => [a, b].map(p => p.join(',')).sort().join('|');
+  const runs = [];
+  let run = null;
+  for (let i = 1; i < path.length; i++) {
+    const k = key(path[i - 1], path[i]);
+    if (seen.has(k)) { run = null; continue; }
+    seen.add(k);
+    if (!run) { run = [path[i - 1]]; runs.push(run); }
+    run.push(path[i]);
+  }
+  return runs;
+}
+
+// Draw only the selected planned route, below stop markers and GPS trails.
+// Its path comes from /api/routes, set in config/stops.json by the admin
+// page's route editor.
+function drawRoutePath(route) {
+  layers.routes.clearLayers();
+  for (const points of uniqueRuns(route?.path ?? [])) {
+    L.polyline(points, {
+      pane: 'routes',
+      color: route.colour ?? '#D4741F',
+      weight: 3,
+      opacity: 0.9,
+      dashArray: '1 8',
+      lineCap: 'round',
+      lineJoin: 'round',
+      smoothFactor: 0,
+      interactive: false,
+      className: 'planned-route-path',
+    }).addTo(layers.routes);
+  }
+}
+
 // Rider stop picker (S15): fully hide every stop marker and label but one, to
 // cut clutter while choosing. Pass null to show them all again — done
 // whenever the rider leaves the picker (map.js is shared with Fleet, so this
@@ -180,13 +218,11 @@ function openStopPopup(stopId) {
 function setStopsVisible(visible) {
   if (visible) {
     layers.stops.addTo(map);
+    layers.routes.addTo(map);
   } else {
     map.removeLayer(layers.stops);
+    map.removeLayer(layers.routes);
   }
-}
-
-function applyStopLabelZoom() {
-  map.getContainer().classList.toggle('hide-stop-labels', map.getZoom() < STOP_LABEL_MIN_ZOOM);
 }
 
 // The bus's latest position in the period: its number in a circle of its

@@ -1,7 +1,7 @@
 // Rider view: choose a stop, ask to be collected, and track that request
 // through to pickup, review or cancellation (S08, S15).
 //
-// Stops are read from /api/stops, so one added to config/stops.yaml appears
+// Stops are read from /api/stops, so one added to config/stops.json appears
 // here after a restart with no code change. The request itself is anonymous:
 // the API sets a rider_token cookie on the first request, which is what lets
 // it recognise a repeat request at the same stop, and what GET

@@ -15,7 +15,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/calendar.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="css/admin.css">
+  <link rel="stylesheet" href="css/route-editor.css">
 </head>
 <body>
 <div class="app-shell">
@@ -32,6 +34,7 @@
       <button type="button" class="app-tab" data-tab="figures">Figures</button>
       <button type="button" class="app-tab" data-tab="downtime">Downtime</button>
       <button type="button" class="app-tab" data-tab="schedule">Schedule</button>
+      <button type="button" class="app-tab" data-tab="routes">Routes</button>
       <button type="button" class="app-tab" data-tab="snapshots">Snapshots</button>
     </nav>
 
@@ -266,6 +269,66 @@
     </div>
 
 <!-- ---- Snapshots (S16 metric selection, S17 daily generation) ---- -->
+<!-- ---- Routes: the stop and route editor, driven by js/route-editor.js ----
+     Stops are the network's nodes, shared by every route that serves them; a
+     route is a path through them, shaped by guide points. Saving rewrites
+     config/stops.json (PUT /api/network). AUTH (S13): admin only. -->
+    <div class="admin-panel admin-panel-wide" id="tab-routes" hidden>
+      <h1 class="admin-section-title">Routes</h1>
+      <p class="admin-section-sub">Place stops and guide points on the map. Each leg follows the campus paths unless you draw it straight.</p>
+
+      <!-- Every route and stop, folded away to a summary until opened. -->
+      <section class="net-bar" id="net-bar">
+        <button type="button" class="net-bar-toggle" id="net-bar-toggle" aria-expanded="false" aria-controls="net-bar-body">
+          <span id="net-bar-summary">Loading…</span>
+          <span class="net-bar-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="net-bar-body" id="net-bar-body" hidden>
+          <div class="net-list">
+            <div class="net-list-head">
+              <span>Routes</span>
+              <button type="button" class="btn-xs" id="net-new-route">New route</button>
+            </div>
+            <ul class="net-items" id="net-routes"></ul>
+          </div>
+          <div class="net-list">
+            <div class="net-list-head">
+              <span>Stops</span>
+              <span class="net-list-hint">With no route open, click the map to add one.</span>
+            </div>
+            <ul class="net-items" id="net-stops"></ul>
+          </div>
+        </div>
+      </section>
+
+      <div class="form-warning" id="net-error"></div>
+
+      <div class="net-editor">
+        <aside class="net-sidebar" id="net-sidebar" aria-label="Route points"></aside>
+        <div class="net-map-wrap">
+          <div class="net-map" id="net-map" aria-label="Route map"></div>
+          <div class="net-map-tools" id="net-map-tools">
+            <div class="net-seg" role="group" aria-label="A click on the map adds">
+              <button type="button" class="net-seg-btn is-on" data-add-mode="guide" aria-pressed="true">Guide point</button>
+              <button type="button" class="net-seg-btn" data-add-mode="stop" aria-pressed="false">Stop</button>
+            </div>
+            <label class="net-check" title="Whether new points snap onto the campus paths. Each point can be changed after: select it."><input type="checkbox" id="net-snap" checked> Snap new points</label>
+            <label class="net-check"><input type="checkbox" id="net-show-paths" checked> Show paths</label>
+            <div class="net-history">
+              <button type="button" class="btn-xs" id="net-undo" disabled title="Undo (Ctrl+Z)">↶ Undo</button>
+              <button type="button" class="btn-xs" id="net-redo" disabled title="Redo (Ctrl+R)">↷ Redo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions net-actions">
+        <button type="button" class="btn-primary" id="net-save" disabled>Save changes</button>
+        <button type="button" class="btn-outline" id="net-discard" disabled>Discard</button>
+        <span class="schedule-status" id="net-status"></span>
+      </div>
+    </div>
+
 <div class="admin-panel" id="tab-snapshots" hidden>
   <h1 class="admin-section-title">Daily snapshots</h1>
   <p class="admin-section-sub">
@@ -363,6 +426,8 @@
 <script src="js/tum.js"></script>
 <script src="js/vehicle-chips.js"></script>
 <script src="js/admin.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="js/route-editor.js"></script>
 <script src="js/operator.js"></script>
 <script src="js/figures.js"></script>
 <!-- Last: the calendar picks the Figures tab's period. -->

@@ -1,0 +1,306 @@
+/* Route editor (admin page, Routes tab; js/route-editor.js). The list of
+   routes and stops folds into a bar at the top; below it, the open route's
+   points beside the map. */
+
+.admin-panel.admin-panel-wide { max-width: none; }
+
+/* ---- The bar: every route and stop ---- */
+
+.net-bar {
+  margin: 0 0 14px;
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.net-bar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: 600 12.5px Sora, sans-serif;
+  color: #1c1917;
+  text-align: left;
+}
+
+.net-bar-chevron { transition: transform 0.15s; opacity: 0.6; }
+.net-bar-toggle[aria-expanded="true"] .net-bar-chevron { transform: rotate(180deg); }
+
+.net-bar-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 18px;
+  padding: 4px 14px 14px;
+  border-top: 1px solid rgba(28, 25, 23, 0.08);
+}
+.net-bar-body[hidden] { display: none; }
+
+.net-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 0 6px;
+  font: 600 10px Sora, sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(28, 25, 23, 0.55);
+}
+.net-list-hint { font-weight: 400; letter-spacing: 0; text-transform: none; }
+
+.net-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.net-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  font: 500 12.5px Sora, sans-serif;
+  color: #1c1917;
+  text-align: left;
+}
+.net-item:hover { background: rgba(28, 25, 23, 0.04); }
+.net-item.is-on { border-color: rgba(28, 25, 23, 0.2); background: rgba(28, 25, 23, 0.05); }
+
+.net-swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.net-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.net-item-meta { font: 400 11px Sora, sans-serif; color: rgba(28, 25, 23, 0.55); white-space: nowrap; }
+.net-empty { font: 400 12px Sora, sans-serif; color: rgba(28, 25, 23, 0.5); padding: 4px 8px; }
+
+.net-stop-row { display: flex; align-items: center; gap: 6px; }
+.net-stop-row .net-stop-name { flex: 1; min-width: 0; padding: 4px 7px; font-size: 12px; }
+
+/* ---- Editor: sidebar and map ---- */
+
+.net-editor {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 14px;
+  height: min(70vh, 720px);
+  min-height: 420px;
+}
+
+.net-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.net-side-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; font: 400 12.5px Sora, sans-serif; }
+.net-side-empty p { margin: 0; }
+.net-hint { margin: 6px 0 8px; font: 400 11.5px/1.45 Sora, sans-serif; color: rgba(28, 25, 23, 0.6); }
+.net-hint code { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; }
+
+.net-route-head { display: flex; align-items: center; gap: 8px; }
+.net-route-name { flex: 1; min-width: 0; font-weight: 600; }
+.net-colour { width: 34px; height: 30px; padding: 0; border: 1px solid rgba(28, 25, 23, 0.16); border-radius: 6px; background: none; cursor: pointer; }
+
+.net-route-opts {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.net-check { display: inline-flex; align-items: center; gap: 5px; font: 400 12px Sora, sans-serif; cursor: pointer; }
+.net-check input { margin: 0; }
+
+.net-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.net-point {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-areas: "handle mark body" ". . actions";
+  align-items: start;
+  column-gap: 7px;
+  row-gap: 4px;
+  padding: 6px 7px;
+  border: 1px solid rgba(28, 25, 23, 0.08);
+  border-radius: 7px;
+  background: #fff;
+}
+.net-point.is-stop { border-color: rgba(28, 25, 23, 0.16); }
+.net-point.is-dragging { opacity: 0.4; }
+.net-point.is-drop { box-shadow: 0 -2px 0 #1c1917; }
+
+.net-handle { grid-area: handle; cursor: grab; color: rgba(28, 25, 23, 0.35); font-size: 12px; line-height: 22px; user-select: none; }
+.net-point-mark {
+  grid-area: mark;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 2px solid var(--net-colour);
+  background: #fff;
+  font: 600 10px Sora, sans-serif;
+}
+.net-point:not(.is-stop) .net-point-mark { width: 10px; height: 10px; margin: 6px 5px 0; border-width: 2px; }
+.net-point.is-stop .net-point-mark { background: var(--net-colour); color: #fff; }
+
+.net-point-body { grid-area: body; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.net-point-name { width: 100%; padding: 3px 6px; font-size: 12px; font-weight: 600; }
+.net-point-label { font: 500 12px Sora, sans-serif; color: rgba(28, 25, 23, 0.7); line-height: 22px; }
+.net-point-note { font: 400 10.5px Sora, sans-serif; color: rgba(28, 25, 23, 0.55); }
+.net-point-note.is-warn { color: oklch(0.5 0.15 60); }
+
+.net-leg {
+  padding: 1px 6px;
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  border-radius: 999px;
+  background: rgba(28, 25, 23, 0.03);
+  cursor: pointer;
+  font: 500 10.5px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.7);
+}
+.net-leg.is-straight { border-style: dashed; }
+
+.net-point-actions { grid-area: actions; display: flex; flex-wrap: wrap; gap: 4px; }
+.net-point-actions .btn-xs { padding: 2px 7px; font-size: 10.5px; }
+.net-point-actions .btn-xs:disabled { opacity: 0.35; cursor: default; }
+
+.net-side-foot { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(28, 25, 23, 0.08); }
+
+.net-map-wrap { position: relative; min-height: 0; }
+.net-map {
+  height: 100%;
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.net-map-tools {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.net-history { display: flex; gap: 4px; }
+.net-history .btn-xs:disabled { opacity: 0.4; cursor: default; }
+
+.net-seg { display: inline-flex; border: 1px solid rgba(28, 25, 23, 0.16); border-radius: 6px; overflow: hidden; }
+.net-seg-btn {
+  padding: 4px 9px;
+  border: 0;
+  background: #fff;
+  cursor: pointer;
+  font: 500 11px Sora, sans-serif;
+  color: #1c1917;
+}
+.net-seg-btn + .net-seg-btn { border-left: 1px solid rgba(28, 25, 23, 0.16); }
+.net-seg-btn.is-on { background: #1c1917; color: #fff; }
+
+/* Map markers: stops are rings, filled and numbered when on the open route;
+   guide points are small white dots. */
+.net-stop-icon, .net-guide-icon { background: none; border: 0; }
+.net-stop {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid #78716c;
+  background: #fff;
+  font: 700 10px Sora, sans-serif;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+}
+.net-stop.is-on { border-color: #fff; background: var(--net-colour); }
+.net-guide {
+  display: block;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid #1c1917;
+  background: #fff;
+  cursor: grab;
+}
+
+.net-actions { margin-top: 12px; align-items: center; }
+
+@media (max-width: 860px) {
+  .net-bar-body { grid-template-columns: 1fr; }
+  .net-editor { grid-template-columns: 1fr; height: auto; }
+  .net-sidebar { max-height: 50vh; }
+  .net-map-wrap { height: 60vh; }
+}
+
+/* Selection and snapping. A selected point gets a halo, on the map and in
+   the list; a point that does not snap onto the paths has a dashed edge. */
+.net-point { cursor: pointer; }
+.net-point.is-selected { border-color: #1c1917; box-shadow: 0 0 0 1px #1c1917; }
+
+.net-snap-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 4px;
+  border-radius: 999px;
+  background: rgba(2, 132, 199, 0.08);
+  font: 500 11px Sora, sans-serif;
+  color: #075985;
+  cursor: pointer;
+}
+.net-snap-switch input { margin: 0; }
+
+.net-free-badge {
+  padding: 0 6px;
+  border: 1px dashed rgba(28, 25, 23, 0.4);
+  border-radius: 999px;
+  font: 500 10px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.65);
+}
+
+.net-snap-chip { min-width: 46px; }
+.net-snap-chip.is-free { border-style: dashed; color: rgba(28, 25, 23, 0.7); }
+
+.net-guide { width: 12px; height: 12px; margin: 2px; }
+.net-guide.is-free, .net-stop.is-free { border-style: dashed; }
+.net-guide.is-selected, .net-stop.is-selected {
+  box-shadow: 0 0 0 3px #fff, 0 0 0 6px #0284c7;
+}

@@ -4,6 +4,7 @@ endpoints (S08).
 """
 
 from __future__ import annotations
+import json
 import shutil
 
 import pytest
@@ -28,11 +29,11 @@ NETWORK = {
 @pytest.fixture
 def config_dir(tmp_path):
     """
-    A copy of the real config directory whose stops.yaml a test can rewrite.
+    A copy of the real config directory whose stops.json a test can rewrite.
     """
-    for name in ("app.yaml", "vehicles.yaml", "stops.yaml"):
+    for name in ("app.yaml", "vehicles.yaml", "stops.json"):
         shutil.copy(DEFAULT_CONFIG_DIR / name, tmp_path / name)
-    (tmp_path / "stops.yaml").write_text(yaml.safe_dump(NETWORK, sort_keys=False), encoding="utf-8")
+    (tmp_path / "stops.json").write_text(json.dumps(NETWORK), encoding="utf-8")
     write_admin_secrets(tmp_path)
     return tmp_path
 
@@ -221,9 +222,9 @@ def test_cancelling_frees_the_stop_for_a_new_request(client):
 
 
 def test_new_stop_can_be_requested_with_no_code_change(config_dir):
-    raw = yaml.safe_load((config_dir / "stops.yaml").read_text(encoding="utf-8"))
+    raw = json.loads((config_dir / "stops.json").read_text(encoding="utf-8"))
     raw["stops"].append(stop("new-stop", name="New Stop"))
-    (config_dir / "stops.yaml").write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    (config_dir / "stops.json").write_text(json.dumps(raw), encoding="utf-8")
 
     client = create_app(config_dir).test_client()
     response = client.post("/api/pickup-requests", json={"stop_id": "new-stop"})

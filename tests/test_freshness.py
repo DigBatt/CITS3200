@@ -94,7 +94,7 @@ class LatestOnly:
 
 @pytest.fixture
 def config_dir(tmp_path):
-    for name in ("app.yaml", "vehicles.yaml", "stops.yaml"):
+    for name in ("app.yaml", "vehicles.yaml", "stops.json"):
         shutil.copy(DEFAULT_CONFIG_DIR / name, tmp_path / name)
     write_admin_secrets(tmp_path)
     return tmp_path

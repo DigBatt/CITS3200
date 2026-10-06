@@ -7,6 +7,8 @@ import logging
 import os
 from datetime import timedelta
 from pathlib import Path
+from dataclasses import replace
+
 from flask import Flask, jsonify, redirect, send_from_directory
 from backend.api.downtime import bp as downtime_bp
 from backend.api.snapshot_settings import bp as snapshot_settings_bp
@@ -17,6 +19,7 @@ from backend.api.pickup_requests import bp as pickup_requests_bp
 from backend.api.schedule import bp as schedule_bp
 from backend.api.positions import bp as positions_bp
 from backend.api.reviews import bp as reviews_bp
+from backend.api.network import bp as network_bp
 from backend.api.stops import bp as stops_bp
 from backend.api.vehicles import bp as vehicles_bp
 from backend.compression import init_app as init_compression
@@ -24,11 +27,13 @@ from backend.auth import admin_required, load_secrets, signed_in
 from backend.auth import bp as auth_bp
 from backend.config import DEFAULT_CONFIG_DIR, ConfigError, load_config
 from backend.downtime import DowntimeStore
+from backend.path_network import FILE_NAME as PATHS_FILE, PathNetwork, PathNetworkError
 from backend.pickup_requests import PickupRequestStore
 from backend.reviews import ReviewStore
 from backend.roster_sync import FILE_NAME as ROSTER_SYNC_FILE, RosterSync, SyncError, SyncSettings, SyncStore
 from backend.repository import CsvRepository
 from backend.snapshot_settings import SnapshotSettingsStore
+from backend.stops import resolve_paths
 from backend.repository.base import RepositoryError
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
@@ -67,6 +72,17 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
 
     config_dir = Path(config_dir)
     config = load_config(config_dir) if config is None else config
+    # The campus paths a route's legs follow (backend/path_network.py). Without
+    # the snapshot every leg is a straight line, which still works.
+    try:
+        paths = PathNetwork.load(config_dir / PATHS_FILE)
+    except PathNetworkError as exc:
+        log.warning("%s; route legs will be straight lines.", exc)
+        paths = None
+    app.config["PATH_NETWORK"] = paths
+    # Every route's legs given a path, so the map has one to draw even for a
+    # route written by hand as a list of stops.
+    config = replace(config, stops=resolve_paths(config.stops, paths))
     app.config["NUWAY_CONFIG"] = config
     app.config["NUWAY_CONFIG_DIR"] = config_dir
     app.config["NUWAY_CONFIG_PATH"] = config_dir / "app.yaml"
@@ -131,6 +147,7 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
     app.register_blueprint(operating_bp)
     app.register_blueprint(schedule_bp)
     app.register_blueprint(stops_bp)
+    app.register_blueprint(network_bp)
     app.register_blueprint(pickup_requests_bp)
     app.register_blueprint(reviews_bp)
     app.register_blueprint(earth_bp)

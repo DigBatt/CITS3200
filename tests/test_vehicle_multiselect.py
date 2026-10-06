@@ -40,7 +40,7 @@ def browser():
 
 @pytest.fixture
 def server(tmp_path):
-    for name in ("app.yaml", "vehicles.yaml", "stops.yaml"):
+    for name in ("app.yaml", "vehicles.yaml", "stops.json"):
         shutil.copy(DEFAULT_CONFIG_DIR / name, tmp_path / name)
     httpd = werkzeug_serving.make_server("127.0.0.1", 0, create_app(tmp_path), threaded=True)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)

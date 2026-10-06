@@ -58,22 +58,94 @@ class Vehicle:
 @dataclass(frozen=True)
 class Stop:
     """
-    A pickup point as declared in config/stops.yaml.
+    A pickup point as declared in config/stops.json.
+
+    `snap` is for the route editor only: False when the stop was placed off
+    the campus paths on purpose, so dragging it does not pull it back on.
     """
 
     id: str
     name: str
     latitude: float
     longitude: float
+    snap: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {"id": self.id, "name": self.name, "latitude": self.latitude, "longitude": self.longitude}
 
 
 @dataclass(frozen=True)
+class RoutePoint:
+    """
+    One point a route passes through, in order.
+
+    Either a stop, which is a node of the network shared by every route that
+    serves it and where riders are picked up, or a guide point, which only
+    shapes this route's path and is never a stop.
+
+    Parameters
+    ----------
+    stop_id : str, optional
+        Set for a stop; its position is the stop's.
+    latitude, longitude : float, optional
+        Set for a guide point.
+    snap : bool
+        For a guide point, False when it was placed off the campus paths on
+        purpose, so the editor does not pull it back on when dragged. A
+        stop's is on the stop. Editor only; it changes no path.
+    straight : bool
+        The leg arriving at this point is drawn as a straight line rather
+        than following the campus path network, for a way that is not on the
+        map. On the first point of a loop it is the closing leg's.
+    path : tuple of (lat, lon)
+        The leg arriving at this point, from the point before it (on the
+        first point of a loop, from the last). Empty for the first point of
+        a route that is not a loop, and when not yet worked out.
+    """
+
+    stop_id: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    straight: bool = False
+    path: tuple[tuple[float, float], ...] = ()
+    snap: bool = True
+
+    @property
+    def is_stop(self) -> bool:
+        return self.stop_id is not None
+
+    def to_dict(self) -> dict[str, Any]:
+        point: dict[str, Any] = (
+            {"stop_id": self.stop_id} if self.is_stop else {"latitude": self.latitude, "longitude": self.longitude}
+        )
+        point["straight"] = self.straight
+        if not self.is_stop:
+            point["snap"] = self.snap
+        point["path"] = [list(p) for p in self.path]
+        return point
+
+
+@dataclass(frozen=True)
+class RouteLeg:
+    """
+    The way from one stop to the next along a route: the edge between two
+    nodes, with the guide points that shape it and the path it follows.
+    """
+
+    from_stop: str
+    to_stop: str
+    guides: tuple[tuple[float, float], ...]
+    path: tuple[tuple[float, float], ...]
+
+
+@dataclass(frozen=True)
 class Route:
     """
-    An ordered list of stop ids as declared in config/stops.yaml.
+    A path through stops, as declared in config/stops.json.
+
+    `points` are what the route passes through in order, stops and guide
+    points both. `stop_ids` are its stops alone, in service order, which is
+    all the pickup and rider code needs.
     """
 
     id: str
@@ -81,6 +153,38 @@ class Route:
     stop_ids: tuple[str, ...]
     colour: Optional[str] = None
     loop: bool = False
+    points: tuple[RoutePoint, ...] = ()
+
+    @property
+    def path(self) -> tuple[tuple[float, float], ...]:
+        """
+        The whole route as one line, in order, closing the loop if it is one.
+        """
+        ordered = list(self.points[1:]) + ([self.points[0]] if self.loop and self.points else [])
+        line: list[tuple[float, float]] = []
+        for point in ordered:
+            for coordinate in point.path:
+                if not line or line[-1] != coordinate:
+                    line.append(coordinate)
+        return tuple(line)
+
+    def legs(self) -> list[RouteLeg]:
+        """
+        The route as stop to stop legs, each with the guide points between.
+        """
+        ordered = list(self.points) + ([self.points[0]] if self.loop and self.points else [])
+        legs: list[RouteLeg] = []
+        start, guides, path = None, [], []
+        for index, point in enumerate(ordered):
+            if index and point.path:
+                path.extend(c for c in point.path if not path or path[-1] != c)
+            if point.is_stop:
+                if start is not None:
+                    legs.append(RouteLeg(start, point.stop_id, tuple(guides), tuple(path)))
+                start, guides, path = point.stop_id, [], []
+            else:
+                guides.append((point.latitude, point.longitude))
+        return legs
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -89,6 +193,8 @@ class Route:
             "colour": self.colour,
             "loop": self.loop,
             "stop_ids": list(self.stop_ids),
+            "points": [point.to_dict() for point in self.points],
+            "path": [list(p) for p in self.path],
         }
 
 
