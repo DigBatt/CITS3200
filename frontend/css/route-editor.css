@@ -269,3 +269,38 @@
   .net-sidebar { max-height: 50vh; }
   .net-map-wrap { height: 60vh; }
 }
+
+/* Selection and snapping. A selected point gets a halo, on the map and in
+   the list; a point that does not snap onto the paths has a dashed edge. */
+.net-point { cursor: pointer; }
+.net-point.is-selected { border-color: #1c1917; box-shadow: 0 0 0 1px #1c1917; }
+
+.net-snap-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 4px;
+  border-radius: 999px;
+  background: rgba(2, 132, 199, 0.08);
+  font: 500 11px Sora, sans-serif;
+  color: #075985;
+  cursor: pointer;
+}
+.net-snap-switch input { margin: 0; }
+
+.net-free-badge {
+  padding: 0 6px;
+  border: 1px dashed rgba(28, 25, 23, 0.4);
+  border-radius: 999px;
+  font: 500 10px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.65);
+}
+
+.net-snap-chip { min-width: 46px; }
+.net-snap-chip.is-free { border-style: dashed; color: rgba(28, 25, 23, 0.7); }
+
+.net-guide { width: 12px; height: 12px; margin: 2px; }
+.net-guide.is-free, .net-stop.is-free { border-style: dashed; }
+.net-guide.is-selected, .net-stop.is-selected {
+  box-shadow: 0 0 0 3px #fff, 0 0 0 6px #0284c7;
+}

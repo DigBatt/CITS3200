@@ -4,7 +4,7 @@
 Stops are the nodes of the network, shared by every route that serves them.
 A route is a path through them, in order, shaped by guide points; each leg
 follows the campus path network (backend/path_network.py) unless the admin
-draws it by hand. Saving rewrites config/stops.yaml, which stays the source
+draws it by hand. Saving rewrites config/stops.json, which stays the source
 of truth, and applies at once with no restart.
 
 AUTHENTICATION (S13): every endpoint here is admin only. Riders and the
@@ -21,7 +21,7 @@ from flask import Blueprint, current_app, jsonify, request
 from backend.auth import admin_required
 from backend.config import load_config
 from backend.models import PickupRequest
-from backend.stops import StopsError, parse_stops, resolve_paths, save_stops
+from backend.stops import STOPS_FILE, StopsError, parse_stops, resolve_paths, save_stops
 
 bp = Blueprint("network", __name__)
 
@@ -46,7 +46,7 @@ def _payload():
     paths = _paths()
     return {
         "stops": [
-            {**stop.to_dict(), "routes": [r.id for r in network.routes_for_stop(stop.id)]}
+            {**stop.to_dict(), "snap": stop.snap, "routes": [r.id for r in network.routes_for_stop(stop.id)]}
             for stop in network.stops.values()
         ],
         "routes": [route.to_dict() for route in network.routes.values()],
@@ -154,7 +154,7 @@ def _slug(name: str, taken: set[str], fallback: str) -> str:
 
 def _to_config(body: dict) -> dict:
     """
-    The editor's body as the stops.yaml structure, giving new stops and
+    The editor's body as the stops.json structure, giving new stops and
     routes their ids.
 
     A new stop has no `id` but a `key` the routes use to point at it until
@@ -180,7 +180,8 @@ def _to_config(body: dict) -> dict:
             stop_id = _slug(str(stop.get("name") or ""), stop_ids, "stop")
         if stop.get("key") is not None:
             keys[str(stop["key"])] = stop_id
-        stops.append({k: stop.get(k) for k in ("name", "latitude", "longitude")} | {"id": stop_id})
+        stops.append({k: stop.get(k) for k in ("name", "latitude", "longitude")} | {"id": stop_id}
+                     | ({} if stop.get("snap", True) else {"snap": False}))
 
     route_ids = set(existing.routes)
     routes = []
@@ -197,6 +198,8 @@ def _to_config(body: dict) -> dict:
                 entry: dict[str, Any] = {"stop": keys.get(str(point["stop"]), point["stop"])}
             else:
                 entry = {"guide": [point.get("latitude"), point.get("longitude")]}
+                if point.get("snap") is False:
+                    entry["snap"] = False
             if point.get("straight"):
                 entry["straight"] = True
             points.append(entry)
@@ -212,7 +215,7 @@ def _to_config(body: dict) -> dict:
 @admin_required
 def save_network():
     """
-    Replace every stop and route, and write config/stops.yaml. Admin only.
+    Replace every stop and route, and write config/stops.json. Admin only.
 
     Body: `{"stops": [{id?, key?, name, latitude, longitude}], "routes":
     [{id?, name, colour?, loop, points: [{stop} | {latitude, longitude},
@@ -249,11 +252,10 @@ def save_network():
                       stops=waiting)
 
     network = resolve_paths(network, _paths(), force=True)
-    path = current_app.config["NUWAY_CONFIG_DIR"] / "stops.yaml"
     try:
-        save_stops(path, network, bounds)
+        save_stops(current_app.config["NUWAY_CONFIG_DIR"], network, bounds)
     except (StopsError, OSError) as exc:
-        return _error("data_unavailable", f"Could not write {path.name}: {exc}", 500)
+        return _error("data_unavailable", f"Could not write {STOPS_FILE}: {exc}", 500)
 
     # Re-read, so what is served is what the file now says.
     current_app.config["NUWAY_CONFIG"] = load_resolved(current_app.config["NUWAY_CONFIG_DIR"], _paths())

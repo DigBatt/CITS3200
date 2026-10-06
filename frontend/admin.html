@@ -260,7 +260,7 @@
 <!-- ---- Routes: the stop and route editor, driven by js/route-editor.js ----
      Stops are the network's nodes, shared by every route that serves them; a
      route is a path through them, shaped by guide points. Saving rewrites
-     config/stops.yaml (PUT /api/network). AUTH (S13): admin only. -->
+     config/stops.json (PUT /api/network). AUTH (S13): admin only. -->
     <div class="admin-panel admin-panel-wide" id="tab-routes" hidden>
       <h1 class="admin-section-title">Routes</h1>
       <p class="admin-section-sub">Place stops and guide points on the map. Each leg follows the campus paths unless you draw it straight.</p>
@@ -300,7 +300,7 @@
               <button type="button" class="net-seg-btn is-on" data-add-mode="guide" aria-pressed="true">Guide point</button>
               <button type="button" class="net-seg-btn" data-add-mode="stop" aria-pressed="false">Stop</button>
             </div>
-            <label class="net-check"><input type="checkbox" id="net-snap" checked> Snap to paths</label>
+            <label class="net-check" title="Whether new points snap onto the campus paths. Each point can be changed after: select it."><input type="checkbox" id="net-snap" checked> Snap new points</label>
             <label class="net-check"><input type="checkbox" id="net-show-paths" checked> Show paths</label>
             <div class="net-history">
               <button type="button" class="btn-xs" id="net-undo" disabled title="Undo (Ctrl+Z)">↶ Undo</button>

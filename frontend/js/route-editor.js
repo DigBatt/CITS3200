@@ -10,12 +10,14 @@
 //   GET  /api/network         stops and routes, each route with its points
 //   GET  /api/network/paths   the campus paths, drawn faintly and snapped to
 //   POST /api/network/legs    a route's legs, worked out as points change
-//   PUT  /api/network         save: rewrites config/stops.yaml
+//   PUT  /api/network         save: rewrites config/stops.json
 //
 // Nothing is written until Save. Every edit can be undone (Ctrl+Z) and
 // redone (Ctrl+R, or Ctrl+Shift+Z / Ctrl+Y) until then; Cmd works as Ctrl.
 // Double-click a guide point to remove it, or a stop to take it off the open
-// route. AUTH (S13): every call is admin only.
+// route. Select a point (click it, or its row) to set whether it snaps onto
+// the campus paths; a point that does not can sit anywhere, such as across a
+// lawn the map has no path over. AUTH (S13): every call is admin only.
 
 (function () {
   const COLOURS = ['#D4741F', '#1F7FD4', '#2E7D32', '#C2185B', '#6A1B9A', '#00838F', '#8D6E63', '#F9A825'];
@@ -37,6 +39,10 @@
   let stops = new Map();
   let routes = [];
   let selected = null;   // ref of the route open in the sidebar
+  let selectedPoint = null; // uid of the selected point on the open route
+  // Each point gets a uid, so a selection survives reordering and undo.
+  let uidCount = 0;
+  const uid = () => `p${++uidCount}`;
   let addMode = 'guide';
   let dirty = false;
   let newCount = 0;
@@ -52,13 +58,14 @@
   let undoStack = [];
   let redoStack = [];
 
-  const snapshot = () => structuredClone({ stops: [...stops.values()], routes, selected, newCount });
+  const snapshot = () => structuredClone({ stops: [...stops.values()], routes, selected, selectedPoint, newCount });
 
   function restore(state) {
     stops = new Map(state.stops.map((stop) => [stop.ref, stop]));
     routes = state.routes;
     selected = state.selected;
     newCount = state.newCount;
+    selectedPoint = state.selectedPoint;
   }
 
   // Call before changing anything.
@@ -109,7 +116,7 @@
   const routesServing = (ref) => routes.filter((route) => route.points.some((p) => p.stop === ref));
 
   function fromServer(data) {
-    stops = new Map(data.stops.map((stop) => [stop.id, { ...stop, ref: stop.id }]));
+    stops = new Map(data.stops.map((stop) => [stop.id, { ...stop, ref: stop.id, snap: stop.snap ?? true }]));
     routes = data.routes.map((route) => ({
       id: route.id,
       ref: route.id,
@@ -117,12 +124,14 @@
       colour: route.colour ?? '#D4741F',
       loop: route.loop,
       points: route.points.map((point) => ({
-        ...(point.stop_id != null ? { stop: point.stop_id } : { latitude: point.latitude, longitude: point.longitude }),
+        uid: uid(),
+        ...(point.stop_id != null ? { stop: point.stop_id } : { latitude: point.latitude, longitude: point.longitude, snap: point.snap ?? true }),
         straight: point.straight,
         path: point.path,
       })),
     }));
     if (selected && !routeOf(selected)) selected = null;
+    selectedPoint = null;
   }
 
   function setDirty(value = true) {
@@ -147,9 +156,14 @@
     return 6371008.8 * Math.hypot(x, y);
   }
 
-  // The nearest place on the campus paths, if within SNAP_M.
-  function snapToPaths(latlng) {
-    if (!paths || !el('net-snap').checked) return latlng;
+  // The nearest place on the campus paths, if within SNAP_M and snapping.
+  // Whether a point snaps: a stop's setting is on the stop, shared by every
+  // route; a guide point's is its own. New points take the map's default.
+  const snapsByDefault = () => el('net-snap').checked;
+  const snapOf = (point) => (point.stop != null ? stopOf(point.stop).snap : point.snap) !== false;
+
+  function snapToPaths(latlng, enabled = snapsByDefault()) {
+    if (!paths || !enabled) return latlng;
     const k = Math.cos(toRad(latlng[0]));
     let best = null;
     for (const [u, v] of paths.edges) {
@@ -284,19 +298,22 @@
     if (route) route.points.forEach((p, i) => { if (p.stop != null) order.set(p.stop, i); });
     let number = 0;
     const numbers = new Map([...order.keys()].map((ref) => [ref, ++number]));
+    const chosen = route?.points.find((p) => p.uid === selectedPoint);
     for (const stop of stops.values()) {
       const on = order.has(stop.ref);
+      const classes = ['net-stop', on && 'is-on', chosen?.stop === stop.ref && 'is-selected', stop.snap === false && 'is-free']
+        .filter(Boolean).join(' ');
       const marker = L.marker([stop.latitude, stop.longitude], {
         draggable: true,
         icon: L.divIcon({
           className: 'net-stop-icon',
-          html: `<span class="net-stop${on ? ' is-on' : ''}" style="--net-colour:${escHtml(route?.colour ?? '#1c1917')}">${on ? numbers.get(stop.ref) : ''}</span>`,
+          html: `<span class="${classes}" style="--net-colour:${escHtml(route?.colour ?? '#1c1917')}">${on ? numbers.get(stop.ref) : ''}</span>`,
           iconSize: [22, 22],
           iconAnchor: [11, 11],
         }),
         zIndexOffset: on ? 1000 : 0,
       });
-      marker.bindTooltip(escHtml(stop.name), { direction: 'top', offset: [0, -10] });
+      marker.bindTooltip(escHtml(stop.name) + (stop.snap === false ? ' · free, not snapped' : ''), { direction: 'top', offset: [0, -10] });
       marker.on('click', (e) => { L.DomEvent.stopPropagation(e); onSingleClick(() => addStopToRoute(stop.ref)); });
       marker.on('dblclick', (e) => { L.DomEvent.stopPropagation(e); cancelSingleClick(); removeStopByDoubleClick(stop.ref); });
       marker.on('dragstart', record);
@@ -309,14 +326,16 @@
     if (route) {
       route.points.forEach((point, i) => {
         if (point.stop != null) return;
+        const classes = ['net-guide', point.uid === selectedPoint && 'is-selected', point.snap === false && 'is-free']
+          .filter(Boolean).join(' ');
         L.marker([point.latitude, point.longitude], {
           draggable: true,
-          icon: L.divIcon({ className: 'net-guide-icon', html: '<span class="net-guide"></span>', iconSize: [12, 12], iconAnchor: [6, 6] }),
-          title: `Guide point ${i + 1}`,
-          zIndexOffset: 500,
+          icon: L.divIcon({ className: 'net-guide-icon', html: `<span class="${classes}"></span>`, iconSize: [16, 16], iconAnchor: [8, 8] }),
+          title: `Guide point ${i + 1}${point.snap === false ? ' (free)' : ''}`,
+          zIndexOffset: point.uid === selectedPoint ? 1500 : 500,
         })
-          .on('click', (e) => L.DomEvent.stopPropagation(e))
-          .on('dblclick', (e) => { L.DomEvent.stopPropagation(e); removePoint(i); })
+          .on('click', (e) => { L.DomEvent.stopPropagation(e); onSingleClick(() => selectPoint(point.uid)); })
+          .on('dblclick', (e) => { L.DomEvent.stopPropagation(e); cancelSingleClick(); removePoint(i); })
           .on('contextmenu', (e) => { L.DomEvent.stopPropagation(e); removePoint(i); })
           .on('dragstart', record)
           .on('drag', (e) => moveGuideLive(route, i, e.target.getLatLng()))
@@ -377,9 +396,13 @@
     }
     if (addMode === 'stop') {
       const stop = newStop(at);
-      route.points.push({ stop: stop.ref, straight: false, path: [] });
+      const point = { uid: uid(), stop: stop.ref, straight: false, path: [] };
+      route.points.push(point);
+      selectedPoint = point.uid;
     } else {
-      route.points.push({ latitude: at[0], longitude: at[1], straight: false, path: [] });
+      const point = { uid: uid(), latitude: at[0], longitude: at[1], snap: snapsByDefault(), straight: false, path: [] };
+      route.points.push(point);
+      selectedPoint = point.uid;
     }
     changed([route]);
   }
@@ -394,7 +417,7 @@
 
   function newStop([latitude, longitude], name) {
     const ref = `new-${++newCount}`;
-    const stop = { id: null, ref, name: name ?? `New stop ${newCount}`, latitude, longitude };
+    const stop = { id: null, ref, name: name ?? `New stop ${newCount}`, latitude, longitude, snap: snapsByDefault() };
     stops.set(ref, stop);
     setDirty();
     return stop;
@@ -403,12 +426,16 @@
   function addStopToRoute(ref) {
     const route = current();
     if (!route) { focusStop(ref); return; }
-    if (route.points.some((p) => p.stop === ref)) {
-      flash(`${stopOf(ref).name} is already on this route; a stop is served once per route.`);
+    const already = route.points.find((p) => p.stop === ref);
+    if (already) {
+      // Already on the route: a click selects it instead.
+      selectPoint(already.uid);
       return;
     }
     record();
-    route.points.push({ stop: ref, straight: false, path: [] });
+    const point = { uid: uid(), stop: ref, straight: false, path: [] };
+    route.points.push(point);
+    selectedPoint = point.uid;
     changed([route]);
   }
 
@@ -420,14 +447,17 @@
     // half and keeps its drawing style.
     const straight = route.points[index].straight;
     const at0 = index === 0 ? route.points.length : index;
-    route.points.splice(at0, 0, { latitude: at[0], longitude: at[1], straight, path: [] });
+    const point = { uid: uid(), latitude: at[0], longitude: at[1], snap: snapsByDefault(), straight, path: [] };
+    route.points.splice(at0, 0, point);
+    selectedPoint = point.uid;
     changed([route]);
   }
 
   function removePoint(index) {
     record();
     const route = current();
-    route.points.splice(index, 1);
+    const [removed] = route.points.splice(index, 1);
+    if (removed?.uid === selectedPoint) selectedPoint = null;
     changed([route]);
   }
 
@@ -438,7 +468,7 @@
   }
 
   function moveGuide(route, index, latlng) {
-    const at = snapToPaths([latlng.lat, latlng.lng]);
+    const at = snapToPaths([latlng.lat, latlng.lng], snapOf(route.points[index]));
     moveGuideLive(route, index, { lat: at[0], lng: at[1] });
     changed([route]);
   }
@@ -450,7 +480,7 @@
 
   // A stop is shared, so moving it reroutes every route that serves it.
   function moveStop(stop, latlng) {
-    const at = snapToPaths([latlng.lat, latlng.lng]);
+    const at = snapToPaths([latlng.lat, latlng.lng], stop.snap !== false);
     moveStopLive(stop, { lat: at[0], lng: at[1] });
     const serving = routesServing(stop.ref);
     if (serving.length > 1) flash(`Moved ${stop.name} on ${serving.length} routes.`);
@@ -465,16 +495,50 @@
       // A stop becomes a guide point where it is; the stop itself stays,
       // for the other routes and to be reused.
       const [latitude, longitude] = positionOf(point);
-      route.points[index] = { latitude, longitude, straight: point.straight, path: point.path };
+      route.points[index] = { uid: point.uid, latitude, longitude, snap: stopOf(point.stop).snap, straight: point.straight, path: point.path };
     } else {
       // A guide point becomes a stop: an existing one right there, or a new one.
       const here = [point.latitude, point.longitude];
       const existing = [...stops.values()].find((s) => metres(here, [s.latitude, s.longitude]) < 8
         && !route.points.some((p) => p.stop === s.ref));
       const stop = existing ?? newStop(here);
-      route.points[index] = { stop: stop.ref, straight: point.straight, path: point.path };
+      if (!existing) stop.snap = point.snap !== false;
+      route.points[index] = { uid: point.uid, stop: stop.ref, straight: point.straight, path: point.path };
     }
     changed([route]);
+  }
+
+  function selectPoint(pointUid) {
+    selectedPoint = selectedPoint === pointUid ? null : pointUid;
+    renderSidebar();
+    drawAll();
+    const row = document.querySelector(`.net-point[data-uid="${pointUid}"]`);
+    row?.scrollIntoView({ block: 'nearest' });
+  }
+
+  // Turn snapping on or off for one point, or one stop (on every route).
+  // Turning it on pulls the point onto the nearest path, if one is close.
+  function toggleSnap(target) {
+    record();
+    const isStop = target.stop != null || target.ref != null;
+    const holder = target.stop != null ? stopOf(target.stop) : target;
+    holder.snap = !(holder.snap !== false);
+    const affected = target.ref != null || target.stop != null ? routesServing(holder.ref) : [current()];
+    let message = `${isStop ? holder.name : 'This guide point'} can now sit anywhere.`;
+    if (holder.snap) {
+      const here = [holder.latitude, holder.longitude];
+      const at = snapToPaths(here, true);
+      if (metres(here, at) > 0.05) {
+        holder.latitude = at[0];
+        holder.longitude = at[1];
+        message = `Snapped onto the nearest path, ${Math.round(metres(here, at))} m away.`;
+      } else {
+        message = paths ? `No path within ${SNAP_M} m. It will snap when dragged near one.` : 'Snaps to paths.';
+      }
+    }
+    changed(affected.filter(Boolean));
+    // After changed(), which would otherwise replace it with "Unsaved changes."
+    flash(message);
   }
 
   function toggleStraight(index) {
@@ -578,6 +642,8 @@
         <li class="net-stop-row">
           <input class="form-input net-stop-name" value="${escHtml(stop.name)}" data-stop-name="${escHtml(stop.ref)}" aria-label="Stop name">
           <span class="net-item-meta">${serving ? `${serving} route${serving === 1 ? '' : 's'}` : 'on no route'}</span>
+          <button type="button" class="btn-xs net-snap-chip${stop.snap === false ? ' is-free' : ''}" data-snap-stop="${escHtml(stop.ref)}"
+                  aria-pressed="${stop.snap !== false}" title="Whether dragging this stop snaps it onto a path">${stop.snap === false ? 'Free' : 'Snaps'}</button>
           <button type="button" class="btn-xs" data-find-stop="${escHtml(stop.ref)}" title="Show on the map">Find</button>
           <button type="button" class="btn-xs danger" data-delete-stop="${escHtml(stop.ref)}">Remove</button>
         </li>`;
@@ -605,8 +671,10 @@
       const shared = isStop ? routesServing(point.stop).length - 1 : 0;
       const hasLeg = i > 0 || route.loop;
       const off = point.routed === false && !point.straight;
+      const isSelected = point.uid === selectedPoint;
+      const snaps = snapOf(point);
       return `
-        <li class="net-point${isStop ? ' is-stop' : ''}" draggable="true" data-index="${i}">
+        <li class="net-point${isStop ? ' is-stop' : ''}${isSelected ? ' is-selected' : ''}" draggable="true" data-index="${i}" data-uid="${point.uid}">
           <span class="net-handle" aria-hidden="true">⋮⋮</span>
           <span class="net-point-mark" style="--net-colour:${escHtml(route.colour)}">${isStop ? ++stopNumber : ''}</span>
           <span class="net-point-body">
@@ -614,6 +682,11 @@
               ? `<input class="form-input net-point-name" value="${escHtml(stop.name)}" data-stop-name="${escHtml(stop.ref)}" aria-label="Stop name">
                  ${shared > 0 ? `<span class="net-point-note">Also on ${shared} other route${shared > 1 ? 's' : ''}</span>` : ''}`
               : '<span class="net-point-label">Guide point</span>'}
+            ${isSelected ? `
+              <label class="net-snap-switch" title="${isStop ? 'For this stop on every route' : 'For this guide point'}">
+                <input type="checkbox" data-snap-point="${point.uid}" ${snaps ? 'checked' : ''}>
+                Snap to paths${isStop && shared > 0 ? ' (on every route)' : ''}
+              </label>` : (!snaps ? '<span class="net-free-badge" title="Placed off the paths; select it to change">Free</span>' : '')}
             ${hasLeg ? `
               <button type="button" class="net-leg${point.straight ? ' is-straight' : ''}" data-straight="${i}"
                       title="The leg arriving here">${point.straight ? '╌ Drawn straight' : '↝ Follows paths'}</button>
@@ -641,7 +714,7 @@
         <label class="net-check"><input type="checkbox" id="net-route-loop" ${route.loop ? 'checked' : ''}> Loop back to the first point</label>
         <span class="net-item-meta">${stopsOn} stop${stopsOn === 1 ? '' : 's'} · ${(length / 1000).toFixed(2)} km</span>
       </div>
-      <p class="net-hint">Click the map to add a ${addMode === 'stop' ? 'stop' : 'guide point'}, or a grey stop to add it. Click a leg to add a guide point in it. Double-click a point to remove it. Ctrl+Z undoes, Ctrl+R redoes.</p>
+      <p class="net-hint">Click the map to add a ${addMode === 'stop' ? 'stop' : 'guide point'}, or a grey stop to add it. Click a leg to add a guide point in it. Click a point to select it and set whether it snaps to the paths. Double-click a point to remove it. Ctrl+Z undoes, Ctrl+R redoes.</p>
       <ol class="net-points" id="net-points">${rows || '<li class="net-empty">No points yet. Click the map.</li>'}</ol>
       <div class="net-side-foot">
         <button type="button" class="btn-xs" data-close-route>Close</button>
@@ -671,13 +744,15 @@
       const on = (attr) => t.closest(`[${attr}]`);
       if (on('data-open-route')) {
         selected = on('data-open-route').dataset.openRoute;
+        selectedPoint = null;
         renderAll();
         drawAll();
         const line = current().points.flatMap((p) => p.path ?? []);
         if (line.length > 1) map.fitBounds(L.latLngBounds(line), { padding: [30, 30] });
       } else if (on('data-new-route')) newRoute();
-      else if (on('data-close-route')) { selected = null; renderAll(); drawAll(); }
+      else if (on('data-close-route')) { selected = null; selectedPoint = null; renderAll(); drawAll(); }
       else if (on('data-delete-route')) deleteRoute();
+      else if (on('data-snap-stop')) toggleSnap(stopOf(on('data-snap-stop').dataset.snapStop));
       else if (on('data-find-stop')) focusStop(on('data-find-stop').dataset.findStop);
       else if (on('data-delete-stop')) deleteStop(on('data-delete-stop').dataset.deleteStop);
       else if (on('data-kind')) toggleKind(Number(on('data-kind').dataset.kind));
@@ -685,6 +760,12 @@
       else if (on('data-remove')) removePoint(Number(on('data-remove').dataset.remove));
       else if (on('data-up')) movePoint(Number(on('data-up').dataset.up), Number(on('data-up').dataset.up) - 1);
       else if (on('data-down')) movePoint(Number(on('data-down').dataset.down), Number(on('data-down').dataset.down) + 1);
+      else if (on('data-snap-point')) {
+        const point = current().points.find((p) => p.uid === on('data-snap-point').dataset.snapPoint);
+        if (point) toggleSnap(point);
+      } else if (t.closest('.net-point') && !t.closest('button, input, label')) {
+        selectPoint(t.closest('.net-point').dataset.uid);
+      }
     });
 
     // Names update as typed; the list and map catch up when the field is left.
@@ -766,6 +847,12 @@
     // Only on this tab, and in a text field Ctrl+Z is left to undo typing.
     // Ctrl+R would otherwise reload the page; F5 still does.
     document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !el('tab-routes').hidden && selectedPoint) {
+        selectedPoint = null;
+        renderSidebar();
+        drawAll();
+        return;
+      }
       if (el('tab-routes').hidden || !(e.ctrlKey || e.metaKey) || e.altKey) return;
       const key = e.key.toLowerCase();
       const typing = e.target.matches?.('input[type="text"], input:not([type]), textarea');
@@ -818,13 +905,13 @@
     const body = {
       stops: [...stops.values()].map((stop) => ({
         id: stop.id, key: stop.id ? null : stop.ref, name: stop.name.trim(),
-        latitude: stop.latitude, longitude: stop.longitude,
+        latitude: stop.latitude, longitude: stop.longitude, snap: stop.snap !== false,
       })),
       routes: routes.map((route) => ({
         id: route.id, name: route.name.trim(), colour: route.colour.toUpperCase(), loop: route.loop,
         points: route.points.map((point) => (point.stop != null
           ? { stop: point.stop, straight: point.straight }
-          : { latitude: point.latitude, longitude: point.longitude, straight: point.straight })),
+          : { latitude: point.latitude, longitude: point.longitude, snap: point.snap !== false, straight: point.straight })),
       })),
     };
     try {

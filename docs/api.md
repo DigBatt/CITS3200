@@ -544,7 +544,7 @@ reason, which is a broken config rather than an empty schedule.
 
 ## Stops and routes
 
-From `config/stops.yaml` ([stops-and-routes.md](stops-and-routes.md)).
+From `config/stops.json` ([stops-and-routes.md](stops-and-routes.md)).
 
 A stop or route id in the path that is not configured is `404`, codes
 `unknown_stop` and `unknown_route`. The no-`404` rule above is about queries
@@ -656,19 +656,19 @@ the two ends. `400` `invalid_points` for a malformed body.
 
 ### `PUT /api/network`
 
-Replaces every stop and route and rewrites `config/stops.yaml`. Applies at
+Replaces every stop and route and rewrites `config/stops.json`. Applies at
 once.
 
 ```json
 {
   "stops": [
     { "id": "reid-library", "name": "Reid Library", "latitude": -31.979012, "longitude": 115.818355 },
-    { "id": null, "key": "new-1", "name": "Pharmacy Lawn", "latitude": -31.9815, "longitude": 115.818 }
+    { "id": null, "key": "new-1", "name": "Pharmacy Lawn", "latitude": -31.9815, "longitude": 115.818, "snap": false }
   ],
   "routes": [
     { "id": null, "name": "Lawn shuttle", "colour": "#00838F", "loop": false, "points": [
       { "stop": "reid-library" },
-      { "latitude": -31.9805, "longitude": 115.8183, "straight": true },
+      { "latitude": -31.9805, "longitude": 115.8183, "straight": true, "snap": false },
       { "stop": "new-1" }
     ] }
   ]
@@ -677,7 +677,10 @@ once.
 
 A new stop has no `id`, and a `key` its routes use until it has one; a new
 stop or route gets its id from its name (`pharmacy-lawn`), and keeps it.
-Paths are worked out here rather than taken from the body.
+Paths are worked out here rather than taken from the body. `snap: false`
+on a stop or a guide point marks it as placed off the paths on purpose; it is
+kept for the editor and changes no path. `GET /api/network` gives each stop's
+`snap`; the public `/api/stops` does not.
 
 `200` with the network as `GET` gives it. `400` `invalid_network`, with
 `problems` listing everything wrong, as the file's validation would. `409`

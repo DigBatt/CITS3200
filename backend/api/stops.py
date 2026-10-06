@@ -1,6 +1,6 @@
 """GET /api/stops, /api/stops/<id>, /api/routes, /api/routes/<id>.
 
-The configured stops and routes from config/stops.yaml.
+The configured stops and routes from config/stops.json.
 
 Response shapes: docs/api.md.
 """

@@ -3,8 +3,8 @@ Encoded polylines, the compact text form of a list of coordinates.
 
 The format Google Maps, OSRM and most map tools share: each coordinate is
 the difference from the previous one, scaled, zig-zag encoded and written as
-printable characters. A route's path is kept this way in config/stops.yaml so
-a few hundred points fit on one line.
+printable characters. config/stops.json keeps paths as plain [lat, lon]
+pairs; an older config/stops.yaml kept them this way, and is still read.
 
 Precision 6 (about 0.1 m), not the usual 5 (about 1 m), so a path meets its
 stop markers exactly.

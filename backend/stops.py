@@ -1,5 +1,11 @@
 """
-Stops and routes from config/stops.yaml.
+Stops and routes from config/stops.json.
+
+The admin page's route editor writes the file (backend/api/network.py), so it
+is JSON: no comments to lose, and any tool can read it. A config directory
+with only the older config/stops.yaml is still read, in the same shape, so a
+hand written or older config keeps working; with both, `load_network_file`
+refuses rather than silently ignoring one.
 """
 
 from __future__ import annotations
@@ -15,18 +21,22 @@ from backend.models import Route, RoutePoint, Stop
 
 log = logging.getLogger(__name__)
 
+#: The file the network is kept in, and the older one still read without it.
+STOPS_FILE = "stops.json"
+LEGACY_STOPS_FILE = "stops.yaml"
+
 _ID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 _COLOUR = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 _TOP_KEYS = {"stops", "routes"}
-_STOP_KEYS = {"id", "name", "latitude", "longitude"}
+_STOP_KEYS = {"id", "name", "latitude", "longitude", "snap"}
 _ROUTE_KEYS = {"id", "name", "stops", "points", "colour", "loop"}
-_POINT_KEYS = {"stop", "guide", "straight", "path"}
+_POINT_KEYS = {"stop", "guide", "straight", "path", "snap"}
 
 
 class StopsError(Exception):
     """
-    config/stops.yaml is invalid. `problems` holds one line per bad entry.
+    config/stops.json is invalid. `problems` holds one line per bad entry.
     """
 
     def __init__(self, problems: Sequence[str]):
@@ -66,7 +76,7 @@ class StopNetwork:
 
 def parse_stops(
     raw: Any,
-    source: str = "config/stops.yaml",
+    source: str = "config/stops.json",
     bounds: Optional[dict[str, Sequence[float]]] = None,
 ) -> StopNetwork:
     """
@@ -152,10 +162,13 @@ def _parse_stop(entry, index, source, bounds, declared, problems) -> Optional[St
     name = _parse_name(entry, where, problems)
     latitude = _parse_coordinate(entry, "latitude", 90, bounds, where, problems)
     longitude = _parse_coordinate(entry, "longitude", 180, bounds, where, problems)
+    snap = entry.get("snap", True)
+    if not isinstance(snap, bool):
+        problems.append(f"{where}: snap must be true or false, got {_describe(snap)}")
 
     if len(problems) > before:
         return None
-    return Stop(id=stop_id, name=name, latitude=latitude, longitude=longitude)
+    return Stop(id=stop_id, name=name, latitude=latitude, longitude=longitude, snap=snap)
 
 
 def _parse_route(entry, index, source, declared, route_ids, problems, bounds=None) -> Optional[Route]:
@@ -231,6 +244,29 @@ def _parse_stop_list(raw_stops, where, declared, problems) -> list[RoutePoint]:
     return points
 
 
+def _parse_path(raw, at, problems) -> Optional[tuple]:
+    """
+    A leg's `path`: a list of [latitude, longitude], as stops.json keeps it,
+    or an encoded polyline, as the older stops.yaml did. None if malformed.
+    """
+    if raw is None:
+        return ()
+    if isinstance(raw, str):
+        try:
+            return tuple(polyline.decode(raw))
+        except ValueError as exc:
+            problems.append(f"{at}: path is not an encoded polyline ({exc})")
+            return None
+    if isinstance(raw, list) and all(
+        isinstance(pair, list) and len(pair) == 2
+        and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in pair)
+        for pair in raw
+    ):
+        return tuple((float(lat), float(lon)) for lat, lon in raw)
+    problems.append(f"{at}: path must be a list of [latitude, longitude], got {_describe(raw)}")
+    return None
+
+
 def _parse_points(raw_points, where, declared, bounds, problems) -> list[RoutePoint]:
     """
     A route's `points`: each `{stop: id}` or `{guide: [lat, lon]}`, with an
@@ -251,15 +287,19 @@ def _parse_points(raw_points, where, declared, bounds, problems) -> list[RoutePo
         if not isinstance(straight, bool):
             problems.append(f"{at}: straight must be true or false, got {_describe(straight)}")
             continue
-        path: tuple = ()
-        if raw.get("path") is not None:
-            try:
-                path = tuple(polyline.decode(str(raw["path"])))
-            except ValueError as exc:
-                problems.append(f"{at}: path is not an encoded polyline ({exc})")
-                continue
+        path = _parse_path(raw.get("path"), at, problems)
+        if path is None:
+            continue
+        snap = raw.get("snap", True)
+        if not isinstance(snap, bool):
+            problems.append(f"{at}: snap must be true or false, got {_describe(snap)}")
+            continue
 
         if "stop" in raw:
+            if "snap" in raw:
+                # A stop is shared by every route, so whether it snaps is too.
+                problems.append(f"{at}: snap belongs on the stop itself, under stops, not on a route's point")
+                continue
             stop_id = _coerce_id(raw["stop"])
             if stop_id is None or stop_id not in declared:
                 problems.append(f"{at}: stop {_describe(raw['stop'])} is not a configured stop")
@@ -274,7 +314,7 @@ def _parse_points(raw_points, where, declared, bounds, problems) -> list[RoutePo
             longitude = _parse_coordinate({"longitude": guide[1]}, "longitude", 180, bounds, at, problems)
             if latitude is None or longitude is None:
                 continue
-            points.append(RoutePoint(latitude=latitude, longitude=longitude, straight=straight, path=path))
+            points.append(RoutePoint(latitude=latitude, longitude=longitude, straight=straight, path=path, snap=snap))
     return points
 
 
@@ -413,69 +453,103 @@ def _near(a, b, metres: float = 0.5) -> bool:
     return distance_m(tuple(a), tuple(b)) <= metres
 
 
-def dump_stops(network: StopNetwork, header: str = "") -> str:
+def to_file_dict(network: StopNetwork) -> dict:
     """
-    The network as config/stops.yaml text.
+    The network in the shape of config/stops.json.
 
-    Laid out by hand rather than by a YAML dumper so the file stays the one
-    people read and diff: a stop to a block, a route's `stops` on one line
-    as a summary, then its `points`, each leg's path an encoded polyline.
+    A route lists its `stops` as a summary of its `points`, checked against
+    them on load, so the file says at a glance what a route serves.
     """
-    def text(value: str) -> str:
-        return json.dumps(value, ensure_ascii=False)
+    def point_dict(point: RoutePoint) -> dict:
+        out: dict[str, Any] = (
+            {"stop": point.stop_id} if point.is_stop else {"guide": [point.latitude, point.longitude]}
+        )
+        if point.straight:
+            out["straight"] = True
+        if not point.snap:
+            out["snap"] = False
+        if point.path:
+            out["path"] = [[lat, lon] for lat, lon in point.path]
+        return out
 
-    lines = [header.rstrip("\n"), ""] if header.strip() else []
-    lines.append("stops:")
-    for stop in network.stops.values():
-        lines += [
-            f"  - id: {stop.id}",
-            f"    name: {text(stop.name)}",
-            f"    latitude: {stop.latitude!r}",
-            f"    longitude: {stop.longitude!r}",
-            "",
-        ]
-    lines.append("routes:")
+    routes = []
     for route in network.routes.values():
-        lines += [f"  - id: {route.id}", f"    name: {text(route.name)}"]
+        entry: dict[str, Any] = {"id": route.id, "name": route.name}
         if route.colour:
-            lines.append(f"    colour: {text(route.colour)}")
-        lines.append(f"    loop: {'true' if route.loop else 'false'}")
-        lines.append(f"    stops: [{', '.join(route.stop_ids)}]")
-        lines.append("    points:")
-        for point in route.points:
-            if point.is_stop:
-                lines.append(f"      - stop: {point.stop_id}")
-            else:
-                lines.append(f"      - guide: [{point.latitude!r}, {point.longitude!r}]")
-            if point.straight:
-                lines.append("        straight: true")
-            if point.path:
-                # Single quoted: a polyline can hold a backslash, never a quote.
-                lines.append(f"        path: '{polyline.encode(point.path)}'")
-        lines.append("")
-    return "\n".join(lines).rstrip("\n") + "\n"
+            entry["colour"] = route.colour
+        entry["loop"] = route.loop
+        entry["stops"] = list(route.stop_ids)
+        entry["points"] = [point_dict(point) for point in route.points]
+        routes.append(entry)
+    return {
+        "stops": [stop.to_dict() | ({} if stop.snap else {"snap": False}) for stop in network.stops.values()],
+        "routes": routes,
+    }
 
 
-def file_header(text: str) -> str:
+# A [lat, lon] pair, or a list of only ids, as json.dumps spreads it over lines.
+_PAIR = re.compile(r"\[\s+(-?[0-9.eE+-]+),\s+(-?[0-9.eE+-]+)\s+\]")
+_ID_LIST = re.compile(r'\[\s+((?:"[a-z0-9-]+",\s+)*"[a-z0-9-]+")\s+\]')
+
+
+def dump_stops(network: StopNetwork) -> str:
     """
-    The comment block at the top of a stops.yaml, kept when it is rewritten.
+    The network as config/stops.json text.
+
+    Indented for reading and diffing, with each coordinate pair and each
+    list of stop ids kept to one line, so a path is a point to a line.
     """
-    header = []
-    for line in text.splitlines():
-        if line.startswith("#") or (header and not line.strip()):
-            header.append(line)
-        else:
-            break
-    return "\n".join(header).rstrip("\n")
+    text = json.dumps(to_file_dict(network), indent=2, ensure_ascii=False)
+    text = _PAIR.sub(r"[\1, \2]", text)
+    text = _ID_LIST.sub(lambda m: "[" + re.sub(r",\s+", ", ", m.group(1)) + "]", text)
+    return text + "\n"
 
 
-def save_stops(path, network: StopNetwork, bounds=None) -> None:
+def load_network_file(config_dir) -> tuple[Any, "Path"]:
     """
-    Write the network to a stops.yaml, in place and atomically.
+    The raw network from a config directory, and which file it came from.
+
+    Raises
+    ------
+    StopsError
+        If both stops.json and stops.yaml are there, so an edit to the old
+        one (a merge from an older branch, say) cannot be silently ignored;
+        if the file cannot be read; or if neither exists.
+    """
+    from pathlib import Path
+
+    import yaml
+
+    config_dir = Path(config_dir)
+    path, legacy = config_dir / STOPS_FILE, config_dir / LEGACY_STOPS_FILE
+    if path.exists() and legacy.exists():
+        raise StopsError([
+            f"{config_dir}: both {STOPS_FILE} and {LEGACY_STOPS_FILE} exist. {STOPS_FILE} is the one used; "
+            f"move any changes from {LEGACY_STOPS_FILE} into it (or the admin page's Routes tab) and delete {LEGACY_STOPS_FILE}."
+        ])
+    if not path.exists() and not legacy.exists():
+        raise StopsError([f"Missing config file: {path}"])
+    source = path if path.exists() else legacy
+    try:
+        text = source.read_text(encoding="utf-8")
+        return (json.loads(text) if source == path else yaml.safe_load(text)), source
+    except (OSError, ValueError, yaml.YAMLError) as exc:
+        raise StopsError([f"Could not read {source}: {exc}"]) from exc
+
+
+def save_stops(config_dir, network: StopNetwork, bounds=None) -> "Path":
+    """
+    Write the network to config_dir/stops.json, atomically, and retire an
+    older stops.yaml it was read from.
 
     The new text is parsed back and compared with what was asked for before
     it replaces anything, so a bug here cannot leave a file that stops the
     server starting.
+
+    Returns
+    -------
+    Path
+        The file written.
 
     Raises
     ------
@@ -486,14 +560,18 @@ def save_stops(path, network: StopNetwork, bounds=None) -> None:
     """
     from pathlib import Path
 
-    import yaml
-
     from backend.files import write_text_atomic
 
-    path = Path(path)
-    header = file_header(path.read_text(encoding="utf-8")) if path.exists() else ""
-    text = dump_stops(network, header)
-    written = parse_stops(yaml.safe_load(text), str(path), bounds)
+    config_dir = Path(config_dir)
+    path = config_dir / STOPS_FILE
+    text = dump_stops(network)
+    written = parse_stops(json.loads(text), str(path), bounds)
     if written != network:
         raise StopsError([f"{path}: refusing to write, the result would not read back as the network given"])
     write_text_atomic(path, text)
+    # Now stops.json holds it all, the older file would only clash with it.
+    legacy = config_dir / LEGACY_STOPS_FILE
+    if legacy.exists():
+        legacy.unlink()
+        log.info("replaced %s with %s", legacy, path)
+    return path

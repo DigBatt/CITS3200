@@ -26,7 +26,7 @@ DEFAULT_METRICS = [
 def config_dir(tmp_path):
     """Create an isolated application configuration for each test."""
 
-    for name in ("vehicles.yaml", "stops.yaml"):
+    for name in ("vehicles.yaml", "stops.json"):
         shutil.copy(DEFAULT_CONFIG_DIR / name, tmp_path / name)
 
     app_config = yaml.safe_load(

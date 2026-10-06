@@ -1,9 +1,10 @@
 """
-Stops and routes: backend.stops, config/stops.yaml, and the /api/stops and
+Stops and routes: backend.stops, config/stops.json, and the /api/stops and
 /api/routes endpoints (S06).
 """
 
 from __future__ import annotations
+import json
 import logging
 import math
 import shutil
@@ -20,7 +21,7 @@ BOUNDS = {"latitude": [-36.0, -13.0], "longitude": [112.0, 130.0]}
 
 # The three stops the Client named, at the coordinates agreed for S06.2.
 # business-school was later corrected to the actual car park rather than the
-# point on the current GPS track (config/stops.yaml's comment on that stop).
+# point on the current GPS track: the real car park, not where the buses pass.
 CLIENT_STOPS = {
     "reid-library": (-31.97901221771226, 115.8183554056777),
     "civ-mech": (-31.980743857374474, 115.81720535774184),
@@ -52,15 +53,15 @@ def metres_between(a, b):
 @pytest.fixture
 def config_dir(tmp_path):
     """
-    A copy of the real config directory whose stops.yaml a test can rewrite.
+    A copy of the real config directory whose stops.json a test can rewrite.
     """
-    for name in ("app.yaml", "vehicles.yaml", "stops.yaml"):
+    for name in ("app.yaml", "vehicles.yaml", "stops.json"):
         shutil.copy(DEFAULT_CONFIG_DIR / name, tmp_path / name)
     return tmp_path
 
 
 def write_stops(config_dir: Path, raw) -> None:
-    (config_dir / "stops.yaml").write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    (config_dir / "stops.json").write_text(json.dumps(raw), encoding="utf-8")
 
 
 @pytest.fixture
@@ -76,7 +77,7 @@ def test_client_stops_present_and_correctly_placed():
     network = load_config().stops
     for stop_id, expected in CLIENT_STOPS.items():
         found = network.stop(stop_id)
-        assert found is not None, f"{stop_id} missing from config/stops.yaml"
+        assert found is not None, f"{stop_id} missing from config/stops.json"
         assert metres_between((found.latitude, found.longitude), expected) < 25
 
 
@@ -198,7 +199,7 @@ def test_route_naming_a_broken_stop_is_not_also_unknown():
     raw = {"stops": [stop("a", latitude="abc")], "routes": [{"id": "r", "name": "R", "stops": ["a"]}]}
     with pytest.raises(StopsError) as caught:
         parse_stops(raw)
-    assert caught.value.problems == ["config/stops.yaml: stops[0] (id 'a'): latitude must be a number between -90 and 90, got 'abc'"]
+    assert caught.value.problems == ["config/stops.json: stops[0] (id 'a'): latitude must be a number between -90 and 90, got 'abc'"]
 
 
 def test_malformed_file_stops_startup(config_dir):
@@ -214,13 +215,13 @@ def test_startup_uses_logger_bounds(config_dir):
 
 
 def test_missing_file_stops_startup(config_dir):
-    (config_dir / "stops.yaml").unlink()
+    (config_dir / "stops.json").unlink()
     with pytest.raises(ConfigError, match="Missing config file"):
         load_config(config_dir)
 
 
 def test_invalid_yaml_stops_startup(config_dir):
-    (config_dir / "stops.yaml").write_text("stops: [\n", encoding="utf-8")
+    (config_dir / "stops.json").write_text("{\"stops\": [\n", encoding="utf-8")
     with pytest.raises(ConfigError, match="Could not read"):
         load_config(config_dir)
 
@@ -273,7 +274,7 @@ def test_unknown_route_is_404(client):
 
 
 def test_new_stop_appears_with_no_code_change(config_dir):
-    raw = yaml.safe_load((config_dir / "stops.yaml").read_text(encoding="utf-8"))
+    raw = json.loads((config_dir / "stops.json").read_text(encoding="utf-8"))
     raw["stops"].append(stop("new-stop", name="New Stop"))
     # A route written by the editor lists its stops twice, as `stops` and in
     # `points`; a hand edit adds the stop to both, or the file is refused.

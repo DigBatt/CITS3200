@@ -1,5 +1,5 @@
 """
-YAML loader.
+Config loader: app.yaml and vehicles.yaml, and stops.json for the network.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from typing import Any, Optional
 import yaml
 
 from backend.models import Vehicle
-from backend.stops import StopNetwork, StopsError, parse_stops
+from backend.stops import StopNetwork, StopsError, load_network_file, parse_stops
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_DIR = PROJECT_ROOT / "config"
@@ -61,8 +61,10 @@ def load_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> Config:
     config_dir = Path(config_dir)
     app = _read_yaml(config_dir / "app.yaml")
     fleet = _read_yaml(config_dir / "vehicles.yaml")
-    stops_path = config_dir / "stops.yaml"
-    stops_raw = _read_yaml(stops_path)
+    try:
+        stops_raw, stops_path = load_network_file(config_dir)
+    except StopsError as exc:
+        raise ConfigError(str(exc)) from exc
 
     try:
         data = app.get("data") or {}

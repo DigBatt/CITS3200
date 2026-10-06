@@ -4,6 +4,7 @@ filling in and writing back route paths, and /api/network.
 """
 
 from __future__ import annotations
+import json
 import shutil
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -15,7 +16,7 @@ from backend import polyline
 from backend.app import create_app
 from backend.config import DEFAULT_CONFIG_DIR, load_config
 from backend.path_network import PathNetwork, distance_m
-from backend.stops import dump_stops, file_header, parse_stops, resolve_paths, save_stops
+from backend.stops import dump_stops, load_network_file, parse_stops, resolve_paths, save_stops
 from tests.admin_support import sign_in, write_admin_secrets
 
 NOW = datetime(2026, 10, 6, 1, tzinfo=timezone.utc)
@@ -141,6 +142,7 @@ def test_a_guide_point_shapes_the_route_and_is_not_a_stop():
     ([{"stop": "a"}, {"guide": [115.81, -31.98]}, {"stop": "b"}], "between -90 and 90"),
     ([{"stop": "a", "guide": [1, 2]}], "either 'stop' or 'guide'"),
     ([{"stop": "a"}, {"stop": "b", "path": "!!"}], "not an encoded polyline"),
+    ([{"stop": "a"}, {"stop": "b", "path": [[1, "x"]]}], "list of [latitude, longitude]"),
 ])
 def test_bad_points_are_refused(points, problem):
     raw = {**RAW, "routes": [{"id": "r", "name": "R", "points": points}]}
@@ -156,20 +158,42 @@ def test_a_loop_may_start_at_a_guide_point():
 
 
 def test_the_written_file_reads_back_the_same(tmp_path, grid):
-    path = tmp_path / "stops.yaml"
-    path.write_text("# Stops and routes.\n# Second line.\n\nstops: []\nroutes: []\n")
-    network = resolve_paths(parse_stops({**RAW, "stops": [{**RAW["stops"][0], "name": 'Odd: "name" #1'}, RAW["stops"][1]]}), grid)
-    save_stops(path, network)
-    text = path.read_text()
-    assert text.startswith("# Stops and routes.\n# Second line.\n")
-    assert parse_stops(yaml.safe_load(text)) == network
-    assert yaml.safe_load(text)["routes"][0]["stops"] == ["a", "b"]
+    network = resolve_paths(parse_stops({**RAW, "stops": [{**RAW["stops"][0], "name": 'Odd: "name" #1 ü'}, RAW["stops"][1]]}), grid)
+    path = save_stops(tmp_path, network)
+    assert path == tmp_path / "stops.json"
+    raw = json.loads(path.read_text())
+    assert parse_stops(raw) == network
+    assert raw["routes"][0]["stops"] == ["a", "b"]
+    # Paths are plain coordinate pairs, one to a line.
+    assert raw["routes"][0]["points"][1]["path"][0] == [-31.98, 115.81]
+    assert '[-31.98, 115.81]' in path.read_text()
 
 
 def test_the_projects_own_routes_survive_a_rewrite():
     network = load_config().stops
-    text = dump_stops(network, file_header((DEFAULT_CONFIG_DIR / "stops.yaml").read_text()))
-    assert parse_stops(yaml.safe_load(text)) == network
+    assert parse_stops(json.loads(dump_stops(network))) == network
+
+
+def test_an_older_stops_yaml_is_read_and_replaced_on_save(tmp_path, grid):
+    (tmp_path / "stops.yaml").write_text(yaml.safe_dump(RAW))
+    raw, source = load_network_file(tmp_path)
+    assert source.name == "stops.yaml" and raw == RAW
+    save_stops(tmp_path, resolve_paths(parse_stops(raw), grid))
+    assert (tmp_path / "stops.json").exists() and not (tmp_path / "stops.yaml").exists()
+
+
+def test_both_files_at_once_is_refused(tmp_path):
+    (tmp_path / "stops.yaml").write_text(yaml.safe_dump(RAW))
+    (tmp_path / "stops.json").write_text(json.dumps(RAW))
+    with pytest.raises(Exception, match="both stops.json and stops.yaml"):
+        load_network_file(tmp_path)
+
+
+def test_a_path_may_be_coordinates_or_an_older_encoded_polyline():
+    line = [[-31.98, 115.81], [-31.982, 115.812]]
+    for path in (line, polyline.encode(line)):
+        raw = {**RAW, "routes": [{"id": "r", "name": "R", "points": [{"stop": "a"}, {"stop": "b", "path": path}]}]}
+        assert parse_stops(raw).routes["r"].points[1].path == ((-31.98, 115.81), (-31.982, 115.812))
 
 
 # ---- /api/network ----
@@ -269,7 +293,7 @@ def test_a_new_stop_and_route_get_ids_and_apply_at_once(client):
     route = client.get("/api/routes/lawn-shuttle").get_json()
     assert [s["id"] for s in route["stops"]] == ["reid-library", "pharmacy-lawn"]
     assert len(route["path"]) > 3
-    written = yaml.safe_load((client.config_dir / "stops.yaml").read_text())
+    written = json.loads((client.config_dir / "stops.json").read_text())
     assert any(r["id"] == "lawn-shuttle" for r in written["routes"])
 
 
@@ -281,7 +305,7 @@ def test_renaming_a_stop_keeps_its_id(client):
 
 
 def test_an_invalid_network_is_a_400_listing_problems_and_writes_nothing(client):
-    before = (client.config_dir / "stops.yaml").read_text()
+    before = (client.config_dir / "stops.json").read_text()
     body = editor_body(client)
     body["routes"][2]["points"].append({"latitude": -31.98, "longitude": 115.81})  # nth-south, not a loop
     response = client.put("/api/network", json=body)
@@ -289,7 +313,7 @@ def test_an_invalid_network_is_a_400_listing_problems_and_writes_nothing(client)
     error = response.get_json()["error"]
     assert error["code"] == "invalid_network"
     assert any("must start and end at a stop" in p for p in error["problems"])
-    assert (client.config_dir / "stops.yaml").read_text() == before
+    assert (client.config_dir / "stops.json").read_text() == before
 
 
 def test_a_stop_outside_the_bounds_is_refused(client):
@@ -300,7 +324,7 @@ def test_a_stop_outside_the_bounds_is_refused(client):
 
 def test_a_stop_riders_are_waiting_at_cannot_be_removed(client):
     client.application.config["PICKUP_REQUEST_STORE"].create("marine-research", "rider-1", NOW)
-    before = (client.config_dir / "stops.yaml").read_text()
+    before = (client.config_dir / "stops.json").read_text()
     body = editor_body(client)
     body["stops"] = [s for s in body["stops"] if s["id"] != "marine-research"]
     for route in body["routes"]:
@@ -308,9 +332,57 @@ def test_a_stop_riders_are_waiting_at_cannot_be_removed(client):
     response = client.put("/api/network", json=body)
     assert response.status_code == 409
     assert response.get_json()["error"]["stops"] == ["marine-research"]
-    assert (client.config_dir / "stops.yaml").read_text() == before
+    assert (client.config_dir / "stops.json").read_text() == before
 
 
 def test_a_malformed_body_is_a_400(client):
     assert client.put("/api/network", json={"stops": "x"}).status_code == 400
     assert client.put("/api/network", json={"stops": [], "routes": [{"name": "x"}]}).status_code == 400
+
+
+# ---- Points placed off the paths (snap) ----
+
+
+def test_snap_defaults_on_and_is_written_only_when_off(grid):
+    raw = {
+        "stops": [RAW["stops"][0] | {"snap": False}, RAW["stops"][1]],
+        "routes": [{"id": "r", "name": "R", "points": [
+            {"stop": "a"}, {"guide": [-31.981, 115.8105], "snap": False}, {"guide": [-31.9812, 115.811]}, {"stop": "b"}]}],
+    }
+    network = parse_stops(raw)
+    assert (network.stops["a"].snap, network.stops["b"].snap) == (False, True)
+    assert [p.snap for p in network.routes["r"].points] == [True, False, True, True]
+
+    written = json.loads(dump_stops(resolve_paths(network, grid)))
+    assert written["stops"][0]["snap"] is False and "snap" not in written["stops"][1]
+    assert [("snap" in p) for p in written["routes"][0]["points"]] == [False, True, False, False]
+    assert parse_stops(written) == resolve_paths(network, grid)
+
+
+def test_snap_on_a_routes_stop_point_is_refused():
+    raw = {**RAW, "routes": [{"id": "r", "name": "R", "points": [{"stop": "a", "snap": False}, {"stop": "b"}]}]}
+    with pytest.raises(Exception) as caught:
+        parse_stops(raw)
+    assert "snap belongs on the stop itself" in str(caught.value.problems)
+
+
+def test_snap_must_be_true_or_false():
+    with pytest.raises(Exception):
+        parse_stops({**RAW, "stops": [RAW["stops"][0] | {"snap": "no"}, RAW["stops"][1]]})
+
+
+def test_the_editor_saves_and_reads_back_free_points(client):
+    body = editor_body(client)
+    stop = next(s for s in body["stops"] if s["id"] == "law-library")
+    stop["snap"] = False
+    route = next(r for r in body["routes"] if r["id"] == "nth-south")
+    guide = next(p for p in route["points"] if "latitude" in p)
+    guide["snap"] = False
+    assert client.put("/api/network", json=body).status_code == 200
+
+    data = client.get("/api/network").get_json()
+    assert next(s for s in data["stops"] if s["id"] == "law-library")["snap"] is False
+    route = next(r for r in data["routes"] if r["id"] == "nth-south")
+    assert [p["snap"] for p in route["points"] if "latitude" in p][0] is False
+    # The public stop list is unchanged by it.
+    assert "snap" not in client.get("/api/stops/law-library").get_json()

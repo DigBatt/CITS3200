@@ -1,10 +1,10 @@
+import json
 """Stored route paths meet real stops, join up, and are drawn once each."""
 import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
-import yaml
 
 from backend.config import load_config
 from backend.path_network import distance_m
@@ -64,7 +64,7 @@ def test_the_hand_traced_shapes_are_kept_as_guide_points(network):
 
 
 def test_config_file_lists_stops_as_a_summary_of_points():
-    raw = yaml.safe_load((ROOT / 'config/stops.yaml').read_text())
+    raw = json.loads((ROOT / 'config/stops.json').read_text())
     for route in raw['routes']:
         assert route['stops'] == [p['stop'] for p in route['points'] if 'stop' in p]
 

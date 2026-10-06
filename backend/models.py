@@ -58,13 +58,17 @@ class Vehicle:
 @dataclass(frozen=True)
 class Stop:
     """
-    A pickup point as declared in config/stops.yaml.
+    A pickup point as declared in config/stops.json.
+
+    `snap` is for the route editor only: False when the stop was placed off
+    the campus paths on purpose, so dragging it does not pull it back on.
     """
 
     id: str
     name: str
     latitude: float
     longitude: float
+    snap: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {"id": self.id, "name": self.name, "latitude": self.latitude, "longitude": self.longitude}
@@ -85,6 +89,10 @@ class RoutePoint:
         Set for a stop; its position is the stop's.
     latitude, longitude : float, optional
         Set for a guide point.
+    snap : bool
+        For a guide point, False when it was placed off the campus paths on
+        purpose, so the editor does not pull it back on when dragged. A
+        stop's is on the stop. Editor only; it changes no path.
     straight : bool
         The leg arriving at this point is drawn as a straight line rather
         than following the campus path network, for a way that is not on the
@@ -100,6 +108,7 @@ class RoutePoint:
     longitude: Optional[float] = None
     straight: bool = False
     path: tuple[tuple[float, float], ...] = ()
+    snap: bool = True
 
     @property
     def is_stop(self) -> bool:
@@ -110,6 +119,8 @@ class RoutePoint:
             {"stop_id": self.stop_id} if self.is_stop else {"latitude": self.latitude, "longitude": self.longitude}
         )
         point["straight"] = self.straight
+        if not self.is_stop:
+            point["snap"] = self.snap
         point["path"] = [list(p) for p in self.path]
         return point
 
@@ -130,7 +141,7 @@ class RouteLeg:
 @dataclass(frozen=True)
 class Route:
     """
-    A path through stops, as declared in config/stops.yaml.
+    A path through stops, as declared in config/stops.json.
 
     `points` are what the route passes through in order, stops and guide
     points both. `stop_ids` are its stops alone, in service order, which is

@@ -172,7 +172,7 @@ function uniqueRuns(path) {
 }
 
 // Draw only the selected planned route, below stop markers and GPS trails.
-// Its path comes from /api/routes, set in config/stops.yaml by the admin
+// Its path comes from /api/routes, set in config/stops.json by the admin
 // page's route editor.
 function drawRoutePath(route) {
   layers.routes.clearLayers();
