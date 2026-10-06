@@ -80,7 +80,8 @@ def page(browser, server):
     context = browser.new_context()
     page = context.new_page()
     page.goto(server)
-    page.wait_for_selector(".stop-label")
+    # The stops are drawn once fetched; their names only show on hover.
+    page.wait_for_function("stopMarkers.size > 0")
     yield page
     context.close()
 
