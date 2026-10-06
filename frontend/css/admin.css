@@ -705,6 +705,22 @@
   text-align: center;
 }
 
+/* Secondary to Sign in: a quiet link back to the public dashboard */
+.login-back {
+  align-self: center;
+  margin-top: -10px; /* sit closer to Sign in than the card's 22px gap */
+  font: 500 12.5px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.8);
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.login-back:hover,
+.login-back:focus-visible {
+  color: #1c1917;
+  text-decoration: underline;
+}
+
 /* S16: Snapshot metric selection */
 
 #snapshot-metrics {
@@ -899,6 +915,209 @@
 .sched-remove input[type="date"] { font-size: 0.72rem; padding: 0.15rem 0.3rem; width: auto; }
 
 
+/* ---- Rider reviews tab (S15 follow-up) ---- */
+.review-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.review-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(28, 25, 23, 0.03);
+}
+
+.review-stat-value { font: 600 18px Sora, sans-serif; letter-spacing: -0.02em; }
+.review-stat-label { font: 400 11px Sora, sans-serif; color: rgba(28, 25, 23, 0.55); }
+
+.review-list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.review-item {
+  padding: 14px 0;
+  border-top: 1px solid rgba(28, 25, 23, 0.07);
+}
+
+.review-item:first-child { border-top: none; padding-top: 0; }
+
+.review-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.review-item-where { font: 600 13px Sora, sans-serif; }
+.review-item-when { color: rgba(28, 25, 23, 0.55); }
+
+.review-scores {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.review-score {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font: 400 11.5px Sora, sans-serif;
+  background: rgba(28, 25, 23, 0.05);
+}
+
+.review-score.is-low {
+  color: oklch(0.45 0.16 25);
+  background: oklch(0.75 0.1 25 / 14%);
+}
+
+.review-answers {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: 6px 14px;
+  margin: 0;
+  font: 400 12.5px/1.45 Sora, sans-serif;
+}
+
+.review-answers dt { color: rgba(28, 25, 23, 0.55); }
+
+.review-answers dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+@media (max-width: 560px) {
+  .review-answers { grid-template-columns: 1fr; }
+  .review-answers dd { margin-bottom: 6px; }
+}
+
+/* Filters above the reviews summary */
+.review-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.review-filters .form-select { width: auto; min-width: 160px; }
+
+.review-filter-low {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 400 12.5px Sora, sans-serif;
+  cursor: pointer;
+}
+
+/* A long answer is cut to three lines until "Read more". The rider's own
+   line breaks are kept on the text, not on the markup around it. */
+.review-answers dd.review-long { white-space: normal; }
+
+.review-long-text {
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+.review-long.is-open .review-long-text {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+
+.review-read-more {
+  padding: 0;
+  margin-top: 2px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: 500 12px Sora, sans-serif;
+  color: #1c1917;
+  text-decoration: underline;
+}
+
+/* Previous / Next under the reviews list */
+.review-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(28, 25, 23, 0.07);
+}
+
+.review-pager[hidden] { display: none; }
+
+.review-pager-label {
+  font: 400 12px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.6);
+  text-align: center;
+}
+
+.review-pager .btn-outline:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Refresh / Expand all, and when the list was last fetched */
+.review-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.review-updated {
+  font: 400 11px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.5);
+  margin-right: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* A brief highlight when the time changes, so a refresh is noticed even when
+   no new reviews arrived. */
+.review-updated.is-fresh { animation: review-updated-flash 1.2s ease-out; }
+
+@keyframes review-updated-flash {
+  from { background: oklch(0.62 0.17 300 / 22%); color: #1c1917; }
+  to { background: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-updated.is-fresh { animation: none; }
+}
+
+.btn-xs:disabled { opacity: 0.5; cursor: default; }
+
+/* Each review collapses to its header and ratings */
+.review-details summary {
+  display: inline-block;
+  cursor: pointer;
+  font: 500 12px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.7);
+  list-style: none;
+}
+
+.review-details summary::-webkit-details-marker { display: none; }
+.review-details summary::after { content: ' ▾'; }
+.review-details[open] summary::after { content: ' ▴'; }
+.review-details summary:hover { color: #1c1917; text-decoration: underline; }
+
+.review-details[open] summary { margin-bottom: 8px; }
+
+.review-no-answers {
+  font: 400 12px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.45);
 /* The synced roster's status, above the hand kept rows. */
 .schedule-sync {
   display: flex;

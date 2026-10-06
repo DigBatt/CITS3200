@@ -12,7 +12,7 @@ import yaml
 from backend.app import create_app
 from backend.config import DEFAULT_CONFIG_DIR
 from backend.models import Review
-from backend.reviews import ReviewStore
+from backend.reviews import DuplicateReview, ReviewStore
 from tests.admin_support import sign_in, write_admin_secrets
 
 
@@ -117,6 +117,27 @@ def test_corrupt_file_is_a_repository_error(tmp_path):
         ReviewStore(path).list()
 
 
+def test_store_refuses_a_second_review_of_a_pickup(tmp_path):
+    def stored_review(review_id):
+        return Review.from_dict(
+            {
+                "id": review_id,
+                "pickup_request_id": "p1",
+                "stop_id": "reid-library",
+                "created_at": "2026-01-01T00:00:00Z",
+                "safety_rating": 5,
+                "app_rating": 4,
+            }
+        )
+
+    store = ReviewStore(tmp_path / "reviews.json")
+    store.add(stored_review("r1"))
+
+    with pytest.raises(DuplicateReview):
+        store.add(stored_review("r2"))
+    assert [r.id for r in store.list()] == ["r1"]
+
+
 # ---- POST /api/reviews ----
 
 
@@ -208,6 +229,69 @@ def test_reviewing_a_cancelled_request_is_409(client):
     response = client.post("/api/reviews", json=minimal_review_body(created["id"]))
     assert response.status_code == 409
     assert response.get_json()["error"]["code"] == "request_not_collected"
+
+
+# ---- Comment length ----
+
+
+@pytest.mark.parametrize("field", ["vehicle_behaviour", "obstacle_interaction", "app_comment", "comments"])
+def test_a_comment_over_the_limit_is_400(client, field):
+    pickup_request = collected_request(client)
+    response = client.post("/api/reviews", json=minimal_review_body(pickup_request["id"], **{field: "a" * 1001}))
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "comment_too_long"
+
+
+def test_a_comment_at_the_limit_is_saved(client):
+    pickup_request = collected_request(client)
+    response = client.post("/api/reviews", json=minimal_review_body(pickup_request["id"], comments="a" * 1000))
+    assert response.status_code == 201
+    assert len(response.get_json()["review"]["comments"]) == 1000
+
+
+def test_surrounding_space_does_not_count_towards_the_limit(client):
+    pickup_request = collected_request(client)
+    body = minimal_review_body(pickup_request["id"], comments="  " + "a" * 1000 + "\n")
+    assert client.post("/api/reviews", json=body).status_code == 201
+
+
+def test_a_refused_long_comment_does_not_use_up_the_pickups_review(client):
+    pickup_request = collected_request(client)
+    client.post("/api/reviews", json=minimal_review_body(pickup_request["id"], comments="a" * 1001))
+
+    response = client.post("/api/reviews", json=minimal_review_body(pickup_request["id"], comments="shorter"))
+    assert response.status_code == 201
+
+
+# ---- One review per pickup ----
+
+
+def test_reviewing_the_same_pickup_twice_is_409(client):
+    pickup_request = collected_request(client)
+    assert client.post("/api/reviews", json=minimal_review_body(pickup_request["id"])).status_code == 201
+
+    response = client.post("/api/reviews", json=minimal_review_body(pickup_request["id"], safety_rating=1))
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "already_reviewed"
+
+
+def test_a_refused_duplicate_leaves_the_first_review_as_it_was(client):
+    pickup_request = collected_request(client)
+    client.post("/api/reviews", json=minimal_review_body(pickup_request["id"], comments="first"))
+    client.post("/api/reviews", json=minimal_review_body(pickup_request["id"], comments="second"))
+
+    reviews = sign_in(client).get("/api/reviews").get_json()["reviews"]
+    assert [r["comments"] for r in reviews] == ["first"]
+
+
+def test_each_pickup_can_be_reviewed_once(client):
+    first = collected_request(client)
+    client.post("/api/reviews", json=minimal_review_body(first["id"]))
+    second = collected_request(client, stop_id="civ-mech")
+
+    response = client.post("/api/reviews", json=minimal_review_body(second["id"]))
+    assert response.status_code == 201
+    assert len(sign_in(client).get("/api/reviews").get_json()["reviews"]) == 2
 
 
 # ---- GET /api/reviews ----

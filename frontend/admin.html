@@ -36,6 +36,7 @@
       <button type="button" class="app-tab" data-tab="schedule">Schedule</button>
       <button type="button" class="app-tab" data-tab="routes">Routes</button>
       <button type="button" class="app-tab" data-tab="snapshots">Snapshots</button>
+      <button type="button" class="app-tab" data-tab="reviews">Reviews</button>
     </nav>
 
     <div class="app-header-spacer"></div>
@@ -398,6 +399,58 @@
     </p>
   </div>
 </div>
+
+    <!-- ---- Rider reviews (S15 follow-up): read from GET /api/reviews, admin only ---- -->
+    <div class="admin-panel" id="tab-reviews" hidden>
+      <h1 class="admin-section-title">Rider reviews</h1>
+      <p class="admin-section-sub">What riders said after a completed pickup, newest first. One review per pickup.</p>
+
+      <!-- Filters narrow both the summary and the list. Vehicle and stop
+           options are the ones that have reviews, filled by js/admin.js. -->
+      <div class="review-filters">
+        <select class="form-select" id="review-filter-vehicle" aria-label="Filter by vehicle">
+          <option value="">All vehicles</option>
+        </select>
+        <select class="form-select" id="review-filter-stop" aria-label="Filter by stop">
+          <option value="">All stops</option>
+        </select>
+        <select class="form-select" id="review-filter-when" aria-label="Filter by date">
+          <option value="">All time</option>
+          <option value="today">Today</option>
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
+        <label class="review-filter-low">
+          <input type="checkbox" id="review-filter-low">
+          Rated 2 or lower only
+        </label>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title" id="review-summary-title">SUMMARY</p>
+        <!-- Filled by js/admin.js -->
+        <div class="review-summary" id="review-summary"></div>
+      </div>
+
+      <div class="admin-card">
+        <div class="review-list-head">
+          <p class="admin-card-title">REVIEWS</p>
+          <div class="review-list-actions">
+            <span class="review-updated" id="review-updated" aria-live="polite"></span>
+            <button type="button" class="btn-xs" id="btn-reviews-expand">Expand all</button>
+            <button type="button" class="btn-xs" id="btn-reviews-refresh">Refresh</button>
+          </div>
+        </div>
+        <div id="review-list">
+          <p class="empty-state">Loading reviews…</p>
+        </div>
+        <nav class="review-pager" id="review-pager" aria-label="Review pages" hidden>
+          <button type="button" class="btn-outline" id="btn-reviews-prev">&lsaquo; Previous</button>
+          <span class="review-pager-label" id="review-pager-label" aria-live="polite"></span>
+          <button type="button" class="btn-outline" id="btn-reviews-next">Next &rsaquo;</button>
+        </nav>
+      </div>
+    </div>
 
 
   </main>

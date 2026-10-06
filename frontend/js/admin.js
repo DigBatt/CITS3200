@@ -782,3 +782,287 @@ snapshotSaveButton.addEventListener('click', async () => {
 });
 
 loadSnapshotSettings();
+
+// ---- Rider reviews (S15 follow-up) ----
+//
+// Read only: GET /api/reviews is admin only and reviews are never edited.
+// Stop, route and vehicle ids are shown by name where the network knows them.
+
+const REVIEW_QUESTIONS = [
+  ['vehicle_behaviour', 'How the vehicle behaved'],
+  ['obstacle_interaction', 'Obstacles, pedestrians and other vehicles'],
+  ['punctuality', 'On time?', { early: 'Early', on_time: 'On time', late: 'Late' }],
+  ['ride_duration_ok', 'Ride time acceptable vs walking?', { yes: 'Yes', no: 'No' }],
+  ['purpose', 'Ride was for', { class: 'Class', work: 'Work / meeting', library: 'Library / study', social: 'Social', other: 'Other' }],
+  ['stop_quality', 'Stops well placed?', { good: 'Yes, good stops', could_be_better: 'Could be better' }],
+  ['ramp_needed', 'Needed the ramp?', { yes: 'Yes', no: 'No' }],
+  ['app_comment', 'About the app'],
+  ['role', 'Rider', { undergrad: 'UWA undergraduate', postgrad: 'UWA postgraduate', staff: 'UWA staff', visitor: 'Visitor' }],
+  ['usage_frequency', 'Expects to ride', { daily: 'Daily', weekly: 'A few times a week', occasional: 'Occasionally', first_time: 'First time' }],
+  ['comments', 'Recommendations or improvements'],
+];
+
+let reviewNames = null; // { stops, routes, vehicles }: id -> name
+
+async function loadReviewNames() {
+  const names = { stops: {}, routes: {}, vehicles: {} };
+  const read = async (path, key, target) => {
+    try {
+      const data = await fetch(path).then(r => r.json());
+      (data[key] ?? []).forEach(item => { if (item.name) target[item.id] = item.name; });
+    } catch {
+      /* fall back to the ids */
+    }
+  };
+  await Promise.all([
+    read('/api/stops', 'stops', names.stops),
+    read('/api/routes', 'routes', names.routes),
+    read('/api/vehicles', 'vehicles', names.vehicles),
+  ]);
+  return names;
+}
+
+function fmtWait(minutes) {
+  if (minutes == null) return '';
+  return minutes < 1 ? 'waited under a minute' : `waited ${Math.round(minutes)} min`;
+}
+
+function average(values) {
+  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+}
+
+// How many reviews a page of the list holds, and how long an answer can be
+// before it is cut to a few lines with "Read more".
+const REVIEW_PAGE_SIZE = 10;
+const REVIEW_LONG_ANSWER = 240;
+
+let allReviews = []; // newest first
+let reviewPage = 0; // zero based
+let reviewsExpanded = false; // "Expand all": open every review's answers
+
+const reviewFilters = {
+  vehicle: document.getElementById('review-filter-vehicle'),
+  stop: document.getElementById('review-filter-stop'),
+  when: document.getElementById('review-filter-when'),
+  low: document.getElementById('review-filter-low'),
+};
+
+// The earliest submission time the "When" filter keeps, or null for all
+// time. "Today" starts at midnight on the admin's own clock.
+function reviewCutoff(when) {
+  if (!when) return null;
+  if (when === 'today') {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    return midnight;
+  }
+  return new Date(Date.now() - Number(when) * 24 * 60 * 60 * 1000);
+}
+
+function isLowReview(review) {
+  return review.safety_rating <= 2 || review.app_rating <= 2;
+}
+
+function filteredReviews() {
+  const vehicle = reviewFilters.vehicle.value;
+  const stop = reviewFilters.stop.value;
+  const cutoff = reviewCutoff(reviewFilters.when.value);
+  return allReviews.filter(r =>
+    (!vehicle || r.vehicle_id === vehicle) &&
+    (!stop || r.stop_id === stop) &&
+    (!cutoff || new Date(r.created_at) >= cutoff) &&
+    (!reviewFilters.low.checked || isLowReview(r)));
+}
+
+// Options for the vehicles and stops that have reviews, keeping the current
+// choice if it still has any.
+function fillReviewFilter(select, ids, names, allLabel, fallback) {
+  const current = select.value;
+  const options = [...new Set(ids.filter(Boolean))]
+    .map(id => [id, names[id] ?? fallback(id)])
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  select.innerHTML = `<option value="">${allLabel}</option>` + options
+    .map(([id, name]) => `<option value="${escHtml(id)}">${escHtml(name)}</option>`)
+    .join('');
+  select.value = options.some(([id]) => id === current) ? current : '';
+}
+
+function renderReviewSummary(reviews) {
+  const summary = document.getElementById('review-summary');
+  const avg = (field) => average(reviews.map(r => r[field]).filter(v => v != null));
+  const rating = (value) => (value == null ? '—' : `${value.toFixed(1)} / 5`);
+  const wait = avg('wait_minutes');
+
+  const filtered = reviews.length !== allReviews.length;
+  document.getElementById('review-summary-title').textContent = filtered
+    ? `SUMMARY · ${reviews.length} OF ${allReviews.length} REVIEWS`
+    : 'SUMMARY';
+
+  summary.innerHTML = [
+    ['Reviews', String(reviews.length)],
+    ['Average safety', rating(avg('safety_rating'))],
+    ['Average app', rating(avg('app_rating'))],
+    ['Average wait', wait == null ? '—' : `${wait.toFixed(1)} min`],
+    ['Rated 2 or lower', String(reviews.filter(isLowReview).length)],
+  ].map(([label, value]) => `
+    <div class="review-stat">
+      <span class="review-stat-value">${escHtml(value)}</span>
+      <span class="review-stat-label">${escHtml(label)}</span>
+    </div>
+  `).join('');
+}
+
+function renderAnswer(text) {
+  if (text.length <= REVIEW_LONG_ANSWER) return `<dd>${escHtml(text)}</dd>`;
+  return `
+    <dd class="review-long">
+      <span class="review-long-text">${escHtml(text)}</span>
+      <button type="button" class="review-read-more" aria-expanded="false">Read more</button>
+    </dd>
+  `;
+}
+
+function renderReview(review) {
+  const { stops, routes, vehicles } = reviewNames;
+  const where = [
+    stops[review.stop_id] ?? review.stop_id,
+    review.vehicle_id ? vehicles[review.vehicle_id] ?? `Vehicle ${review.vehicle_id}` : null,
+    review.route_id ? routes[review.route_id] ?? review.route_id : null,
+  ].filter(Boolean);
+  const when = [fmtLocal(review.created_at), fmtWait(review.wait_minutes)].filter(Boolean).join(' · ');
+
+  const answers = REVIEW_QUESTIONS
+    .filter(([field]) => review[field])
+    .map(([field, label, choices]) => `
+      <dt>${escHtml(label)}</dt>
+      ${choices ? `<dd>${escHtml(choices[review[field]] ?? review[field])}</dd>` : renderAnswer(review[field])}
+    `).join('');
+
+  const score = (label, value) =>
+    `<span class="review-score${value <= 2 ? ' is-low' : ''}">${label} <b>${value}</b>/5</span>`;
+
+  // Collapsed to the header and ratings; the answers open on request.
+  const answered = REVIEW_QUESTIONS.filter(([field]) => review[field]).length;
+  const details = answered
+    ? `
+      <details class="review-details"${reviewsExpanded ? ' open' : ''}>
+        <summary>${answered} ${answered === 1 ? 'answer' : 'answers'}</summary>
+        <dl class="review-answers">${answers}</dl>
+      </details>`
+    : '<span class="review-no-answers">Ratings only</span>';
+
+  return `
+    <article class="review-item">
+      <div class="review-item-head">
+        <span class="review-item-where">${escHtml(where.join(' · '))}</span>
+        <span class="review-item-when mono">${escHtml(when)}</span>
+      </div>
+      <div class="review-scores">
+        ${score('Safety', review.safety_rating)}
+        ${score('App', review.app_rating)}
+      </div>
+      ${details}
+    </article>
+  `;
+}
+
+function renderReviews() {
+  const list = document.getElementById('review-list');
+  const reviews = filteredReviews();
+  renderReviewSummary(reviews);
+
+  const pages = Math.max(1, Math.ceil(reviews.length / REVIEW_PAGE_SIZE));
+  reviewPage = Math.min(reviewPage, pages - 1);
+  const first = reviewPage * REVIEW_PAGE_SIZE;
+  const shown = reviews.slice(first, first + REVIEW_PAGE_SIZE);
+
+  if (!allReviews.length) {
+    list.innerHTML = '<p class="empty-state">No reviews yet. They appear here once riders review a completed pickup.</p>';
+  } else if (!reviews.length) {
+    list.innerHTML = '<p class="empty-state">No reviews match these filters.</p>';
+  } else {
+    list.innerHTML = shown.map(renderReview).join('');
+  }
+  document.getElementById('btn-reviews-expand').textContent = reviewsExpanded ? 'Collapse all' : 'Expand all';
+
+  // "21–40 of 67 · Page 2 of 4", only when there is more than one page.
+  document.getElementById('review-pager').hidden = pages <= 1;
+  document.getElementById('review-pager-label').textContent =
+    `${first + 1}–${first + shown.length} of ${reviews.length} · Page ${reviewPage + 1} of ${pages}`;
+  document.getElementById('btn-reviews-prev').disabled = reviewPage === 0;
+  document.getElementById('btn-reviews-next').disabled = reviewPage >= pages - 1;
+}
+
+function turnReviewPage(step) {
+  reviewPage += step;
+  renderReviews();
+  // Back to the top of the list, not left at the bottom of the last page.
+  document.getElementById('review-list').scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+// "Refreshing…" stays up at least this long: a local load takes a few
+// milliseconds, too quick to see that anything happened.
+const REVIEW_REFRESH_MIN_MS = 350;
+
+async function loadReviews() {
+  const list = document.getElementById('review-list');
+  const refresh = document.getElementById('btn-reviews-refresh');
+  const updated = document.getElementById('review-updated');
+  // The button keeps its label, so its width does not jump; the time beside
+  // it says what is happening instead.
+  refresh.disabled = true;
+  updated.classList.remove('is-fresh');
+  updated.textContent = 'Refreshing…';
+  const shownFor = new Promise(resolve => setTimeout(resolve, REVIEW_REFRESH_MIN_MS));
+  try {
+    if (!reviewNames) reviewNames = await loadReviewNames();
+    const [{ ok, status, data }] = await Promise.all([downtimeRequest('GET', '/api/reviews'), shownFor]);
+    if (!ok) throw new Error(data?.error?.message ?? `Could not load reviews (${status}).`);
+
+    allReviews = [...data.reviews].reverse(); // the API is oldest first
+    fillReviewFilter(reviewFilters.vehicle, allReviews.map(r => r.vehicle_id), reviewNames.vehicles,
+      'All vehicles', id => `Vehicle ${id}`);
+    fillReviewFilter(reviewFilters.stop, allReviews.map(r => r.stop_id), reviewNames.stops,
+      'All stops', id => id);
+    reviewPage = 0;
+    renderReviews();
+    updated.textContent = `Updated ${new Date().toLocaleTimeString('en-AU')}`;
+    void updated.offsetWidth; // restart the highlight even if it just ran
+    updated.classList.add('is-fresh');
+  } catch (err) {
+    document.getElementById('review-summary').innerHTML = '';
+    document.getElementById('review-pager').hidden = true;
+    list.innerHTML = `<p class="empty-state">${escHtml(err.message)}</p>`;
+    updated.textContent = '';
+  } finally {
+    refresh.disabled = false;
+  }
+}
+
+Object.values(reviewFilters).forEach(control => {
+  control.addEventListener('change', () => {
+    reviewPage = 0; // a new filter starts from the first page
+    renderReviews();
+  });
+});
+
+document.getElementById('btn-reviews-prev').addEventListener('click', () => turnReviewPage(-1));
+document.getElementById('btn-reviews-next').addEventListener('click', () => turnReviewPage(1));
+
+// One listener for every "Read more" in the list, however often it is redrawn.
+document.getElementById('review-list').addEventListener('click', (event) => {
+  const button = event.target.closest('.review-read-more');
+  if (!button) return;
+  const open = button.closest('.review-long').classList.toggle('is-open');
+  button.textContent = open ? 'Show less' : 'Read more';
+  button.setAttribute('aria-expanded', String(open));
+});
+
+// Fetched each time the tab is opened or Refresh is pressed, so new reviews
+// show without a page reload; "Updated …" beside the list says when that was.
+document.querySelector('.app-tab[data-tab="reviews"]').addEventListener('click', loadReviews);
+document.getElementById('btn-reviews-refresh').addEventListener('click', loadReviews);
+document.getElementById('btn-reviews-expand').addEventListener('click', () => {
+  reviewsExpanded = !reviewsExpanded;
+  renderReviews();
+});

@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelButton: document.getElementById('rider-cancel-button'),
     collected: document.getElementById('rider-collected'),
     reviewButton: document.getElementById('rider-review-button'),
+    reviewDecline: document.getElementById('rider-review-decline'),
     reviewForm: document.getElementById('rider-review-form'),
     reviewSkip: document.getElementById('rider-review-skip'),
     status: document.getElementById('rider-status'),
@@ -62,9 +63,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fresh every time: the button offers the review again, the form (and
     // whatever was typed into it) is reset and hidden until asked for.
     els.reviewButton.hidden = false;
+    els.reviewDecline.hidden = false;
     els.reviewForm.hidden = true;
     els.reviewForm.reset();
     prefillProfile();
+    clearStatus(); // "The shuttle knows you're waiting..." no longer applies
     showView('collected');
     setActiveStop(pickupRequest.stop_id);
   }
@@ -182,8 +185,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ---- Review (S15 follow-up) ----
   //
-  // "Leave a review" reveals the form in place of the button; "Not now" or a
-  // successful submit both return to the picker, ready for the next trip.
+  // "Leave a review" reveals the form in place of the buttons; "Not today",
+  // the form's "Not now" or a successful submit all return to the picker,
+  // ready for the next trip.
   // vehicle_id, route_id and wait_minutes are not asked here -- the server
   // reads them off the pickup request itself (backend/api/reviews.py).
 
@@ -221,24 +225,117 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // A "120 / 1000" counter under each comment box, red once the box is full.
+  // The limit is the textarea's own maxlength, which matches the server's
+  // MAX_COMMENT_LENGTH (backend/api/reviews.py).
+  els.reviewForm?.querySelectorAll('textarea[maxlength]').forEach((textarea, index) => {
+    const counter = document.createElement('span');
+    counter.className = 'review-count';
+    counter.id = `review-count-${index}`;
+    textarea.setAttribute('aria-describedby', counter.id);
+    textarea.after(counter);
+
+    const update = () => {
+      const full = textarea.value.length >= textarea.maxLength;
+      counter.textContent = full
+        ? `${textarea.maxLength} character limit reached`
+        : `${textarea.value.length} / ${textarea.maxLength}`;
+      counter.classList.toggle('is-full', full);
+    };
+    textarea.addEventListener('input', update);
+    // reset fires before the fields clear, so count once they have.
+    els.reviewForm.addEventListener('reset', () => setTimeout(update));
+    update();
+  });
+
+  // The required ratings say what is missing in red under each one, rather
+  // than the browser's own one-at-a-time bubble (the form is novalidate; the
+  // radios keep `required` so assistive tech still announces them as such).
+  const ratingGroups = [...(els.reviewForm?.querySelectorAll('.review-rating') ?? [])].map((group, index) => {
+    const field = group.closest('.review-field');
+    const error = document.createElement('span');
+    error.className = 'review-error';
+    error.id = `review-error-${index}`;
+    error.textContent = 'Please choose a rating from 1 to 5.';
+    error.setAttribute('aria-live', 'polite');
+    error.hidden = true;
+    group.after(error);
+
+    const inputs = [...group.querySelectorAll('input[type="radio"]')];
+    inputs.forEach((input) => input.setAttribute('aria-describedby', error.id));
+
+    const setInvalid = (invalid) => {
+      field.classList.toggle('is-invalid', invalid);
+      error.hidden = !invalid;
+      inputs.forEach((input) => input.setAttribute('aria-invalid', String(invalid)));
+    };
+    group.addEventListener('change', () => setInvalid(false));
+    return { inputs, setInvalid };
+  });
+
+  // Marks every unanswered rating at once and moves to the first. True when
+  // nothing required is missing.
+  function checkRatings() {
+    const missing = ratingGroups.filter(({ inputs }) => !inputs.some((input) => input.checked));
+    ratingGroups.forEach((group) => group.setInvalid(missing.includes(group)));
+    if (missing.length) {
+      missing[0].inputs[0].focus({ preventScroll: true });
+      missing[0].inputs[0].closest('.review-field').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    return missing.length === 0;
+  }
+
+  els.reviewForm?.addEventListener('reset', () => ratingGroups.forEach((group) => group.setInvalid(false)));
+
+  // Pickups this browser is done with -- reviewed, or the review declined --
+  // so a reload does not offer the review again. Only the latest few are
+  // kept, since only the rider's most recent pickup is ever shown. The
+  // server refuses a second review regardless (409 already_reviewed).
+  const FINISHED_KEY = 'rider_finished_pickups';
+  const FINISHED_KEEP = 20;
+
+  function finishedPickups() {
+    try {
+      return JSON.parse(localStorage.getItem(FINISHED_KEY) ?? '[]');
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function markFinished(requestId) {
+    try {
+      const ids = [...finishedPickups().filter((id) => id !== requestId), requestId].slice(-FINISHED_KEEP);
+      localStorage.setItem(FINISHED_KEY, JSON.stringify(ids));
+    } catch (error) {
+      /* storage unavailable: the review is just offered again on reload */
+    }
+  }
+
+  function declineReview(message) {
+    if (currentRequestId) markFinished(currentRequestId);
+    resetToPicker(message, 'ok');
+  }
+
   els.reviewButton?.addEventListener('click', () => {
     els.reviewButton.hidden = true;
+    els.reviewDecline.hidden = true;
     els.reviewForm.hidden = false;
   });
 
-  els.reviewSkip?.addEventListener('click', () => {
-    resetToPicker('Thanks for riding nuway!', 'ok');
-  });
+  els.reviewDecline?.addEventListener('click', () => declineReview('Thanks for riding nuway!'));
+
+  els.reviewSkip?.addEventListener('click', () => declineReview('Thanks for riding nuway!'));
 
   els.reviewForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!els.reviewForm.reportValidity() || !currentRequestId) return; // the two ratings are required
+    if (!checkRatings() || !currentRequestId) return; // the two ratings are required
 
     const submitButton = document.getElementById('rider-review-submit');
     submitButton.disabled = true;
     try {
       const data = Object.fromEntries(new FormData(els.reviewForm).entries());
       await submitReview({ pickup_request_id: currentRequestId, ...data });
+      markFinished(currentRequestId);
       rememberProfile(els.reviewForm);
       resetToPicker('Thanks for the feedback!', 'ok');
     } catch (error) {
@@ -274,7 +371,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     stopPolling();
     if (pickupRequest.status === 'collected') {
-      showCollected(pickupRequest);
+      // Already reviewed or declined here: stay on the picker, quietly.
+      if (!finishedPickups().includes(pickupRequest.id)) showCollected(pickupRequest);
     } else {
       // expired, or cancelled from another tab or device mid-wait.
       resetToPicker(`Your request at ${pickupRequest.stop_id} ${pickupRequest.status}.`, 'error');

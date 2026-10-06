@@ -14,7 +14,7 @@ from backend.auth import admin_required
 from backend.config import ConfigError
 from backend.models import PickupRequest, Review
 from backend.pickup_requests import PickupRequestStore
-from backend.reviews import ReviewStore
+from backend.reviews import DuplicateReview, ReviewStore
 
 bp = Blueprint("reviews", __name__)
 
@@ -39,6 +39,12 @@ OPTIONAL_TEXT_FIELDS = (
     "usage_frequency",
     "comments",
 )
+
+#: The free text fields, as against the choices; each is held to
+#: MAX_COMMENT_LENGTH characters once surrounding space is stripped. The
+#: rider form's textareas carry the same limit as `maxlength`.
+COMMENT_FIELDS = ("vehicle_behaviour", "obstacle_interaction", "app_comment", "comments")
+MAX_COMMENT_LENGTH = 1000
 
 
 def _store() -> ReviewStore:
@@ -88,7 +94,10 @@ def create_review():
         `not_your_request` if it is not this rider's own. `409`
         `request_not_collected` if it was never marked collected -- only a
         completed pickup can be reviewed. `400` `bad_rating` if either rating
-        is missing or out of range. Otherwise `201` with the stored review.
+        is missing or out of range. `400` `comment_too_long` if a free text
+        field is over MAX_COMMENT_LENGTH characters. `409`
+        `already_reviewed` if this pickup already has a review: one per
+        pickup. Otherwise `201` with the stored review.
     """
     body = request.get_json(silent=True) or {}
 
@@ -114,6 +123,11 @@ def create_review():
     except ValueError as exc:
         return jsonify({"error": {"code": "bad_rating", "message": str(exc)}}), 400
 
+    for field in COMMENT_FIELDS:
+        if len(_text(body, field)) > MAX_COMMENT_LENGTH:
+            message = f"'{field}' must be {MAX_COMMENT_LENGTH} characters or fewer."
+            return jsonify({"error": {"code": "comment_too_long", "message": message}}), 400
+
     wait_minutes = None
     if pickup_request.cleared_at is not None:
         wait_minutes = round((pickup_request.cleared_at - pickup_request.created_at).total_seconds() / 60, 1)
@@ -130,7 +144,11 @@ def create_review():
         app_rating=app_rating,
         **{field: _text(body, field) for field in OPTIONAL_TEXT_FIELDS},
     )
-    _store().add(review)
+    try:
+        _store().add(review)
+    except DuplicateReview:
+        message = "This pickup has already been reviewed."
+        return jsonify({"error": {"code": "already_reviewed", "message": message}}), 409
     return jsonify({"review": review.to_dict()}), 201
 
 

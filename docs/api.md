@@ -20,6 +20,7 @@ Codes: `bad_timestamp`, `bad_range` (from > to), `unknown_vehicle`,
 `request_not_open`, `data_unavailable`, `not_signed_in`, `bad_credentials`,
 `admin_not_configured`, `missing_field`, `overlap`, `unknown_downtime`,
 `invalid_schedule`, `request_not_collected`, `bad_rating`,
+`already_reviewed`, `comment_too_long`.
 
 
 **Signing in.** Endpoints marked *Admin only* answer `401` `not_signed_in`
@@ -976,8 +977,12 @@ anything beyond what is in the body.
 `not_your_request` if it is not this rider's own. `409`
 `request_not_collected` if it was never marked collected -- only a completed
 pickup can be reviewed. `400` `bad_rating` if either rating is missing or
-outside 1-5. Otherwise `201` with the stored review, shaped as the body
-above plus `id`, `stop_id`, `vehicle_id`, `route_id`, `wait_minutes` and
+outside 1-5. `400` `comment_too_long` if `vehicle_behaviour`,
+`obstacle_interaction`, `app_comment` or `comments` is over 1000 characters
+once surrounding space is trimmed; the rider form stops typing at the same
+limit. `409` `already_reviewed` if the pickup already has a review:
+one review per pickup, and the first one stands. Otherwise `201` with the
+stored review, shaped as the body above plus `id`, `stop_id`, `vehicle_id`, `route_id`, `wait_minutes` and
 `created_at`.
 
 ### `GET /api/reviews`
