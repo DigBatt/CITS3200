@@ -236,7 +236,25 @@ function busIcon(vehicle) {
   });
 }
 
-function drawTracks(vehicles, { fit = true } = {}) {
+// A bus that went quiet and came back was not on a straight line between the
+// two fixes, so its trail is broken there rather than joined: `fixes`
+// (ascending by timestamp) cut wherever two neighbours are more than
+// `gapSeconds` apart. With no threshold it is one unbroken run.
+function splitAtGaps(fixes, gapSeconds) {
+  const runs = [];
+  let previous = null;
+  for (const fix of fixes) {
+    const time = Date.parse(fix.timestamp);
+    if (previous === null || (gapSeconds != null && time - previous > gapSeconds * 1000)) runs.push([]);
+    runs[runs.length - 1].push(fix);
+    previous = time;
+  }
+  return runs;
+}
+
+// `gapSeconds` is the server's inactivity threshold: a silence longer than
+// that breaks the trail (splitAtGaps above).
+function drawTracks(vehicles, { fit = true, gapSeconds = null } = {}) {
   layers.trails.clearLayers();
   if (fit) pendingFit = null;
   const bounds = L.latLngBounds([]);
@@ -244,18 +262,19 @@ function drawTracks(vehicles, { fit = true } = {}) {
 
   for (const vehicle of vehicles) {
     // A row with no fix carries no coordinates, so it cannot be plotted.
-    const points = vehicle.positions
-      .filter((p) => p.latitude !== null && p.longitude !== null)
-      .map((p) => [p.latitude, p.longitude]);
+    const fixes = vehicle.positions.filter((p) => p.latitude !== null && p.longitude !== null);
+    if (fixes.length === 0) continue;
 
-    if (points.length === 0) continue;
+    // One line per unbroken run of reporting.
+    const runs = splitAtGaps(fixes, gapSeconds).map((run) => run.map((p) => [p.latitude, p.longitude]));
+    const points = runs.flat();
     drawn += 1;
 
     const style = vehicle.colour ? { color: vehicle.colour } : {};
     // Not interactive: the trail carries no popup of its own, and it is drawn
     // over the stops, so a clickable trail would swallow clicks on a stop
     // underneath it.
-    L.polyline(points, { weight: 3, interactive: false, ...style }).addTo(layers.trails);
+    L.polyline(runs, { weight: 3, interactive: false, ...style }).addTo(layers.trails);
     L.marker(points[points.length - 1], { icon: busIcon(vehicle), pane: 'buses', keyboard: false })
       .bindPopup(`${vehicle.name ?? vehicle.vehicle_id} — ${vehicle.count} positions`)
       .addTo(layers.trails);
