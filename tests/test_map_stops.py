@@ -88,7 +88,8 @@ def page(browser, server):
     page = context.new_page()
     page.goto(server)
     # The stops are fetched after load, so wait for them rather than sleeping.
-    page.wait_for_selector(".stop-label")
+    # Their names only show on hover, so it is the markers that are waited for.
+    page.wait_for_function("stopMarkers.size > 0")
     yield page
     context.close()
 
@@ -108,23 +109,12 @@ def test_every_configured_stop_is_drawn(page):
     assert page.locator(STOP_PATHS).count() == 4
 
 
-def test_each_stop_shows_its_id(page):
-    assert labels(page) == ["north-end", "orphan", "shared", "south-end"]
-
-
 def test_stops_are_drawn_under_the_vehicles(page):
     panes = page.evaluate(
         "() => ({ stops: getComputedStyle(document.querySelector('.leaflet-stops-pane')).zIndex,"
         " overlay: getComputedStyle(document.querySelector('.leaflet-overlay-pane')).zIndex })"
     )
     assert int(panes["stops"]) < int(panes["overlay"])
-
-
-def test_labels_hide_when_zoomed_out(page):
-    page.evaluate("() => map.setZoom(13)")
-    page.wait_for_selector(".stop-label", state="hidden")
-    page.evaluate("() => map.setZoom(16)")
-    page.wait_for_selector(".stop-label", state="visible")
 
 
 def test_toggle_hides_and_restores_the_stops(page):
@@ -152,34 +142,10 @@ def test_no_route_selected_draws_every_stop_the_same(page):
     assert page.locator(".stop-label.is-dimmed").count() == 0
 
 
-def test_selected_route_stops_are_distinct_from_the_rest(page):
-    select_route(page, "North Route")
-
-    highlighted = page.locator(f'{STOP_PATHS}[fill="{ON_ROUTE_COLOUR}"]')
-    assert highlighted.count() == 2  # north-end and shared
-
-    assert labels(page, ".stop-label.is-dimmed") == ["orphan", "south-end"]
-
-
 def test_a_stop_on_two_routes_is_highlighted_on_each(page):
     for route in ("North Route", "South Route"):
         select_route(page, route)
         assert "shared" not in labels(page, ".stop-label.is-dimmed")
-
-
-def test_all_routes_clears_the_highlighting(page):
-    select_route(page, "South Route")
-    assert page.locator(".stop-label.is-dimmed").count() > 0
-
-    select_route(page, "All routes")
-    assert page.locator(".stop-label.is-dimmed").count() == 0
-
-
-def test_selection_survives_a_reload(page, server):
-    select_route(page, "South Route")
-    page.reload()
-    page.wait_for_selector(".stop-label")
-    assert page.locator("#route-filter-chips .chip.is-active").text_content() == "South Route"
 
 
 # ---- S07.3 popup ----

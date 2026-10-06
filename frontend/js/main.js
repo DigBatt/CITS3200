@@ -45,12 +45,15 @@ async function load() {
 
   // Mid drag these fire several times a second: a flashing status line and
   // a liveness refetch (which does not depend on the period) would be noise.
+  // The liveness is waited for with the rest, as it carries the inactivity
+  // threshold the trails are broken at.
+  let liveness = null;
   if (!dragging) {
     setStatus('Loading positions...');
-    Vehicles.refresh();
+    liveness = Vehicles.refresh();
   }
 
-  const [positions, metrics] = await Promise.allSettled([getPositions(query), getMetrics(query)]);
+  const [positions, metrics] = await Promise.allSettled([getPositions(query), getMetrics(query), liveness]);
 
   // A newer selection was made while these were in flight; its load owns the
   // screen, so drawing this one would show the wrong vehicle or period. A
@@ -60,12 +63,13 @@ async function load() {
   latestDrawn = request;
 
   if (positions.status === 'fulfilled') {
-    View3D.update(positions.value.vehicles);
+    const gapSeconds = Vehicles.inactivityThreshold();
+    View3D.update(positions.value.vehicles, gapSeconds);
     const selection = JSON.stringify(query);
     // A slider being dragged, or a live poll, redraws in place: refitting
     // would move the map out from under the operator mid scrub.
     const fit = selection !== lastFitted && !scrub;
-    const drawn = drawTracks(positions.value.vehicles, { fit });
+    const drawn = drawTracks(positions.value.vehicles, { fit, gapSeconds });
     if (drawn > 0) lastFitted = selection;
 
     if (drawn === 0) {

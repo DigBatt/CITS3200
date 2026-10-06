@@ -17,6 +17,7 @@
 
 (function () {
   let freshnessRule = null;
+  let inactivityThreshold = null;
   let chips = null;
   let fleet = [];
   let onChange = null;
@@ -46,6 +47,7 @@
       if (request !== latestRefresh) return;
       fleet = data.vehicles;
       freshnessRule = data.freshness_rule ?? null;
+      inactivityThreshold = data.inactivity_threshold_seconds ?? null;
       refreshError = null;
     } catch (error) {
       if (request !== latestRefresh) return;
@@ -162,5 +164,8 @@
     nameOf,
     // As the API's `vehicles` parameter: "1,2", or null for the whole fleet.
     getSelection: () => chips.query(),
+    // Seconds of silence after which the server calls a vehicle inactive, or
+    // null until the first refresh. The trails break at a gap this long.
+    inactivityThreshold: () => inactivityThreshold,
   };
 })();

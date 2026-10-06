@@ -71,7 +71,7 @@
 
   // One vehicle from /api/positions as the 3D view wants it: its last fix,
   // heading and recent trail, or no position at all.
-  function toBus(vehicle) {
+  function toBus(vehicle, gapSeconds) {
     const fixes = vehicle.positions.filter((p) => p.latitude != null && p.longitude != null);
     const bus = { id: vehicle.vehicle_id, name: vehicle.name, colour: vehicle.colour, fix: null };
     if (!fixes.length) return bus;
@@ -89,7 +89,11 @@
       altitude: last.altitude_m,
       timestamp: last.timestamp,
       speed: last.speed_mps,
-      trail: fixes.filter((p) => Date.parse(p.timestamp) >= since).map((p) => [p.longitude, p.latitude]),
+      // Only since the bus last went quiet: the trail is one line, and it
+      // was not on a straight one across the silence (splitAtGaps, js/map.js).
+      trail: splitAtGaps(fixes.filter((p) => Date.parse(p.timestamp) >= since), gapSeconds)
+        .pop()
+        .map((p) => [p.longitude, p.latitude]),
     };
     return bus;
   }
@@ -300,9 +304,10 @@
      * position is shown.
      *
      * @param {Array} vehicles - `vehicles` from /api/positions.
+     * @param {?number} gapSeconds - a silence longer than this ends a trail.
      */
-    update(vehicles) {
-      buses = vehicles.map(toBus);
+    update(vehicles, gapSeconds = null) {
+      buses = vehicles.map((vehicle) => toBus(vehicle, gapSeconds));
       if (!buses.some((bus) => bus.id === currentId)) {
         currentId = (buses.find((bus) => bus.fix) ?? buses[0])?.id ?? null;
       }
