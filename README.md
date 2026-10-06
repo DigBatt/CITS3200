@@ -7,6 +7,11 @@ which shows a live snapshot only and overwrites positions week by week.
 
 CITS3200 Group 11.
 
+- [User guide](docs/user-guide.md): using the dashboard, for riders, operators and administrators.
+- [Installation guide](docs/installation-guide.md): installing it on a web server and keeping it running.
+
+The rest of this page is the quick start for developers.
+
 ## Local setup
 
 Requires Python 3.10+.
