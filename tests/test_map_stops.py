@@ -117,15 +117,32 @@ def test_stops_are_drawn_under_the_vehicles(page):
     assert int(panes["stops"]) < int(panes["overlay"])
 
 
-def test_toggle_hides_and_restores_the_stops(page):
-    # The checkbox itself is covered by the switch graphic, as it is for a
-    # user: the label is what gets clicked.
-    switch = page.locator("label.layer-toggle-row", has_text="Stops")
+def test_focus_on_routes_and_stops_fades_the_trails_and_shows_the_route_line(page):
+    # The panes' own opacity, as set, not as computed: computed, it would read
+    # partway through the 200ms fade. The checkbox itself is covered by the
+    # switch graphic, as it is for a user: the label is what gets clicked.
+    opacities = (
+        "() => Object.fromEntries(['trails', 'stopRings', 'routes', 'stops'].map("
+        "name => [name, document.querySelector(`.leaflet-${name}-pane`).style.opacity]))"
+    )
+    switch = page.locator("label.layer-toggle-row", has_text="Focus on routes and stops")
+
+    # Off by default: trails and rings at full strength, no route line.
+    assert page.evaluate(opacities) == {"trails": "", "stopRings": "", "routes": "0", "stops": ""}
 
     switch.click()
-    assert page.locator(STOP_PATHS).count() == 0
+    assert page.evaluate(opacities) == {"trails": "0.65", "stopRings": "0.65", "routes": "", "stops": ""}
+    assert page.locator(STOP_PATHS).count() == 4
 
     switch.click()
+    assert page.evaluate(opacities) == {"trails": "", "stopRings": "", "routes": "0", "stops": ""}
+
+
+def test_focus_shows_the_selected_routes_line_and_keeps_the_stops(page):
+    select_route(page, "North Route")
+    page.locator("label.layer-toggle-row", has_text="Focus on routes and stops").click()
+
+    assert page.locator(".leaflet-routes-pane path.planned-route-path").count() > 0
     assert page.locator(STOP_PATHS).count() == 4
 
 
