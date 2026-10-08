@@ -1180,3 +1180,107 @@
   opacity: 0.65;
   overflow-wrap: anywhere;
 }
+
+/* ---- A phone ----
+   Seven tabs do not fit in one row, and the tab bar used to push the whole
+   page wider than the screen. It takes a row of its own and scrolls sideways
+   instead, every tab on one line; nothing else on the page moves. */
+@media (max-width: 700px) {
+  .app-header {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .app-tabs {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .app-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-tab {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  /* One row per kind of thing, rather than wrapping in source order:
+     brand and the two exits (Return, Sign out) on top, then the tabs, then
+     the calendar. Reordered with CSS only; the markup is unchanged. */
+  .app-header-brand { order: 1; }
+
+  .app-header .btn-signout {
+    order: 2;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .app-header a.btn-signout {
+    margin-left: auto; /* pushes both exits to the right of the brand */
+  }
+
+  .app-header .app-tabs { order: 3; }
+
+  .app-header-spacer { display: none; }
+
+  .app-header .period-picker {
+    order: 4;
+    flex: 1 1 100%;
+  }
+
+  .admin-panel {
+    padding: 16px 12px;
+  }
+
+  .admin-card {
+    padding: 14px;
+  }
+
+  /* Operator view: each label above its dropdown, the dropdowns full width
+     (their max-width is set inline in admin.html). */
+  .route-select-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .route-select-row .form-select {
+    max-width: none !important;
+    margin-bottom: 6px;
+  }
+
+  /* Reviews: the Updated time, Expand all and Refresh wrap under the title
+     rather than squeezing beside it. */
+  .review-list-head {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+
+  .review-list-actions .btn-xs {
+    white-space: nowrap;
+  }
+
+  /* iPhone Safari zooms the whole page in when you tap a field whose text is
+     under 16px, and leaves it zoomed (the sign-in boxes are 13px). At 16px
+     it does not. This is used instead of maximum-scale=1 in the viewport,
+     which would also stop people pinch-zooming to read. (Also loaded by the
+     sign-in page, admin-login.html.) */
+  .form-input,
+  .form-select,
+  .form-textarea,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Wide tables scroll inside their card rather than widening the page. */
+  .admin-card:has(> table) {
+    overflow-x: auto;
+  }
+}
