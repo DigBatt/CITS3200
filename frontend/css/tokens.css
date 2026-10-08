@@ -1,0 +1,67 @@
+/*
+  nUWAy colour tokens (DESIGN-FINAL.md). Loaded first on every page;
+  css/colours.css applies them.
+
+  UWA blue #003087 (measured from the uwa.edu.au header) means "you can click
+  this / it is selected". Its complement, UWA gold, is a small accent on the
+  blue header only. Vehicle colours are the only other saturated colours, and
+  nothing else reuses them.
+*/
+:root {
+  /* Brand */
+  --uwa-blue: #003087;
+  --uwa-blue-hover: #00266b;
+  --uwa-gold: #E0B321;          /* on blue only; too light for text on white */
+
+  /* Surfaces: neutral off-whites, lightest on top */
+  --surface-page: #F2F3F5;      /* behind everything */
+  --surface-panel: #FAFAFB;     /* filter bars, sidebar */
+  --surface-card: #FFFFFF;      /* cards, chips, fields */
+  --surface-card-muted: #F6F7F9; /* an offline vehicle */
+  --surface-tint: #EEEFF2;      /* KPI tiles, neutral badges */
+  --border: #E4E6EA;
+  --border-strong: #C9CDD4;     /* hovered borders */
+
+  /* Text: only these three */
+  --text: #141B2D;
+  --text-2: #4A5366;
+  --text-3: #667085;            /* smallest labels; 4.5:1 or better on the panel */
+
+  /* Interactive */
+  --accent: var(--uwa-blue);
+  --accent-ink: #FFFFFF;
+  --accent-soft: #E3EAF6;       /* selected rows, calendar range, hovered chips */
+  --focus-ring: 0 0 0 3px rgba(0, 48, 135, 0.28);
+
+  /* The header, on UWA blue */
+  --header-bg: var(--uwa-blue);
+  --header-ink: #FFFFFF;
+  --header-ink-2: #DCE4F2;      /* inactive tabs */
+  --header-tray: rgba(255, 255, 255, 0.12);
+  --header-line: rgba(255, 255, 255, 0.45);
+
+  /* Status */
+  --live: #2FA66A;
+  --live-ink: #1F8A55;          /* "Live" text on white */
+  --danger: #B42318;            /* errors, Remove, low ratings */
+  --danger-soft: #FDECEA;
+
+  /* Vehicles: keep in sync with config/vehicles.yaml (tests check nUWAy 1's) */
+  --vehicle-1: #D4741F;
+  --vehicle-2: #2F7D8F;
+  --vehicle-3: #7A5EA8;
+  --vehicle-4: #4F8A3C;
+
+  /* Utilisation chart: shades of UWA blue for time in service, the gold
+     complement for delay, and neutrals for the rest. None of them is a
+     vehicle colour, so a slice cannot be mistaken for a bus. */
+  --chart-calendar: #A9BCDD;
+  --chart-operating: #3D64A8;
+  --chart-working: #003087;
+  --chart-delay: #D9A21B;
+  --chart-standby: #7C8AA5;
+  --chart-downtime: #C2412D;
+  --chart-not-reporting: #B7BCC6;
+  --chart-scheduled: #5B7FBF;
+  --chart-unscheduled: #D5DBE6;
+}

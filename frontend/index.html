@@ -11,9 +11,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/calendar.css">
   <link rel="stylesheet" href="css/dashboard.css">
+  <!-- Colours only, applied over the rest (css/tokens.css). -->
+  <link rel="stylesheet" href="css/colours.css">
   <!-- For the map's 3D views (js/campus3d.js, js/earth3d.js), which are only
        loaded when someone switches to them. three.js is pinned to the version
        the bus model's own viewer was built with. 3d-tiles-renderer is mapped
@@ -38,8 +41,8 @@
     <!-- ============ Header: brand, view tabs, admin link ============ -->
     <header class="app-header">
       <div class="app-header-brand">
-        <span class="app-header-brand-name">nuway</span>
-        <span class="app-header-brand-tag">SHUTTLE OPS</span>
+        <span class="app-header-brand-name">nUWAy</span>
+        <span class="app-header-brand-tag">AUTONOMOUS SHUTTLES</span>
       </div>
       <nav class="app-tabs" id="app-tabs" aria-label="Dashboard view">
         <button type="button" class="app-tab is-active" data-view="fleet">Fleet</button>
@@ -101,13 +104,22 @@
 
             <div class="vehicle-list" id="vehicle-list"></div>
 
-            <!-- js/stops.js wires the Stops toggle to the map's stop layer. -->
+            <!-- js/stops.js wires the Stops toggle to the map's stop layer,
+                 and Full-colour map to the basemap's tint (css/colours.css). -->
             <div class="layer-toggles">
               <span class="layer-toggles-label">MAP LAYERS</span>
               <label class="layer-toggle-row">
                 <span>Stops</span>
                 <span class="toggle-switch">
                   <input type="checkbox" id="layer-toggle-stops" checked>
+                  <span class="toggle-track"></span>
+                  <span class="toggle-knob"></span>
+                </span>
+              </label>
+              <label class="layer-toggle-row">
+                <span>Full-colour map</span>
+                <span class="toggle-switch">
+                  <input type="checkbox" id="layer-toggle-full-colour">
                   <span class="toggle-track"></span>
                   <span class="toggle-knob"></span>
                 </span>
