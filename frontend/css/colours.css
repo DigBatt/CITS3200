@@ -1,0 +1,395 @@
+/*
+  The colour scheme (DESIGN-FINAL.md), from css/tokens.css.
+
+  Loaded last on the dashboard, the admin page and the sign-in page. It sets
+  colours only (text, backgrounds, borders, focus rings, the map's tint),
+  never sizes, spacing, layout or markup, so every feature and test is
+  untouched. Each rule recolours one that lives in base, calendar,
+  dashboard or admin.css.
+
+  Two meanings for colour: UWA blue = clickable or selected; a vehicle's
+  colour = that vehicle. Everything else is neutral, in three text greys.
+  UWA gold, blue's complement, is a small accent on the blue header.
+*/
+
+/* =====================================================================
+   Shared by every page
+   ===================================================================== */
+
+.app-shell,
+.login-page {
+  background: var(--surface-page);
+  color: var(--text);
+}
+
+/* ---- The header: UWA blue, white text, gold accent ---- */
+
+.app-header {
+  background: var(--header-bg);
+  border-bottom-color: transparent;
+  color: var(--header-ink);
+}
+
+.app-header-brand-name { color: var(--header-ink); }
+.app-header-brand-tag { color: var(--uwa-gold); }
+
+.app-tabs { background: var(--header-tray); }
+
+.app-tab { color: var(--header-ink-2); }
+
+.app-tab:hover:not(.is-active) {
+  color: var(--header-ink);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* The active tab: white, UWA blue text, a gold underline. */
+.app-tab.is-active {
+  color: var(--uwa-blue);
+  background: var(--surface-card);
+  box-shadow: inset 0 -2px 0 var(--uwa-gold), 0 1px 2px rgba(0, 0, 0, 0.16);
+}
+
+.app-tab:focus-visible,
+.app-header .admin-link:focus-visible,
+.app-header .btn-signout:focus-visible {
+  outline: 2px solid var(--header-ink);
+  outline-offset: 2px;
+}
+
+/* The exits (dashboard: Admin; admin page: Return to Dashboard, Sign out) */
+.app-header .admin-link,
+.app-header .btn-signout {
+  color: var(--header-ink);
+  background: transparent;
+  border-color: var(--header-line);
+}
+
+.app-header .admin-link:hover,
+.app-header .btn-signout:hover {
+  color: var(--header-ink);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+/* The calendar's month bar: a white field on the blue. */
+.period-bar .mini-head {
+  background: var(--surface-card);
+  border-color: transparent;
+  color: var(--text);
+}
+
+.period-bar .mini-step:hover,
+.period-bar .mini-month:hover { background: var(--accent-soft); }
+
+/* Its overlay opens inside the header: it must not inherit white text. */
+.period-panel {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+/* ---- Chips (vehicle, route, area; the admin Figures vehicles) ---- */
+
+.chip {
+  background: var(--surface-card);
+  color: var(--text-2);
+  border-color: var(--border);
+}
+
+.chip:hover:not(.is-active) {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.chip.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ---- Switches: UWA blue when on ---- */
+
+.toggle-track { background: #CFD3DA; }
+.toggle-switch input:checked + .toggle-track { background: var(--accent); }
+.toggle-switch input:focus-visible + .toggle-track { box-shadow: var(--focus-ring); }
+
+/* ---- The calendar: UWA blue selection, not nUWAy 2's teal ---- */
+
+.mini-day.is-in-range { background: var(--accent-soft); }
+.mini-day.is-in-range:hover { background: #D3DEF0; }
+
+.mini-day.is-range-start,
+.mini-day.is-range-end {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.mini-day.is-range-start .mini-num,
+.mini-day.is-range-end .mini-num { color: var(--accent-ink); }
+
+.mini-day.is-preview {
+  background: rgba(0, 48, 135, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(0, 48, 135, 0.3);
+}
+
+.mini-day.is-preview.is-range-start,
+.mini-day.is-preview.is-range-end {
+  background: rgba(0, 48, 135, 0.16);
+  color: var(--text);
+}
+
+.mini-day.is-preview.is-range-start .mini-num,
+.mini-day.is-preview.is-range-end .mini-num { color: var(--text); }
+
+.mini-day.is-pending { background: var(--accent); }
+
+button.cal-day-head:hover,
+button.cal-day-head.is-in-period { background: var(--accent-soft); }
+button.cal-day-head.is-pick-start { background: #C9D6EE; }
+button.cal-day-head:focus-visible { outline-color: var(--accent); }
+
+.cal-measure-dot { background: var(--accent); }
+.timeline-slider input[type='range'] { accent-color: var(--accent); }
+.cal-slider-input:focus-visible::-webkit-slider-thumb { outline-color: var(--accent); }
+
+/* "Live": the status green */
+.timeline-live-btn.is-on {
+  border-color: var(--live);
+  background: rgba(47, 166, 106, 0.1);
+  color: var(--live-ink);
+}
+
+.timeline-live-btn:focus-visible { outline-color: var(--accent); }
+
+/* =====================================================================
+   The dashboard
+   ===================================================================== */
+
+/* ---- Filter bars ---- */
+
+.filter-bar {
+  background: var(--surface-panel);
+  border-bottom-color: var(--border);
+}
+
+.filter-bar-label { color: var(--text-3); }
+.filter-bar-label:hover { color: var(--text-2); }
+.filter-bar-label:focus-visible { outline-color: var(--accent); }
+
+/* ---- Sidebar ---- */
+
+.sidebar {
+  background: var(--surface-panel);
+  border-right-color: var(--border);
+}
+
+.panel-subtitle { color: var(--text-3); }
+
+.vehicle-row {
+  background: var(--surface-card);
+  border-bottom-color: var(--border);
+}
+
+.vehicle-row:hover:not(.is-selected) { background: var(--surface-panel); }
+
+.vehicle-row.is-selected {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Offline: a muted row rather than hatching. */
+.vehicle-row.is-offline { background: var(--surface-card-muted); }
+.vehicle-row.is-offline.is-selected { background: var(--accent-soft); }
+
+.vehicle-id { color: var(--text); }
+.vehicle-note { color: var(--text-2); }
+.vehicle-stats { color: var(--text-3); }
+
+.badge-active {
+  background: rgba(47, 166, 106, 0.14);
+  color: var(--live-ink);
+}
+
+.badge-idle,
+.badge-offline,
+.badge-inactive {
+  background: var(--surface-tint);
+  color: var(--text-2);
+}
+
+.empty-state { color: var(--text-3); }
+
+.layer-toggles { border-top-color: var(--border); }
+.layer-toggles-label { color: var(--text-3); }
+.layer-toggle-row { color: var(--text); }
+
+.kpi-mini-grid {
+  background: var(--border);
+  border-top-color: var(--border);
+}
+
+.kpi-mini { background: var(--surface-card); }
+.kpi-mini-label { color: var(--text-3); }
+.kpi-mini-value { color: var(--text); }
+
+/* ---- Buttons: the main action is UWA blue ---- */
+
+.request-button,
+.btn-dark,
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.request-button:hover:not(:disabled),
+.btn-dark:hover,
+.btn-primary:hover { background: var(--uwa-blue-hover); }
+
+.request-button:focus-visible,
+.btn-dark:focus-visible,
+.btn-primary:focus-visible,
+.btn-outline:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.btn-outline {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn-outline:hover { border-color: var(--border-strong); }
+
+/* ---- Rider view: the purple accent becomes UWA blue ---- */
+
+.stop-picker-dot { background: var(--accent); }
+
+.stop-select:focus,
+.review-text:focus,
+.review-select:focus { outline-color: var(--accent); }
+
+.rider-status.is-ok {
+  background: var(--accent-soft);
+  border-color: rgba(0, 48, 135, 0.25);
+  color: var(--uwa-blue);
+}
+
+.review-rating label:has(input:checked) {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.review-rating label:has(input:focus-visible) { outline-color: var(--accent); }
+
+/* ---- The map ---- */
+
+/* A muted basemap, so the vehicles and routes are the only saturated
+   colours. Only the tile layer is toned down, not the routes, stops or
+   buses drawn over it. The Map Layers "Full-colour map" switch (js/stops.js)
+   turns it off for anyone who wants the map's own colours to find their way. */
+.leaflet-tile-pane { filter: saturate(0.3) brightness(1.05) contrast(0.92); }
+.map-full-colour .leaflet-tile-pane { filter: none; }
+
+.map-status {
+  background: var(--surface-card);
+  color: var(--text-2);
+}
+
+.map-legend {
+  background: rgba(250, 250, 251, 0.96);
+  border-color: var(--border);
+  color: var(--text-2);
+}
+
+.stop-label {
+  border-color: var(--border);
+  color: var(--text-2);
+}
+
+.map-mode { background: var(--surface-card); }
+.map-mode-side { color: var(--text-3); }
+
+.map-mode:not(.is-on) .map-mode-side.is-2d,
+.map-mode.is-on .map-mode-side.is-3d { color: var(--text); }
+
+.map-mode .toggle-switch input:focus-visible + .toggle-track,
+.campus3d-step:focus-visible { outline-color: var(--accent); }
+
+/* Stop popup: each route led by a dot in its own colour (js/stops.js), so
+   the popup says which line on the map is which route. */
+.stop-popup-routes { color: var(--text-2); }
+
+.stop-popup-route-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: 0.05em;
+}
+
+/* Route chips: a dot in the route's colour (js/stops.js), the legend for
+   the route colours. A white ring keeps it clear on a selected (blue) chip. */
+.route-chip-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: 0.05em;
+}
+
+.chip.is-active .route-chip-dot { box-shadow: 0 0 0 1.5px #fff; }
+
+/* ---- Utilisation: neutral cards, and a chart palette with no vehicle
+   colours in it (it used purple for working time, nUWAy 3's colour) ---- */
+
+.view-utilisation {
+  --util-ct: var(--chart-calendar);
+  --util-ot: var(--chart-operating);
+  --util-wt: var(--chart-working);
+  --util-od: var(--chart-delay);
+  --util-sb: var(--chart-standby);
+  --util-dt: var(--chart-downtime);
+  --util-nr: var(--chart-not-reporting);
+  --util-st: var(--chart-scheduled);
+  --util-ut: var(--chart-unscheduled);
+}
+
+.util-kpi-card,
+.util-pie-card,
+.util-tum-card,
+.util-table { border-color: var(--border); }
+
+.util-kpi-label,
+.util-kpi-formula { color: var(--text-3); }
+.util-kpi-value { color: var(--text); }
+
+/* =====================================================================
+   The admin page and sign-in
+   ===================================================================== */
+
+.admin-card { border-color: var(--border); }
+.admin-section-sub,
+.admin-card-title { color: var(--text-3); }
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus { outline-color: var(--accent); }
+
+/* Operator view: nUWAy 2's teal was the accent here too. */
+.operator-stop-here { color: var(--accent); }
+
+.operator-collect {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.operator-collect:hover { background: var(--uwa-blue-hover); }
+
+.stop-dot { background: var(--accent); }
+
+/* Reviews: the "Updated" flash in blue, not purple. */
+@keyframes review-updated-flash {
+  from { background: var(--accent-soft); color: var(--text); }
+  to { background: transparent; }
+}
