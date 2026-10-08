@@ -24,7 +24,7 @@ def config_dir(tmp_path):
     """
     The real config with storage pointed into this test's directory.
     """
-    for name in ("app.yaml", "vehicles.yaml", "stops.yaml"):
+    for name in ("app.yaml", "vehicles.yaml", "stops.json"):
         shutil.copy(DEFAULT_CONFIG_DIR / name, tmp_path / name)
     app_config = yaml.safe_load((tmp_path / "app.yaml").read_text(encoding="utf-8"))
     app_config["storage"] = {"directory": str(tmp_path / "admin")}
