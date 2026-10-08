@@ -129,6 +129,19 @@ def test_toggle_hides_and_restores_the_stops(page):
     assert page.locator(STOP_PATHS).count() == 4
 
 
+def test_full_colour_switch_turns_the_basemap_tint_off_and_on(page):
+    tint = "() => getComputedStyle(document.querySelector('.leaflet-tile-pane')).filter"
+    switch = page.locator("label.layer-toggle-row", has_text="Full-colour map")
+
+    assert page.evaluate(tint) != "none"  # muted by default
+
+    switch.click()
+    assert page.evaluate(tint) == "none"
+
+    switch.click()
+    assert page.evaluate(tint) != "none"
+
+
 # ---- S07.2 route selector and highlighting ----
 
 

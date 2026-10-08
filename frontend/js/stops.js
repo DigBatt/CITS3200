@@ -11,17 +11,24 @@
     return routes.find((route) => route.id === routeId) ?? null;
   }
 
-  // Names, in the order the config lists the routes. An id with no route left
-  // in the config is dropped rather than shown raw.
-  function routeNamesFor(stop) {
-    return routes.filter((route) => stop.routes.includes(route.id)).map((route) => route.name);
+  // The stop's routes, in the order the config lists them. An id with no route
+  // left in the config is dropped rather than shown raw.
+  function routesFor(stop) {
+    return routes.filter((route) => stop.routes.includes(route.id));
   }
 
-  // Names come from a file an administrator edits, so everything is escaped.
+  // Each route led by a dot in its own colour (as drawn when it is picked in
+  // the Route filter), so the popup says which line is which. Names and
+  // colours come from a file an administrator edits, so everything is escaped.
   function popupHtml(stop) {
-    const names = routeNamesFor(stop);
-    const routeLine = names.length
-      ? names.map((name) => `<li>${escapeHtml(name)}</li>`).join('')
+    const onRoutes = routesFor(stop);
+    const routeLine = onRoutes.length
+      ? onRoutes.map((route) => {
+        const dot = route.colour
+          ? `<span class="stop-popup-route-dot" style="background: ${escapeHtml(route.colour)}"></span>`
+          : '';
+        return `<li>${dot}${escapeHtml(route.name)}</li>`;
+      }).join('')
       : '<li class="is-empty">Not on any route</li>';
     return `
       <div class="stop-popup-id">${escapeHtml(stop.id)}</div>
@@ -70,11 +77,15 @@
     // is nothing to choose from.
     bar.hidden = routes.length === 0;
 
-    const chip = (id, label, isActive) =>
-      `<button type="button" class="chip${isActive ? ' is-active' : ''}" data-route="${escapeHtml(id)}">${escapeHtml(label)}</button>`;
+    // Each route's chip is led by a dot in the route's colour, the same as in
+    // the stop popups, so the chips double as the legend for route colours.
+    const chip = (id, label, isActive, colour = null) => {
+      const dot = colour ? `<span class="route-chip-dot" style="background: ${escapeHtml(colour)}"></span>` : '';
+      return `<button type="button" class="chip${isActive ? ' is-active' : ''}" data-route="${escapeHtml(id)}">${dot}${escapeHtml(label)}</button>`;
+    };
     row.innerHTML = [
       chip('all', 'All routes', selected === null),
-      ...routes.map((route) => chip(route.id, route.name, route.id === selected)),
+      ...routes.map((route) => chip(route.id, route.name, route.id === selected, route.colour)),
     ].join('');
   }
 
@@ -83,6 +94,17 @@
     if (!toggle) return;
     setStopsVisible(toggle.checked);
     toggle.addEventListener('change', () => setStopsVisible(toggle.checked));
+  }
+
+  // The basemap is muted by default (css/colours.css); this switch shows its
+  // own colours, for anyone finding their way by its parks and roads.
+  function wireFullColourToggle() {
+    const toggle = document.getElementById('layer-toggle-full-colour');
+    const mapEl = document.getElementById('map');
+    if (!toggle || !mapEl) return;
+    const apply = () => mapEl.classList.toggle('map-full-colour', toggle.checked);
+    apply();
+    toggle.addEventListener('change', apply);
   }
 
   function wireChips() {
@@ -95,6 +117,7 @@
   async function init(options = {}) {
     onChange = options.onChange ?? null;
     wireToggle();
+    wireFullColourToggle();
     wireChips();
 
     try {
