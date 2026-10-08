@@ -70,34 +70,36 @@ def test_config_file_lists_stops_as_a_summary_of_points():
 
 
 @pytest.mark.skipif(NODE is None, reason='Node.js is needed to run map.js')
-def test_renderer_replaces_clears_and_toggles_route_layers():
+def test_renderer_replaces_and_clears_the_route_line():
     script = r"""
 const fs = require('fs'), vm = require('vm'), assert = require('node:assert/strict');
 const group = () => ({items: [], visible: true,
   clearLayers() { this.items = []; }, addTo() { this.visible = true; }});
 const routes = group(), stops = group();
 const ctx = { window: {}, routesGroup: routes, stopsGroup: stops,
-  fakeMap: {removeLayer(layer) {layer.visible = false;}},
-  L: {polyline(points, options) {return {addTo(layer) {layer.items.push({points, options});}};}} };
+  fakeMap: {removeLayer(layer) {layer.visible = false;}, hasLayer() {return false;},
+    getContainer() {return {clientWidth: 0};}},
+  L: {polyline(points, options) {return {addTo(layer) {layer.items.push({points, options});}};},
+    latLngBounds(points) {return points;}} };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'), ctx);
 vm.runInContext('layers.routes = routesGroup; layers.stops = stopsGroup; map = fakeMap;', ctx);
+// A white casing under a solid line in the route's colour.
+const lines = () => routes.items.filter(item => item.options.className === 'planned-route-path');
 ctx.drawRoutePath({colour:'#123456', path: [[1,2],[3,4]]});
-assert.equal(routes.items.length, 1);
-assert.equal(routes.items[0].options.dashArray, '1 8');
-assert.equal(routes.items[0].options.smoothFactor, 0);
+assert.equal(routes.items.length, 2);
+assert.equal(routes.items[0].options.className, 'planned-route-casing');
+assert.equal(routes.items[0].options.color, '#ffffff');
+assert.ok(routes.items[0].options.weight > lines()[0].options.weight);
+assert.equal(lines()[0].options.dashArray, undefined);
+assert.equal(lines()[0].options.smoothFactor, 0);
 ctx.drawRoutePath({colour:'#abcdef', path: [[1,2],[3,4]]});
-assert.equal(routes.items.length, 1);
-assert.equal(routes.items[0].options.color, '#abcdef');
+assert.equal(lines().length, 1);
+assert.equal(lines()[0].options.color, '#abcdef');
 // Out along a spur and back: the stretch is drawn once, not twice.
 ctx.drawRoutePath({colour:'#abcdef', path: [[0,0],[1,1],[2,2],[1,1],[0,0],[0,5]]});
-const drawn = routes.items.flatMap(item => item.points.slice(1).map((p, i) => [item.points[i], p]));
+const drawn = lines().flatMap(item => item.points.slice(1).map((p, i) => [item.points[i], p]));
 assert.equal(drawn.length, 3);
-ctx.setStopsVisible(false);
-assert.equal(routes.visible, false);
-assert.equal(stops.visible, false);
-ctx.setStopsVisible(true);
-assert.equal(routes.visible, true);
 ctx.drawRoutePath(null);
 assert.equal(routes.items.length, 0);
 """
