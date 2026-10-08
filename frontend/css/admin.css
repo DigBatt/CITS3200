@@ -1279,6 +1279,42 @@
     font-size: 16px !important;
   }
 
+  /* iPhone Safari draws date and time fields with a minimum width of its own
+     and ignores width: 100%, so the Downtime and Figures start/end fields
+     stuck out of their cards (desktop "mobile mode" does not show this: it
+     is still Chrome's control). Without Safari's own styling they obey the
+     card's width; the height and left-aligned text are set back by hand.
+     (Their white background still comes from .form-input.) */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 40px;
+    box-sizing: border-box;
+  }
+
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value {
+    text-align: left;
+  }
+
+  /* Grid and flex items default to "no narrower than my content", which is
+     what lets a wide field push past the card; let them shrink instead. */
+  .form-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .form-group,
+  .form-row > * {
+    min-width: 0;
+  }
+
   /* Wide tables scroll inside their card rather than widening the page. */
   .admin-card:has(> table) {
     overflow-x: auto;
