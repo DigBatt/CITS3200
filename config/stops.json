@@ -65,7 +65,7 @@
     {
       "id": "full-campus-loop",
       "name": "Campus loop",
-      "colour": "#D4741F",
+      "colour": "#E0B321",
       "loop": true,
       "stops": ["reid-library", "ezone-central", "civ-mech", "law-library", "guild-village", "barry-marshall", "sports-science", "business-school", "bilya-marlee", "marine-research"],
       "points": [
