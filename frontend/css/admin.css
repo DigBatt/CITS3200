@@ -1118,6 +1118,8 @@
 .review-no-answers {
   font: 400 12px Sora, sans-serif;
   color: rgba(28, 25, 23, 0.45);
+}
+
 /* The synced roster's status, above the hand kept rows. */
 .schedule-sync {
   display: flex;
