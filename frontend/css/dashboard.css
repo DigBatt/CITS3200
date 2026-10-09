@@ -1463,8 +1463,11 @@ shared with the admin page.
   pointer-events: none;
 }
 
-/* The 3D view covers the map, and the chips do not apply to it. */
-.map-controls:has(.map-mode.is-on) .map-chips { display: none; }
+/* Hidden in 3D, which covers the map and they do not apply to, and on the
+   Rider tab (js/panels.js; .is-chrome-hidden alone loses to display: flex
+   above, which comes later in this file). */
+.map-controls:has(.map-mode.is-on) .map-chips,
+.map-chips.is-chrome-hidden { display: none; }
 
 .campus3d {
   position: absolute;
