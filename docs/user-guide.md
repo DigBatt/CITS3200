@@ -161,13 +161,15 @@ bottom of the panel summarise utilisation for the vehicles and period chosen.
   colour. Picking one fills that route's stops with its colour, fades the
   others, and zooms the map to the whole route. **All routes** clears it and
   zooms back to the shuttles.
-- Under **MAP LAYERS**:
-  - **Focus on routes and stops** fades the shuttles' lines and rings, and
-    draws the selected route's planned path over them. The shuttles and stops
-    stay at full strength. Off by default.
-  - **Full-colour map** shows the map's own colours, for finding your way by
-    its parks and roads. Off by default, which mutes the map so the routes
-    and shuttles stand out.
+- Two chips at the top right of the map, beside the 2D / 3D switch, change
+  how the map is drawn. Each turns blue while it is on, and both are off by
+  default. They are not shown on the Rider tab or in 3D.
+  - **Focus routes** fades the shuttles' lines and rings, and draws the
+    selected route's planned path over them. The shuttles and stops stay at
+    full strength.
+  - **Full colour** shows the map's own colours, for finding your way by its
+    parks and roads. Off, the map is muted so the routes and shuttles stand
+    out.
 - The **AREA** bar keeps the map on one place, **UWA Campus** or
   **Eglinton**. Without it, the map zooms to fit every shuttle shown, which
   zooms a long way out when shuttles are in both places.

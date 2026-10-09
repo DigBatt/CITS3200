@@ -159,7 +159,7 @@ function initMap() {
   }).addTo(map);
 
   // Bottom to top: the GPS trails, the selected route's line, the stops'
-  // rings, the stops. The Focus on routes and stops switch (setRouteFocus) fades the
+  // rings, the stops. The Focus routes chip (setRouteFocus) fades the
   // trails and rings and fades the route line in, pane by pane, so whatever
   // is drawn later follows the switch.
   map.createPane('trails').style.zIndex = 335;
@@ -253,8 +253,8 @@ function uniqueRuns(path) {
 
 // Draw only the selected planned route, over the GPS trails and below the
 // stop markers. Its path comes from /api/routes, set in config/stops.json by
-// the admin page's route editor. It is seen only with the Focus on routes and stops
-// switch on (setRouteFocus); with the trails at full strength, the
+// the admin page's route editor. It is seen only with the Focus routes
+// chip on (setRouteFocus); with the trails at full strength, the
 // route's filled stops (highlightRoute above) show it on their own.
 //
 // A solid line in the route's colour over a wider white one, the casing,
@@ -318,7 +318,7 @@ function openStopPopup(stopId) {
   stopMarkers.get(stopId)?.openPopup();
 }
 
-// The Focus on routes and stops switch. Off: the trails and the stops' rings at full
+// The Focus routes chip. Off: the trails and the stops' rings at full
 // strength, and no route line. On: the trails and rings faded, still there
 // for context, and the selected route's line shown over them. The buses and
 // stops stay at full strength either way.

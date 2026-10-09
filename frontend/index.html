@@ -104,29 +104,6 @@
 
             <div class="vehicle-list" id="vehicle-list"></div>
 
-            <!-- js/stops.js wires Focus on routes and stops to fading the trails
-                 for the route line, and Full-colour map to the basemap's tint
-                 (css/colours.css). -->
-            <div class="layer-toggles">
-              <span class="layer-toggles-label">MAP LAYERS</span>
-              <label class="layer-toggle-row">
-                <span>Focus on routes and stops</span>
-                <span class="toggle-switch">
-                  <input type="checkbox" id="layer-toggle-focus-route">
-                  <span class="toggle-track"></span>
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
-              <label class="layer-toggle-row">
-                <span>Full-colour map</span>
-                <span class="toggle-switch">
-                  <input type="checkbox" id="layer-toggle-full-colour">
-                  <span class="toggle-track"></span>
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
-            </div>
-
             <div class="kpi-mini-grid" id="fleet-kpis"></div>
           </div>
 
@@ -385,16 +362,34 @@
             <p class="campus3d-hint">Drag to look around &middot; scroll to zoom &middot; &larr; &rarr; for the next bus</p>
           </section>
 
-          <!-- 2D / 3D toggle, the same switch as the map layer toggles. -->
-          <label class="map-mode" for="map-3d-toggle" title="Switch between the 2D map and the 3D view">
-            <span class="map-mode-side is-2d">2D</span>
-            <span class="toggle-switch">
-              <input type="checkbox" id="map-3d-toggle" role="switch" aria-label="3D view">
-              <span class="toggle-track"></span>
-              <span class="toggle-knob"></span>
-            </span>
-            <span class="map-mode-side is-3d">3D</span>
-          </label>
+          <!-- The map's own controls, top right: the layer chips, then the
+               2D / 3D switch. -->
+          <div class="map-controls">
+            <!-- Layer chips, blue while on, like the filter chips. Each is a
+                 checkbox under its label: js/stops.js wires Focus routes to
+                 fading the trails for the route line, and Full colour to the
+                 basemap's tint (css/colours.css). Hidden in 3D, which they do
+                 not apply to, and on the Rider tab (js/panels.js). -->
+            <div class="map-chips" id="map-layers">
+              <label class="chip map-chip" title="Fade the vehicle tracks and draw the selected route's line">
+                <input type="checkbox" id="layer-toggle-focus-route">Focus routes
+              </label>
+              <label class="chip map-chip" title="Show the map's own colours">
+                <input type="checkbox" id="layer-toggle-full-colour">Full colour
+              </label>
+            </div>
+
+            <!-- 2D / 3D toggle. -->
+            <label class="map-mode" for="map-3d-toggle" title="Switch between the 2D map and the 3D view">
+              <span class="map-mode-side is-2d">2D</span>
+              <span class="toggle-switch">
+                <input type="checkbox" id="map-3d-toggle" role="switch" aria-label="3D view">
+                <span class="toggle-track"></span>
+                <span class="toggle-knob"></span>
+              </span>
+              <span class="map-mode-side is-3d">3D</span>
+            </label>
+          </div>
 
           <div class="map-legend" id="map-legend" hidden></div>
 

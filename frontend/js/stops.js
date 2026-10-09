@@ -89,7 +89,7 @@
     ].join('');
   }
 
-  // Focus on routes and stops, off by default; on fades the buses' GPS trails
+  // The Focus routes chip, off by default; on fades the buses' GPS trails
   // and shows the selected route's line over them (js/map.js). The stops
   // themselves are always shown.
   function wireRouteFocusToggle() {
