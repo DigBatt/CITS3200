@@ -394,13 +394,21 @@
     <p id="snapshot-status" role="status" aria-live="polite"></p>
   </div>
 
-  <!-- S17: Daily snapshot generation (separate issue) -->
-  <div class="admin-card">
+
+<!-- S17: Daily snapshots -->
+<div class="admin-card">
+  <div class="review-list-head">
     <p class="admin-card-title">PAST SNAPSHOTS</p>
-    <p class="empty-state">
-      Daily snapshot generation and downloads are not yet available.
-    </p>
+    <button type="button" class="btn-xs" id="btn-snapshots-refresh">
+      Refresh
+    </button>
   </div>
+
+  <div id="snapshot-list" aria-live="polite">
+    <p class="empty-state">Loading snapshots...</p>
+  </div>
+</div>
+
 </div>
 
     <!-- ---- Rider reviews (S15 follow-up): read from GET /api/reviews, admin only ---- -->
@@ -482,6 +490,7 @@
 <script src="js/tum.js"></script>
 <script src="js/vehicle-chips.js"></script>
 <script src="js/admin.js"></script>
+<script src="js/admin-snapshots.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="js/route-editor.js"></script>
 <script src="js/operator.js"></script>
