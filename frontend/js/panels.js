@@ -28,6 +28,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('vehicle-filter')?.classList.toggle('is-chrome-hidden', hideVehicle);
     document.getElementById('route-filter')?.classList.toggle('is-chrome-hidden', hideRoute);
     document.getElementById('area-filter')?.classList.toggle('is-chrome-hidden', hideArea);
+    // The map's layer chips: Focus routes works on the selected route, and
+    // the Rider tab has no Route bar to select one with.
+    document.getElementById('map-layers')?.classList.toggle('is-chrome-hidden', hideRoute);
     // The date-range picker is the header calendar, with the period control
     // inside its overlay, so the whole of it is hidden, bar and all.
     document.querySelector('.app-header .period-picker')?.classList.toggle('is-chrome-hidden', hideTimeline);

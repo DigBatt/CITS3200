@@ -89,11 +89,14 @@
     ].join('');
   }
 
-  function wireToggle() {
-    const toggle = document.getElementById('layer-toggle-stops');
+  // The Focus routes chip, off by default; on fades the buses' GPS trails
+  // and shows the selected route's line over them (js/map.js). The stops
+  // themselves are always shown.
+  function wireRouteFocusToggle() {
+    const toggle = document.getElementById('layer-toggle-focus-route');
     if (!toggle) return;
-    setStopsVisible(toggle.checked);
-    toggle.addEventListener('change', () => setStopsVisible(toggle.checked));
+    setRouteFocus(toggle.checked);
+    toggle.addEventListener('change', () => setRouteFocus(toggle.checked));
   }
 
   // The basemap is muted by default (css/colours.css); this switch shows its
@@ -116,7 +119,7 @@
 
   async function init(options = {}) {
     onChange = options.onChange ?? null;
-    wireToggle();
+    wireRouteFocusToggle();
     wireFullColourToggle();
     wireChips();
 

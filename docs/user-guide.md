@@ -145,18 +145,31 @@ bottom of the panel summarise utilisation for the vehicles and period chosen.
 
 #### The map
 
-- Each shuttle is a **numbered circle in its own colour**, at its latest
-  position in the period. Click it for its name and how many positions were
-  recorded.
-- The **coloured line** behind it is where it travelled during the period.
-  The line has a break wherever the shuttle stopped reporting for more than
-  5 minutes, so a gap in the line means a gap in the data, not a jump.
+- Each shuttle is a **small bus in its own colour**, with its number in a
+  badge, at its latest position in the period. Click it for its name and how
+  many positions were recorded.
+- The **coloured line** is where it travelled during the period. The line
+  has a break wherever the shuttle stopped reporting for more than 5
+  minutes, so a gap in the line means a gap in the data, not a jump.
 - **Stops** are the small circles. Hover over one to see its name; click it
-  to see which routes serve it. The **Stops** switch under **MAP LAYERS**
-  hides and shows them.
-- The **ROUTE** bar highlights one route: its stops stay at full strength,
-  the others fade, and the route's planned path is drawn. **All routes**
-  clears it.
+  to see which routes serve it, each with a dot in the route's colour.
+- A **ring around a stop** means a shuttle came within about 25 metres of it
+  during the period, in that shuttle's colour. A stop two shuttles passed
+  has two rings, one per shuttle, always in the same order as the Vehicles
+  panel.
+- The **ROUTE** bar highlights one route. Each chip has a dot in its route's
+  colour. Picking one fills that route's stops with its colour, fades the
+  others, and zooms the map to the whole route. **All routes** clears it and
+  zooms back to the shuttles.
+- Two chips at the top right of the map, beside the 2D / 3D switch, change
+  how the map is drawn. Each turns blue while it is on, and both are off by
+  default. They are not shown on the Rider tab or in 3D.
+  - **Focus routes** fades the shuttles' lines and rings, and draws the
+    selected route's planned path over them. The shuttles and stops stay at
+    full strength.
+  - **Full colour** shows the map's own colours, for finding your way by its
+    parks and roads. Off, the map is muted so the routes and shuttles stand
+    out.
 - The **AREA** bar keeps the map on one place, **UWA Campus** or
   **Eglinton**. Without it, the map zooms to fit every shuttle shown, which
   zooms a long way out when shuttles are in both places.
