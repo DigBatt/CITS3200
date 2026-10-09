@@ -87,4 +87,7 @@ def test_selecting_a_bus_leaves_only_its_marker(page):
 
 def test_clicking_a_marker_still_opens_its_popup(page):
     page.locator(".bus-marker", has_text="2").click()
-    assert page.locator(".leaflet-popup-content").text_content().startswith("nUWAy 2 — ")
+    popup = page.locator(".leaflet-popup-content")
+    assert popup.locator(".stop-popup-id").text_content() == "nUWAy 2"
+    assert "LAST POSITION" in popup.text_content()
+    assert "IN THIS PERIOD" in popup.text_content()

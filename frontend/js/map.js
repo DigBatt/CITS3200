@@ -367,6 +367,22 @@ function busIcon(vehicle) {
 }
 
 
+// A bus's popup, styled as the stops' are (.stop-popup): its name led by a dot
+// in its colour, when its marker's position was recorded, and how many
+// positions the period holds. `lastFix` is the fix the marker stands on.
+function busPopupHtml(vehicle, lastFix) {
+  const colour = vehicle.colour
+    ? `<span class="stop-popup-route-dot" style="background: ${escapeHtml(vehicle.colour)}"></span>`
+    : '';
+  const count = `${vehicle.count} position${vehicle.count === 1 ? '' : 's'}`;
+  return `
+    <div class="stop-popup-id">${colour}${escapeHtml(vehicle.name ?? vehicle.vehicle_id)}</div>
+    <div class="stop-popup-label">LAST POSITION</div>
+    <div class="stop-popup-name">${escapeHtml(formatInstant(lastFix.timestamp))}</div>
+    <div class="stop-popup-label">IN THIS PERIOD</div>
+    <div class="stop-popup-name">${escapeHtml(count)}</div>`;
+}
+
 // A bus that went quiet and came back was not on a straight line between the
 // two fixes, so its trail is broken there rather than joined: `fixes`
 // (ascending by timestamp) cut wherever two neighbours are more than
@@ -406,7 +422,7 @@ function drawTracks(vehicles, { fit = true, gapSeconds = null } = {}) {
     // catch clicks meant for the map or a stop near it.
     L.polyline(runs, { pane: 'trails', weight: 3, interactive: false, ...style }).addTo(layers.trails);
     L.marker(points[points.length - 1], { icon: busIcon(vehicle), pane: 'buses', keyboard: false })
-      .bindPopup(`${vehicle.name ?? vehicle.vehicle_id} — ${vehicle.count} positions`)
+      .bindPopup(busPopupHtml(vehicle, fixes[fixes.length - 1]), { className: 'stop-popup', closeButton: false })
       .addTo(layers.trails);
 
     bounds.extend(points);
