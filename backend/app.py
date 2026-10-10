@@ -22,6 +22,7 @@ from backend.api.reviews import bp as reviews_bp
 from backend.api.network import bp as network_bp
 from backend.api.stops import bp as stops_bp
 from backend.api.vehicles import bp as vehicles_bp
+from backend.api.snapshots import bp as snapshots_bp
 from backend.compression import init_app as init_compression
 from backend.auth import admin_required, load_secrets, signed_in
 from backend.auth import bp as auth_bp
@@ -33,6 +34,8 @@ from backend.reviews import ReviewStore
 from backend.roster_sync import FILE_NAME as ROSTER_SYNC_FILE, RosterSync, SyncError, SyncSettings, SyncStore
 from backend.repository import CsvRepository
 from backend.snapshot_settings import SnapshotSettingsStore
+from backend.snapshots import SnapshotStore
+from backend.snapshot_scheduler import SnapshotScheduler
 from backend.stops import resolve_paths
 from backend.repository.base import RepositoryError
 
@@ -99,15 +102,26 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
 
     # S16: Persistent snapshot metric selection.
     app.config["SNAPSHOT_SETTINGS_STORE"] = (
-        SnapshotSettingsStore(
-            config.storage_directory,
-            config.snapshot_default_metrics or [
-                "asset_utilisation",
-                "operating_efficiency",
-                "effective_utilisation",
-            ],
-        )
+        SnapshotSettingsStore.from_config(config)
         if config.storage_directory else None
+    )
+
+    # S17: Daily Snapshot storage
+    app.config["SNAPSHOT_STORE"] = (
+        SnapshotStore(config.storage_directory)
+        if config.storage_directory
+        else None
+    )
+
+    # S17: Read missing snapshot dates
+    app.config["SNAPSHOT_SCHEDULE_STORE"] = (
+        SnapshotScheduler(
+            config.storage_directory,
+            app.config["SNAPSHOT_STORE"],
+            generate=None,
+        )
+        if config.storage_directory
+        else None
     )
 
     # The driving roster synced from calendar.online (backend/roster_sync.py).
@@ -151,6 +165,7 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
     app.register_blueprint(pickup_requests_bp)
     app.register_blueprint(reviews_bp)
     app.register_blueprint(earth_bp)
+    app.register_blueprint(snapshots_bp)
     # Gzip for JSON, scripts and styles: the 3D view's model above all.
     init_compression(app)
     app.register_blueprint(downtime_bp)

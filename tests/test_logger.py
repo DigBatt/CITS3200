@@ -18,6 +18,7 @@ from backend.logger import Logger, LoggerSettings, main
 from backend.metrics.tum import EARTH_RADIUS_M
 from backend.models import Vehicle
 from backend.repository import CsvRepository, RepositoryError
+from backend.roster_sync import SyncError
 
 UA = "Mozilla/5.0 test"
 SETTINGS = LoggerSettings(poll_interval_seconds=5, timeout_seconds=10, user_agent=UA)
@@ -149,6 +150,36 @@ def test_run_polls_until_interrupted(tmp_path, monkeypatch):
     assert len(stored(tmp_path)) == 2
 
 
+class BrokenScheduler:
+    """A snapshot scheduler whose start or check always fails."""
+
+    def __init__(self, start_fails=False):
+        self.start_fails = start_fails
+        self.checks = 0
+
+    def start(self, now):
+        if self.start_fails:
+            raise ValueError("corrupt schedule")
+
+    def check(self, now):
+        self.checks += 1
+        raise OSError("disk full")
+
+
+@pytest.mark.parametrize("start_fails, checks", [(False, 3), (True, 0)])
+def test_a_failing_snapshot_scheduler_does_not_stop_the_polling(tmp_path, monkeypatch, caplog, start_fails, checks):
+    monkeypatch.setattr(logger_module.time, "sleep", lambda seconds: None)
+    fetcher = Fetcher(bus1=[snapshot(0), snapshot(5), snapshot(10), KeyboardInterrupt()], bus2=[snapshot(0)])
+    scheduler = BrokenScheduler(start_fails)
+    logger = Logger(CsvRepository(tmp_path, [BUS1, BUS2]), [BUS1, BUS2], SETTINGS, PARSE, fetch=fetcher,
+                    snapshot_scheduler=scheduler)
+    with pytest.raises(KeyboardInterrupt):
+        logger.run()
+    assert len(stored(tmp_path)) == 3
+    assert scheduler.checks == checks
+    assert ("daily snapshots disabled" in caplog.text) == start_fails
+
+
 def test_settings_from_config():
     block = load_config().logger
     assert LoggerSettings.from_config(load_config()) == LoggerSettings(
@@ -205,3 +236,39 @@ def test_main_refuses_to_append_to_files_in_another_format(tmp_path, monkeypatch
     after = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
     assert {name: after[name] for name in before} == before
     assert "has a header other than" in caplog.text
+
+
+@pytest.mark.parametrize("error", [SyncError("roster_sync.vehicles names an unknown vehicle"),
+                                   ConfigError("snapshots.default_metrics in config/app.yaml: bad")])
+def test_main_polls_without_snapshots_when_their_settings_are_invalid(tmp_path, monkeypatch, caplog, error):
+    def fail(config, config_dir):
+        raise error
+
+    monkeypatch.setattr(logger_module.SyncSettings, "load", fail)
+    live = tmp_path / "live"
+    config = dataclasses.replace(load_config(), live_directory=live, storage_directory=tmp_path / "admin")
+    run_main(monkeypatch, config, ALL)
+    assert sorted(p.name for p in live.iterdir()) == [f"positions_{i}.csv" for i in "1234"]
+    assert f"daily snapshots disabled: {error}" in caplog.text
+    assert not (tmp_path / "admin" / "snapshot_schedule.json").exists()
+
+
+def test_snapshots_read_the_repository_the_dashboard_reads(tmp_path, monkeypatch, caplog):
+    monkeypatch.setattr(logger_module.SyncSettings, "load", lambda config, config_dir: None)
+    captured = {}
+
+    def generate(day, config, repository, *args, **kwargs):
+        captured["repository"] = repository
+
+    monkeypatch.setattr(logger_module, "generate_daily_snapshot", generate)
+    config = dataclasses.replace(load_config(), live_directory=tmp_path / "live", storage_directory=tmp_path / "admin",
+                                 snapshot_default_metrics=None)
+    scheduler = logger_module.build_snapshot_scheduler(config)
+    scheduler.generate(datetime.now(timezone.utc).date())
+    assert captured["repository"].data_directory == config.data_directory
+    assert "set data.directory to data.live_directory" in caplog.text
+
+
+def test_no_snapshots_without_a_storage_directory():
+    config = dataclasses.replace(load_config(), storage_directory=None)
+    assert logger_module.build_snapshot_scheduler(config) is None

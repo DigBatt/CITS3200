@@ -22,6 +22,13 @@ AVAILABLE_METRICS = {
     "use_of_availability": "Use of availability",
 }
 
+# Used when config/app.yaml does not set snapshots.default_metrics.
+DEFAULT_METRICS = [
+    "asset_utilisation",
+    "operating_efficiency",
+    "effective_utilisation",
+]
+
 
 class SnapshotSettingsStore:
     """Read and save the administrator's snapshot metric selection."""
@@ -32,6 +39,14 @@ class SnapshotSettingsStore:
             self.default_metrics = self.validate(default_metrics)
         except ValueError as exc:
             raise ConfigError(f"snapshots.default_metrics in config/app.yaml: {exc}") from exc
+
+    @classmethod
+    def from_config(cls, config) -> "SnapshotSettingsStore":
+        """Build from a backend.config.Config, which must set storage.directory."""
+        return cls(
+            config.storage_directory,
+            config.snapshot_default_metrics or DEFAULT_METRICS,
+        )
 
     @staticmethod
     def validate(metrics: list[str]) -> list[str]:
