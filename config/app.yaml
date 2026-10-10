@@ -41,7 +41,9 @@ utilisation:
   # Thresholds for the GMG time utilisation model (docs/GMG Time Utilisation Model.md).
   stationary_speed_mps: 0.2   # below this the shuttle counts as stopped.
   min_standby_seconds: 120    # a shorter stop at the depot is a delay, not standby.
-  max_gap_seconds: 30         # longer is not reporting.
+  # Longer is not reporting. Keep it several times logger.poll_interval_seconds:
+  # live positions are at least that far apart, and a missed poll doubles it.
+  max_gap_seconds: 60
 
   depot:
     # PLACEHOLDER,  Currently the start of the record.
@@ -125,7 +127,7 @@ pickup_requests:
     friday: ["08:00", "17:00"]
 
 logger:
-  poll_interval_seconds: 30
+  poll_interval_seconds: 10
   timeout_seconds: 60
   # The REV server answers 406 to non-browser user agents.
   user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"

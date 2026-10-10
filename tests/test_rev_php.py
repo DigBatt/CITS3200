@@ -3,6 +3,7 @@ backend.ingest.rev_php: REV tracking responses onto the schema.
 """
 
 from __future__ import annotations
+import dataclasses
 import json
 from datetime import datetime, timedelta, timezone
 from math import degrees, inf, nan
@@ -246,4 +247,5 @@ def test_speed_without_a_max_gap_has_no_upper_limit():
 # Config
 
 def test_settings_from_config():
-    assert Settings.from_config(load_config()) == SETTINGS
+    # config/app.yaml allows a longer gap than these tests' own SETTINGS.
+    assert Settings.from_config(load_config()) == dataclasses.replace(SETTINGS, max_gap_seconds=60)
