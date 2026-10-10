@@ -4,6 +4,7 @@ A test admin account (S13) for tests whose endpoints need signing in.
 
 from __future__ import annotations
 from pathlib import Path
+from typing import Any
 
 import yaml
 from werkzeug.security import generate_password_hash
@@ -33,3 +34,40 @@ def sign_in(client):
     response = client.post("/api/admin/login", json={"username": ADMIN_USERNAME, "password": ADMIN_PASSWORD})
     assert response.status_code == 200, response.get_json()
     return client
+
+
+#: Every day, wide open, so widening a copied app.yaml to this makes
+#: POST /api/pickup-requests succeed no matter the real time a test happens
+#: to run at (backend/operating_hours.py). The sample config's own hours are
+#: realistic office hours, which is the opposite of what most tests want.
+_ALL_DAY = ["00:00", "23:59"]
+_DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
+
+def allow_pickup_requests_any_time(config_dir: Path, app_config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    Widen `pickup_requests.operating_hours` in a test's app.yaml to every day,
+    all day. For a test exercising POST /api/pickup-requests (or anything
+    downstream of it) that is not itself testing the operating hours gate.
+
+    Parameters
+    ----------
+    config_dir : Path
+        Directory holding the test's own app.yaml, already copied from
+        config/.
+    app_config : dict, optional
+        The already loaded app.yaml, if the caller has one in hand (and will
+        write it back itself). None reads and writes the file directly.
+
+    Returns
+    -------
+    dict
+        The updated app.yaml content, in case the caller wants to make
+        further changes before writing it.
+    """
+    path = Path(config_dir) / "app.yaml"
+    config = app_config if app_config is not None else yaml.safe_load(path.read_text(encoding="utf-8"))
+    config.setdefault("pickup_requests", {})["operating_hours"] = {day: _ALL_DAY for day in _DAYS}
+    if app_config is None:
+        path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    return config

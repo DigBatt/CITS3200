@@ -20,7 +20,7 @@ Codes: `bad_timestamp`, `bad_range` (from > to), `unknown_vehicle`,
 `request_not_open`, `data_unavailable`, `not_signed_in`, `bad_credentials`,
 `admin_not_configured`, `missing_field`, `overlap`, `unknown_downtime`,
 `invalid_schedule`, `request_not_collected`, `bad_rating`,
-`already_reviewed`, `comment_too_long`.
+`already_reviewed`, `comment_too_long`, `outside_operating_hours`.
 
 
 **Signing in.** Endpoints marked *Admin only* answer `401` `not_signed_in`
@@ -771,7 +771,9 @@ a JSON body, and the operator view never sees another rider's token.
 
 `400` `unknown_stop` if the stop is not configured — this is a bad request
 body, not a path lookup, so it does not follow the `404` convention `/api/stops/<id>`
-uses.
+uses. `403` `outside_operating_hours` if the shuttle is not currently taking
+requests (S15 follow-up; see `GET /api/pickup-requests/hours` below for where
+that is defined and how to read it).
 
 If the rider (by cookie) already has an open request at that stop, that same
 request is returned unchanged with `200` instead of opening a second one. A
@@ -828,6 +830,58 @@ request going `collected` (to show a "leave a review" prompt) or `expired`.
 `{"request": null}` if this rider has no `rider_token` cookie yet, or has
 never made a request — not an error, since that is the normal state before a
 rider's first request.
+
+### `GET /api/pickup-requests/hours`
+
+S15 follow-up. Whether the shuttle is taking pickup requests right now, and
+the week's hours. Public, same as the rest of the rider-facing endpoints
+above — the rider page reads this to show a "closed" message in place of the
+stop picker outside these hours, rather than letting the rider pick a stop
+only to have `POST /api/pickup-requests` refuse it.
+
+```json
+{
+  "configured": true,
+  "timezone": "Australia/Perth",
+  "open_now": false,
+  "today": "saturday",
+  "today_hours": null,
+  "hours": {
+    "monday": ["08:00", "17:00"],
+    "tuesday": ["08:00", "17:00"],
+    "wednesday": ["08:00", "17:00"],
+    "thursday": ["08:00", "17:00"],
+    "friday": ["08:00", "17:00"],
+    "saturday": null,
+    "sunday": null
+  }
+}
+```
+
+**Where these hours are set.** `pickup_requests.operating_hours` in
+`config/app.yaml`, one `[open, close]` pair of local wall clock times
+(`display.timezone`) per day; a day left out has no service that day:
+
+```yaml
+pickup_requests:
+  operating_hours:
+    monday: ["08:00", "17:00"]
+    tuesday: ["08:00", "17:00"]
+    # ... through to whichever days the shuttle runs
+```
+
+Leaving the whole block out of `app.yaml` turns the check off rather than
+closing the service every day — `configured` is then `false` and `open_now`
+is always `true` — the same "absent means no limit" default
+`pickup_requests.expire_after_seconds` already uses. `today`/`today_hours` are
+`null` only if `display.timezone` itself is not set, since there is then no
+way to say what day it locally is.
+
+This is deliberately separate from `utilisation.service_hours` (`GET
+/api/schedule`): that rosters the fleet per vehicle for the time usage model
+and is edited from the admin page; this is the one public answer to "is the
+shuttle running", so it is simpler and hand kept only. Keep the two in step
+by hand if the timetable changes.
 
 ### `POST /api/pickup-requests/<id>/cancel`
 

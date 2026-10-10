@@ -12,7 +12,7 @@ import pytest
 from backend.app import create_app
 from backend.auth import load_secrets
 from backend.config import DEFAULT_CONFIG_DIR, ConfigError
-from tests.admin_support import ADMIN_PASSWORD, ADMIN_USERNAME, sign_in, write_admin_secrets
+from tests.admin_support import ADMIN_PASSWORD, ADMIN_USERNAME, allow_pickup_requests_any_time, sign_in, write_admin_secrets
 
 # Admin-only endpoints, as (method, path, body). body is None for a GET.
 ADMIN_ENDPOINTS = [
@@ -27,6 +27,9 @@ ADMIN_ENDPOINTS = [
 def config_dir(tmp_path):
     for name in ("app.yaml", "vehicles.yaml", "stops.json"):
         shutil.copy(DEFAULT_CONFIG_DIR / name, tmp_path / name)
+    # Not testing operating hours here: open every day, so this suite does
+    # not depend on what time it is when it runs.
+    allow_pickup_requests_any_time(tmp_path)
     write_admin_secrets(tmp_path)
     return tmp_path
 

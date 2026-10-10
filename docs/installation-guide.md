@@ -281,6 +281,7 @@ commented in the file. Restart both services after changing any of them.
 | `roster_sync.*` | nUWAy 4 | Which calendar.online events count as drives (section 4.4). |
 | `admin.session_hours` | `12` | How long an admin sign-in lasts. |
 | `pickup_requests.expire_after_seconds` | `1800` | How long a rider's pickup request stays open if nobody collects them. |
+| `pickup_requests.operating_hours` | Mon to Fri 08:00 to 17:00 | Days and hours riders may request a pickup at all. Outside them, the rider page shows a "closed" message instead of the stop picker. Edited here by hand, unlike `utilisation.service_hours` above; leaving it out entirely turns the check off rather than closing the service every day. |
 | `snapshots.default_metrics` | Three metrics | The metrics selected for daily snapshots until an administrator saves a choice. |
 
 ## 10. Keeping it running

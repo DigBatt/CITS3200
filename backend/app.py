@@ -27,6 +27,7 @@ from backend.auth import admin_required, load_secrets, signed_in
 from backend.auth import bp as auth_bp
 from backend.config import DEFAULT_CONFIG_DIR, ConfigError, load_config
 from backend.downtime import DowntimeStore
+from backend.operating_hours import OperatingHours, OperatingHoursError
 from backend.path_network import FILE_NAME as PATHS_FILE, PathNetwork, PathNetworkError
 from backend.pickup_requests import PickupRequestStore
 from backend.reviews import ReviewStore
@@ -88,6 +89,13 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
     app.config["NUWAY_CONFIG_PATH"] = config_dir / "app.yaml"
     app.config["REPOSITORY"] = CsvRepository.from_config(config)
     app.config["PICKUP_REQUEST_STORE"] = PickupRequestStore()
+    # S15 follow-up: when riders may request a pickup at all (backend/operating_hours.py).
+    try:
+        app.config["OPERATING_HOURS"] = OperatingHours.from_config_block(
+            (config.pickup_requests or {}).get("operating_hours")
+        )
+    except OperatingHoursError as exc:
+        raise ConfigError(f"pickup_requests.operating_hours: {exc}") from exc
     # if storage is unset /api/downtime then answers 500.
     app.config["DOWNTIME_STORE"] = (
         DowntimeStore(config.storage_directory / "downtime.json") if config.storage_directory else None
