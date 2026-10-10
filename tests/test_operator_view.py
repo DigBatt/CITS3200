@@ -16,7 +16,7 @@ import yaml
 
 from backend.app import FRONTEND, create_app
 from backend.config import DEFAULT_CONFIG_DIR
-from tests.admin_support import ADMIN_PASSWORD, ADMIN_USERNAME, sign_in, write_admin_secrets
+from tests.admin_support import ADMIN_PASSWORD, ADMIN_USERNAME, allow_pickup_requests_any_time, sign_in, write_admin_secrets
 from backend.models import PickupRequest
 from backend.pickup_requests import waiting_at_stops
 
@@ -42,6 +42,9 @@ def config_dir(tmp_path):
     for name in ("app.yaml", "vehicles.yaml"):
         shutil.copy(DEFAULT_CONFIG_DIR / name, tmp_path / name)
     (tmp_path / "stops.yaml").write_text(yaml.safe_dump(NETWORK, sort_keys=False), encoding="utf-8")
+    # Not testing operating hours here: open every day, so this suite does
+    # not depend on what time it is when it runs.
+    allow_pickup_requests_any_time(tmp_path)
     write_admin_secrets(tmp_path)
     return tmp_path
 

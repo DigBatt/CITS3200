@@ -12,7 +12,7 @@ import yaml
 
 from backend.app import create_app
 from backend.config import DEFAULT_CONFIG_DIR
-from tests.admin_support import sign_in, write_admin_secrets
+from tests.admin_support import allow_pickup_requests_any_time, sign_in, write_admin_secrets
 
 
 def stop(stop_id, latitude=-31.98, longitude=115.82, name=None):
@@ -34,6 +34,9 @@ def config_dir(tmp_path):
     for name in ("app.yaml", "vehicles.yaml", "stops.json"):
         shutil.copy(DEFAULT_CONFIG_DIR / name, tmp_path / name)
     (tmp_path / "stops.json").write_text(json.dumps(NETWORK), encoding="utf-8")
+    # Not testing operating hours here: open every day, so this suite does
+    # not depend on what time it is when it runs.
+    allow_pickup_requests_any_time(tmp_path)
     write_admin_secrets(tmp_path)
     return tmp_path
 

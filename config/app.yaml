@@ -107,6 +107,22 @@ admin:
 
 pickup_requests:
   expire_after_seconds: 1800
+  # S15 follow-up: days and hours riders may request a pickup at all.
+  # Local wall clock in display.timezone. A day left out (the weekend here)
+  # has no service that day, and the rider page shows a "closed" message
+  # instead of the stop picker outside these windows.
+  #
+  # This is separate from utilisation.service_hours above: that rosters the
+  # fleet, per vehicle, for the time usage model; this is the one public
+  # answer to "is the shuttle running", so it does not need per-vehicle
+  # detail or the admin schedule editor. Keep the two in step by hand if the
+  # timetable changes.
+  operating_hours:
+    monday: ["08:00", "17:00"]
+    tuesday: ["08:00", "17:00"]
+    wednesday: ["08:00", "17:00"]
+    thursday: ["08:00", "17:00"]
+    friday: ["08:00", "17:00"]
 
 logger:
   poll_interval_seconds: 30

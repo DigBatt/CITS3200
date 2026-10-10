@@ -19,6 +19,7 @@ import yaml
 from backend.app import create_app
 from backend.config import DEFAULT_CONFIG_DIR
 from backend.models import Review
+from tests.admin_support import allow_pickup_requests_any_time
 
 sync_playwright = pytest.importorskip("playwright.sync_api").sync_playwright
 werkzeug_serving = pytest.importorskip("werkzeug.serving")
@@ -71,6 +72,11 @@ def config_dir(tmp_path):
     # names, same as tests/test_downtime.py.
     app_config = yaml.safe_load((tmp_path / "app.yaml").read_text(encoding="utf-8"))
     app_config["storage"] = {"directory": str(tmp_path / "admin")}
+    # Not testing operating hours here: open every day, so this suite does
+    # not depend on what time it is when it runs. test_operating_hours.py
+    # covers the "closed" message itself with its own, deliberately shut,
+    # config.
+    allow_pickup_requests_any_time(tmp_path, app_config)
     (tmp_path / "app.yaml").write_text(yaml.safe_dump(app_config, sort_keys=False), encoding="utf-8")
 
     return tmp_path

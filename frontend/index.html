@@ -135,6 +135,16 @@
               </button>
             </div>
 
+            <!-- ---- Closed: shown in place of the picker outside
+                 pickup_requests.operating_hours (S15 follow-up). An active
+                 request (waiting/collected) is unaffected -- this only
+                 replaces the idle picker, never cuts short a ride already
+                 under way. -->
+            <div class="rider-closed" id="rider-closed" hidden>
+              <p class="rider-closed-title">No pickups right now</p>
+              <p class="rider-closed-note" id="rider-closed-note">Check back during shuttle hours.</p>
+            </div>
+
             <!-- ---- Waiting: shown once the rider has an open request (S15) ---- -->
             <div class="rider-waiting" id="rider-waiting" hidden>
               <p class="rider-waiting-title">Waiting for the shuttle at</p>

@@ -85,6 +85,13 @@ function getMyPickupRequest() {
   return request('/api/pickup-requests/mine');
 }
 
+// GET /api/pickup-requests/hours (S15 follow-up): whether the shuttle is
+// taking pickup requests right now, and the week's hours, for the rider
+// page's "closed" message. Public, and never errors in normal operation.
+function getPickupRequestHours() {
+  return request('/api/pickup-requests/hours');
+}
+
 // POST /api/pickup-requests/<id>/cancel (S15). Resolves to the cancelled
 // request, or throws with the API's message (e.g. it was already collected).
 async function cancelPickupRequest(requestId) {

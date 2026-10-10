@@ -13,7 +13,7 @@ from backend.app import create_app
 from backend.config import DEFAULT_CONFIG_DIR
 from backend.models import Review
 from backend.reviews import DuplicateReview, ReviewStore
-from tests.admin_support import sign_in, write_admin_secrets
+from tests.admin_support import allow_pickup_requests_any_time, sign_in, write_admin_secrets
 
 
 def stop(stop_id, latitude=-31.98, longitude=115.82, name=None):
@@ -37,6 +37,9 @@ def config_dir(tmp_path):
     # than the real storage.directory the copied app.yaml names.
     app_config = yaml.safe_load((tmp_path / "app.yaml").read_text(encoding="utf-8"))
     app_config["storage"] = {"directory": str(tmp_path / "admin")}
+    # Not testing operating hours here: open every day, so this suite does
+    # not depend on what time it is when it runs.
+    allow_pickup_requests_any_time(tmp_path, app_config)
     (tmp_path / "app.yaml").write_text(yaml.safe_dump(app_config, sort_keys=False), encoding="utf-8")
 
     write_admin_secrets(tmp_path)

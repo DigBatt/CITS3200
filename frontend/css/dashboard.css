@@ -731,7 +731,8 @@ shared with the admin page.
 }
 
 .rider-waiting,
-.rider-collected {
+.rider-collected,
+.rider-closed {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -741,14 +742,27 @@ shared with the admin page.
   border-radius: 10px;
 }
 
-/* js/rider.js toggles the `hidden` attribute to switch between these three;
+/* js/rider.js toggles the `hidden` attribute to switch between these four;
    without this, the `display: flex` above (an author rule) would outrank the
    browser's own `[hidden] { display: none }`, same as .rider-status[hidden]
    already needs above. */
 .rider-picker[hidden],
 .rider-waiting[hidden],
-.rider-collected[hidden] {
+.rider-collected[hidden],
+.rider-closed[hidden] {
   display: none;
+}
+
+.rider-closed-title {
+  margin: 0;
+  font: 600 13px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.7);
+}
+
+.rider-closed-note {
+  margin: 0;
+  font: 400 11.5px Sora, sans-serif;
+  color: rgba(28, 25, 23, 0.55);
 }
 
 .rider-waiting-title,

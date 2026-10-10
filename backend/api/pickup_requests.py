@@ -1,6 +1,6 @@
 """POST and GET /api/pickup-requests, GET /api/pickup-requests/mine,
-POST /api/pickup-requests/<id>/cancel, GET /api/routes/<id>/waiting,
-POST /api/stops/<id>/collect.
+GET /api/pickup-requests/hours, POST /api/pickup-requests/<id>/cancel,
+GET /api/routes/<id>/waiting, POST /api/stops/<id>/collect.
 
 A rider asking to be collected at a stop (and checking on or cancelling that
 request themselves), the operator's per-route view of who is waiting, and the
@@ -16,6 +16,8 @@ from flask import Blueprint, current_app, jsonify, request
 
 from backend.auth import admin_required
 from backend.models import PickupRequest, format_timestamp
+from backend.operating_hours import OperatingHours, local_day_and_time
+from backend.schedule import format_time
 from backend.pickup_requests import PickupRequestStore, waiting_at_stops
 from backend.stops import StopNetwork
 
@@ -35,6 +37,34 @@ def _store() -> PickupRequestStore:
     return current_app.config["PICKUP_REQUEST_STORE"]
 
 
+def _operating_hours() -> OperatingHours:
+    return current_app.config["OPERATING_HOURS"]
+
+
+def _hours_payload(now: datetime) -> dict:
+    """
+    Whether riders may request a pickup right now, and the week's hours
+    (S15 follow-up). Backs GET /api/pickup-requests/hours, which the rider
+    page reads to show a "closed" message instead of the stop picker.
+    """
+    hours = _operating_hours()
+    tz = current_app.config["NUWAY_CONFIG"].timezone
+    by_day = hours.to_dict()
+    today = local_day_and_time(now, tz)[0] if tz else None
+    opening = hours.next_opening(now, tz)
+    return {
+        "configured": hours.configured,
+        "timezone": tz,
+        "open_now": hours.covers(now, tz),
+        "today": today,
+        "today_hours": by_day.get(today) if today else None,
+        "next_open": (
+            {"day": opening[0], "at": format_time(opening[1]), "days_ahead": opening[2]} if opening else None
+        ),
+        "hours": by_day,
+    }
+
+
 def _expire_stale(now: datetime) -> None:
     """
     S10: expire open requests older than `pickup_requests.expire_after_seconds`.
@@ -47,6 +77,28 @@ def _expire_stale(now: datetime) -> None:
         _store().expire(now, timedelta(seconds=seconds))
 
 
+@bp.get("/api/pickup-requests/hours")
+def pickup_request_hours():
+    """
+    When riders may request a pickup at all (S15 follow-up).
+
+    Public, same as the rest of the rider-facing endpoints here: the rider
+    page reads this to show a "closed" message instead of the stop picker
+    outside the shuttle's hours, defined in `pickup_requests.operating_hours`
+    of config/app.yaml (docs/api.md).
+
+    Returns
+    -------
+    flask.Response
+        `200` with `configured` (false if the block is not set at all, so the
+        feature is off and `open_now` is always true), `timezone`, `open_now`,
+        `today` and `today_hours` (local to `timezone`, null if it is not
+        set), `next_open` (when a window next opens, null if none does) and
+        `hours` for the whole week.
+    """
+    return jsonify(_hours_payload(datetime.now(timezone.utc)))
+
+
 @bp.post("/api/pickup-requests")
 def create_pickup_request():
     """
@@ -57,10 +109,14 @@ def create_pickup_request():
     Returns
     -------
     flask.Response
-        `400` `unknown_stop` if the stop is not configured. Otherwise `201`
-        with the new request, or `200` with the rider's existing open request
-        at that stop if they already have one (no-duplicate rule)
-        A `rider_token` cookie is set on the rider's first request
+        `400` `unknown_stop` if the stop is not configured. `403`
+        `outside_operating_hours` if the shuttle is not currently taking
+        requests (S15 follow-up; GET /api/pickup-requests/hours says when it
+        is). Otherwise `201` with the new request, or `200` with the rider's
+        existing open request at that stop if they already have one
+        (no-duplicate rule), which is answered whatever the hours, since a
+        request already open plays out after closing. A `rider_token` cookie
+        is set on the rider's first request.
     """
     body = request.get_json(silent=True) or {}
     stop_id = body.get("stop_id")
@@ -70,14 +126,25 @@ def create_pickup_request():
         message = f"No stop with id {stop_id!r}. Known ids: {', '.join(network.stops) or 'none'}."
         return jsonify({"error": {"code": "unknown_stop", "message": message}}), 400
 
+    now = datetime.now(timezone.utc)
     rider_token = request.cookies.get(RIDER_TOKEN_COOKIE)
     is_new_rider = rider_token is None
+
+    # Expire first, so a rider whose old request has gone stale gets a new one.
+    _expire_stale(now)
+
+    # Only a new request is turned away outside the hours: a rider still
+    # waiting from before closing gets their open request back, as ever.
+    already_waiting = not is_new_rider and _store().open_request(stop_id, rider_token) is not None
+    tz = current_app.config["NUWAY_CONFIG"].timezone
+    if not already_waiting and not _operating_hours().covers(now, tz):
+        # Shown to the rider as is (frontend/js/rider.js), so no API detail.
+        message = "The shuttle is not taking pickup requests right now."
+        return jsonify({"error": {"code": "outside_operating_hours", "message": message}}), 403
+
     if is_new_rider:
         rider_token = secrets.token_urlsafe(24)
 
-    # Expire first, so a rider whose old request has gone stale gets a new one.
-    now = datetime.now(timezone.utc)
-    _expire_stale(now)
     pickup_request, created = _store().create(stop_id, rider_token, now)
 
     response = jsonify({"request": pickup_request.to_dict()})
