@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     select: document.getElementById('rider-stop-select'),
     button: document.getElementById('rider-request-button'),
     buttonSub: document.getElementById('rider-request-sub'),
+    closed: document.getElementById('rider-closed'),
+    closedNote: document.getElementById('rider-closed-note'),
     waiting: document.getElementById('rider-waiting'),
     waitingStop: document.getElementById('rider-waiting-stop'),
     cancelButton: document.getElementById('rider-cancel-button'),
@@ -33,6 +35,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentRequestId = null;
   let activeStopId = null; // the stop shown alone on the map, or null for every stop
 
+  // ---- Shuttle hours (S15 follow-up): a "closed" message in place of the
+  // picker outside pickup_requests.operating_hours. Checked far less often
+  // than the request poll above, since hours change at most a couple of
+  // times a day, not every few seconds.
+  const HOURS_POLL_MS = 60000;
+  let hoursInfo = null;
+
   function showStatus(message, kind) {
     els.status.textContent = message;
     els.status.className = `rider-status is-${kind}`;
@@ -47,8 +56,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function showView(name) {
     els.picker.hidden = name !== 'picker';
+    els.closed.hidden = name !== 'closed';
     els.waiting.hidden = name !== 'waiting';
     els.collected.hidden = name !== 'collected';
+  }
+
+  // ---- Shuttle hours (S15 follow-up) ----
+  //
+  // Only the idle state (no active request) is ever replaced by "closed":
+  // a request already waiting or collected plays out regardless of hours
+  // that close mid-ride.
+
+  function describeHours(info) {
+    if (info.today_hours) {
+      const [open, close] = info.today_hours;
+      return `Pickup requests open today from ${open} to ${close}.`;
+    }
+    return 'No shuttle service today. Check back on the next service day.';
+  }
+
+  function renderIdleView() {
+    if (hoursInfo && !hoursInfo.open_now) {
+      els.closedNote.textContent = describeHours(hoursInfo);
+      showView('closed');
+    } else {
+      showView('picker');
+    }
+  }
+
+  async function checkHours() {
+    try {
+      hoursInfo = await getPickupRequestHours();
+    } catch (error) {
+      console.warn(`Could not check shuttle hours: ${error.message}`);
+      return;
+    }
+    if (currentRequestId === null) renderIdleView();
   }
 
   function showWaiting(pickupRequest) {
@@ -79,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
     els.select.value = '';
     els.button.disabled = true;
     els.buttonSub.textContent = 'Choose a stop first';
-    showView('picker');
+    renderIdleView();
     showStatus(message, kind);
   }
 
@@ -163,6 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showStatus(error.message, 'error');
       els.button.disabled = false;
       els.buttonSub.textContent = stopId;
+      checkHours(); // hours may have just closed between loading the picker and clicking
     }
   });
 
@@ -396,5 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.Rider = { syncMapIsolation };
 
+  checkHours();
+  setInterval(checkHours, HOURS_POLL_MS);
   loadStops().then(checkMyRequest);
 });
