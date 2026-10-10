@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -269,3 +270,19 @@ def test_unsupported_default_metric_is_a_config_error(config_dir):
 
     with pytest.raises(ConfigError):
         create_app(config_dir)
+
+
+def test_from_config_uses_the_configured_defaults(tmp_path):
+    config = SimpleNamespace(storage_directory=tmp_path, snapshot_default_metrics=["uptime"])
+
+    assert SnapshotSettingsStore.from_config(config).load() == ["uptime"]
+
+
+def test_from_config_falls_back_to_the_shared_defaults(tmp_path):
+    config = SimpleNamespace(storage_directory=tmp_path, snapshot_default_metrics=None)
+
+    assert SnapshotSettingsStore.from_config(config).load() == [
+        "asset_utilisation",
+        "operating_efficiency",
+        "effective_utilisation",
+    ]

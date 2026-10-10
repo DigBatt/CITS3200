@@ -102,16 +102,9 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
 
     # S16: Persistent snapshot metric selection.
     app.config["SNAPSHOT_SETTINGS_STORE"] = (
-    SnapshotSettingsStore(
-        config.storage_directory,
-        config.snapshot_default_metrics or [
-            "asset_utilisation",
-            "operating_efficiency",
-            "effective_utilisation",
-        ],
+        SnapshotSettingsStore.from_config(config)
+        if config.storage_directory else None
     )
-    if config.storage_directory else None
-)
 
     # S17: Daily Snapshot storage
     app.config["SNAPSHOT_STORE"] = (

@@ -1,14 +1,18 @@
 
 """Daily snapshot scheduling and missed-day tracking (S17)."""
 
-from datetime import datetime, timedelta, time
+import json
+import logging
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from backend.files import write_json_atomic
-import logging
 
 PERTH_TZ = ZoneInfo("Australia/Perth")
+# How long after midnight a failing snapshot is retried before the day is
+# recorded as missing.
+RETRY_MINUTES = 60
 log = logging.getLogger(__name__)
 
 
@@ -24,33 +28,19 @@ class SnapshotScheduler:
         if now.tzinfo is None:
             raise ValueError("now must be timezone-aware")
 
-        import json
-
         today = now.astimezone(PERTH_TZ).date()
 
-        if not self.path.exists():
+        state = self._load_state()
+
+        if state is None:
             self._save_state({
                 "last_checked": today.isoformat(),
                 "missing": [],
             })
             return
 
-        with self.path.open("r", encoding="utf-8") as file:
-            state = json.load(file)
-
-        last_checked = datetime.fromisoformat(
-            state["last_checked"]
-        ).date()
-
-        missing = state.get("missing", [])
-        day = last_checked
-
-        while day < today:
-            if not self.snapshot_store.exists(day):
-                value = day.isoformat()
-                if value not in missing:
-                    missing.append(value)
-            day += timedelta(days=1)
+        last_checked, missing = state
+        self._mark_missing(missing, last_checked, today)
 
         self._save_state({
             "last_checked": today.isoformat(),
@@ -63,23 +53,25 @@ class SnapshotScheduler:
         if now.tzinfo is None:
             raise ValueError("now must be timezone-aware")
 
-        import json
-
         today = now.astimezone(PERTH_TZ).date()
 
-        with self.path.open("r", encoding="utf-8") as file:
-            state = json.load(file)
+        state = self._load_state()
 
-        last_checked = datetime.fromisoformat(
-            state["last_checked"]
-        ).date()
+        # The state file was removed or damaged while running: start afresh.
+        if state is None:
+            self._save_state({
+                "last_checked": today.isoformat(),
+                "missing": [],
+            })
+            return
+
+        last_checked, missing = state
 
         if today <= last_checked:
             return
 
-        missing = state.get("missing", [])
-
-        # Generate only if the logger has crossed into the next day.
+        # Generate only if the logger has crossed into the next day. Reaching
+        # here means it was running over midnight, however late this check is.
         if today == last_checked + timedelta(days=1):
             local_now = now.astimezone(PERTH_TZ)
             minutes_after_midnight = (
@@ -87,27 +79,19 @@ class SnapshotScheduler:
             )
 
             if not self.snapshot_store.exists(last_checked):
-                if minutes_after_midnight <= 5:
-                    try:
-                        self.generate(last_checked)
-                    except Exception:
-                        log.exception(
-                            "Failed to generate daily snapshot for %s",
-                            last_checked,
-                        )
+                try:
+                    self.generate(last_checked)
+                except Exception:
+                    log.exception(
+                        "Failed to generate daily snapshot for %s",
+                        last_checked,
+                    )
+                    # Leave the state alone so the next check retries.
+                    if minutes_after_midnight <= RETRY_MINUTES:
                         return
-                else:
-                    value = last_checked.isoformat()
-                    if value not in missing:
-                        missing.append(value)
+                    self._mark_missing(missing, last_checked, today)
         else:
-            day = last_checked
-            while day < today:
-                if not self.snapshot_store.exists(day):
-                    value = day.isoformat()
-                    if value not in missing:
-                        missing.append(value)
-                day += timedelta(days=1)
+            self._mark_missing(missing, last_checked, today)
 
         self._save_state({
             "last_checked": today.isoformat(),
@@ -116,8 +100,6 @@ class SnapshotScheduler:
 
     def missing_dates(self) -> list[str]:
         """Return dates recorded as missing snapshots."""
-        import json
-
         if not self.path.exists():
             return []
 
@@ -130,6 +112,42 @@ class SnapshotScheduler:
             raise ValueError("Invalid snapshot schedule state.")
 
         return sorted(missing, reverse=True)
+
+    def _load_state(self) -> tuple[date, list[str]] | None:
+        """Return (last_checked, missing), or None without a usable state file."""
+        try:
+            with self.path.open("r", encoding="utf-8") as file:
+                state = json.load(file)
+
+            last_checked = datetime.fromisoformat(
+                state["last_checked"]
+            ).date()
+            missing = state.get("missing", [])
+
+            if not isinstance(missing, list):
+                raise ValueError("missing is not a list")
+        except FileNotFoundError:
+            return None
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+            log.warning(
+                "Ignoring unreadable snapshot schedule %s: %s",
+                self.path,
+                exc,
+            )
+            return None
+
+        return last_checked, missing
+
+    def _mark_missing(self, missing: list[str], first: date, today: date) -> None:
+        """Add each day from `first` up to yesterday that has no snapshot."""
+        day = first
+
+        while day < today:
+            if not self.snapshot_store.exists(day):
+                value = day.isoformat()
+                if value not in missing:
+                    missing.append(value)
+            day += timedelta(days=1)
 
     def _save_state(self, state: dict) -> None:
         write_json_atomic(self.path, state)

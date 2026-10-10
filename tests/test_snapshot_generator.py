@@ -3,8 +3,9 @@
 
 from datetime import date
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+from backend.repository import CsvRepository
 from backend.snapshot_generator import generate_daily_snapshot
 from backend.snapshots import SnapshotStore
 
@@ -13,10 +14,7 @@ def test_generate_daily_snapshot(tmp_path):
     day = date(2026, 10, 8)
     store = SnapshotStore(tmp_path)
 
-    config = SimpleNamespace(
-        live_directory=tmp_path,
-        vehicles=[],
-    )
+    config = SimpleNamespace(vehicles=[])
 
     settings_store = SimpleNamespace(
         load=lambda: ["asset_utilisation"]
@@ -35,6 +33,7 @@ def test_generate_daily_snapshot(tmp_path):
         snapshot = generate_daily_snapshot(
             day,
             config,
+            CsvRepository(tmp_path, []),
             settings_store,
             store,
         )
@@ -54,10 +53,11 @@ def test_snapshot_selected_vehicle_metrics(tmp_path):
     day = date(2026, 10, 8)
     store = SnapshotStore(tmp_path)
 
-    config = SimpleNamespace(
-        live_directory=tmp_path,
-        vehicles=[],
-    )
+    config = SimpleNamespace(vehicles=[])
+
+    repository = Mock()
+    repository.vehicle_ids.return_value = ["vehicle_1"]
+    repository.get_positions.return_value = {"vehicle_1": []}
 
     settings_store = SimpleNamespace(
         load=lambda: [
@@ -78,7 +78,6 @@ def test_snapshot_selected_vehicle_metrics(tmp_path):
     }
 
     with (
-        patch("backend.snapshot_generator.CsvRepository") as repo_class,
         patch("backend.snapshot_generator.summarise") as mock_summarise,
         patch(
             "backend.snapshot_generator.Settings.from_config",
@@ -89,15 +88,12 @@ def test_snapshot_selected_vehicle_metrics(tmp_path):
             return_value=object(),
         ),
     ):
-        repository = repo_class.return_value
-        repository.vehicle_ids.return_value = ["vehicle_1"]
-        repository.get_positions.return_value = {"vehicle_1": []}
-
         mock_summarise.return_value.to_dict.return_value = fake_result
 
         snapshot = generate_daily_snapshot(
             day,
             config,
+            repository,
             settings_store,
             store,
         )

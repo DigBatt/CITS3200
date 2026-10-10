@@ -19,7 +19,7 @@ from backend.snapshot_generator import generate_daily_snapshot
 from backend.snapshot_settings import SnapshotSettingsStore
 from backend.snapshots import SnapshotStore
 from backend.downtime import DowntimeStore
-from backend.roster_sync import FILE_NAME as ROSTER_SYNC_FILE, SyncStore, SyncSettings
+from backend.roster_sync import FILE_NAME as ROSTER_SYNC_FILE, SyncError, SyncStore, SyncSettings
 
 log = logging.getLogger("backend.logger")
 
@@ -131,16 +131,80 @@ class Logger:
     def run(self) -> None:
         """Poll vehicles and check daily snapshots."""
 
+        # Snapshots must never stop the polling: a failure here is logged only.
         if self._snapshot_scheduler is not None:
-            self._snapshot_scheduler.start(datetime.now(timezone.utc))
+            try:
+                self._snapshot_scheduler.start(datetime.now(timezone.utc))
+            except Exception:
+                log.exception("daily snapshots disabled: the scheduler failed to start")
+                self._snapshot_scheduler = None
 
         while True:
             self.poll_all()
 
             if self._snapshot_scheduler is not None:
-                self._snapshot_scheduler.check(datetime.now(timezone.utc))
+                try:
+                    self._snapshot_scheduler.check(datetime.now(timezone.utc))
+                except Exception:
+                    log.exception("daily snapshot check failed")
 
             time.sleep(self._settings.poll_interval_seconds)
+
+
+def build_snapshot_scheduler(config) -> SnapshotScheduler | None:
+    """
+    Wire up the daily snapshots (S17).
+
+    Returns
+    -------
+    SnapshotScheduler or None
+        None when config/app.yaml does not set storage.directory.
+
+    Raises
+    ------
+    ConfigError, SyncError, RepositoryError
+        If the roster sync, snapshot or data settings are invalid.
+    """
+    if config.storage_directory is None:
+        return None
+
+    snapshot_store = SnapshotStore(config.storage_directory)
+    downtime_store = DowntimeStore(
+        config.storage_directory / "downtime.json"
+    )
+    roster_sync_store = None
+
+    sync_settings = SyncSettings.load(config, DEFAULT_CONFIG_DIR)
+
+    if sync_settings is not None:
+        roster_sync_store = SyncStore(
+            config.storage_directory / ROSTER_SYNC_FILE
+        )
+
+    snapshot_settings = SnapshotSettingsStore.from_config(config)
+
+    # The repository the dashboard reads, so a snapshot matches its figures.
+    repository = CsvRepository.from_config(config)
+    if config.data_directory != config.live_directory:
+        log.warning("daily snapshots read %s, not the live data in %s: set data.directory to "
+                    "data.live_directory to snapshot live data", config.data_directory, config.live_directory)
+
+    def generate_snapshot(day):
+        return generate_daily_snapshot(
+            day,
+            config,
+            repository,
+            snapshot_settings,
+            snapshot_store,
+            downtime_store = downtime_store,
+            roster_sync_store = roster_sync_store,
+        )
+
+    return SnapshotScheduler(
+        config.storage_directory,
+        snapshot_store,
+        generate_snapshot,
+    )
 
 
 def main() -> None:
@@ -152,43 +216,13 @@ def main() -> None:
     settings = LoggerSettings.from_config(config)
     vehicles = [v for v in config.vehicles if v.source_url]
 
-    snapshot_scheduler = None
-
-    if config.storage_directory is not None:
-        snapshot_store = SnapshotStore(config.storage_directory)
-        downtime_store = DowntimeStore(
-            config.storage_directory / "downtime.json"
-        )
-        roster_sync_store = None
-
-        sync_settings = SyncSettings.load(config, DEFAULT_CONFIG_DIR)
-
-        if sync_settings is not None:
-            roster_sync_store = SyncStore(
-                config.storage_directory / ROSTER_SYNC_FILE
-            )
-
-        snapshot_settings = SnapshotSettingsStore(
-            config.storage_directory,
-            config.snapshot_default_metrics
-            or ["asset_utilisation"],
-        )
-
-        def generate_snapshot(day):
-            return generate_daily_snapshot(
-                day,
-                config,
-                snapshot_settings,
-                snapshot_store,
-                downtime_store = downtime_store,
-                roster_sync_store = roster_sync_store,
-            )
-
-        snapshot_scheduler = SnapshotScheduler(
-            config.storage_directory,
-            snapshot_store,
-            generate_snapshot,
-        )
+    # The positions matter more than the snapshots, so bad snapshot settings
+    # are reported and the logger polls on without them.
+    try:
+        snapshot_scheduler = build_snapshot_scheduler(config)
+    except (ConfigError, SyncError, RepositoryError) as exc:
+        log.error("daily snapshots disabled: %s", exc)
+        snapshot_scheduler = None
 
     logger = Logger(
         CsvRepository(config.live_directory, vehicles),

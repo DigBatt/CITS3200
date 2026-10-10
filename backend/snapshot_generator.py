@@ -6,7 +6,6 @@ from zoneinfo import ZoneInfo
 
 from backend.downtime import intervals_by_vehicle
 from backend.metrics.tum import Settings, summarise
-from backend.repository.csv_repo import CsvRepository
 from backend.roster_sync import with_synced_roster
 
 PERTH_TZ = ZoneInfo("Australia/Perth")
@@ -15,12 +14,18 @@ PERTH_TZ = ZoneInfo("Australia/Perth")
 def generate_daily_snapshot(
     day,
     config,
+    repository,
     settings_store,
     snapshot_store,
     downtime_store=None,
     roster_sync_store=None,
 ):
-    """Generate and save metrics for one complete Perth calendar day."""
+    """
+    Generate and save metrics for one complete Perth calendar day.
+
+    `repository` should be the one the dashboard reads, so that a snapshot
+    holds the figures the admin sees for that day.
+    """
 
     if snapshot_store.exists(day):
         raise FileExistsError(f"Snapshot already exists for {day}")
@@ -31,7 +36,6 @@ def generate_daily_snapshot(
     start = start_local.astimezone(timezone.utc)
     end = end_local.astimezone(timezone.utc)
 
-    repository = CsvRepository(config.live_directory, config.vehicles)
     vehicle_ids = repository.vehicle_ids()
     tracks = repository.get_positions(vehicle_ids, start, end)
 
