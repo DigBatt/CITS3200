@@ -114,3 +114,55 @@ def test_a_request_within_hours_still_succeeds(open_page):
         page.click("#rider-request-button")
     assert resp.value.status == 201
     page.wait_for_selector("#rider-waiting:not([hidden])")
+
+
+@pytest.mark.parametrize(
+    "today_hours, next_open, note",
+    [
+        (
+            ["08:00", "17:00"],
+            {"day": "monday", "at": "08:00", "days_ahead": 0},
+            "Pickup requests open today from 08:00 to 17:00.",
+        ),
+        (
+            ["08:00", "17:00"],
+            {"day": "tuesday", "at": "08:00", "days_ahead": 1},
+            "Pickup requests have closed for today. They open again tomorrow at 08:00.",
+        ),
+        (
+            ["08:00", "17:00"],
+            {"day": "monday", "at": "08:00", "days_ahead": 3},
+            "Pickup requests have closed for today. They open again on Monday at 08:00.",
+        ),
+        (
+            None,
+            {"day": "monday", "at": "08:00", "days_ahead": 2},
+            "No shuttle service today. They open again on Monday at 08:00.",
+        ),
+    ],
+)
+def test_closing_while_a_stop_is_chosen_clears_the_choice_and_says_when_to_come_back(
+    open_page, today_hours, next_open, note
+):
+    """
+    The hours end between the rider choosing a stop and pressing the button:
+    the request is refused, and the page swaps to the closed message with
+    nothing left half chosen behind it.
+    """
+    page = open_page
+    page.wait_for_selector("#rider-stop-select:not([disabled])")
+    page.select_option("#rider-stop-select", "reid-library")
+
+    closed = {"configured": True, "open_now": False, "today_hours": today_hours, "next_open": next_open}
+    refusal = {"error": {"code": "outside_operating_hours", "message": "Not taking pickup requests right now."}}
+    page.route("**/api/pickup-requests/hours", lambda route: route.fulfill(json=closed))
+    page.route("**/api/pickup-requests", lambda route: route.fulfill(status=403, json=refusal))
+
+    page.click("#rider-request-button")
+    page.wait_for_selector("#rider-closed:not([hidden])")
+
+    assert page.locator("#rider-closed-note").inner_text() == note
+    assert page.locator("#rider-picker").is_hidden()
+    assert page.locator("#rider-status").is_hidden()
+    assert page.input_value("#rider-stop-select") == ""
+    assert page.locator("#rider-request-button").is_disabled()

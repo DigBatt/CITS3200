@@ -81,17 +81,21 @@ class ScheduleError(Exception):
     """
 
 
-def _parse_time(value: Any) -> time:
+def parse_time(value: Any) -> time:
     """
     Read one `HH:MM` wall clock time.
 
     Raises
     ------
     ScheduleError
-        If it is not a time of day.
+        If it is not a time of day, or is not text. An unquoted `17:00` in
+        YAML is read as the number 1020 (sixty-based), which would otherwise
+        pass for 10:20.
     """
+    if not isinstance(value, str):
+        raise ScheduleError(f"{value!r} is not a time of day, expected \"HH:MM\" in quotes")
     try:
-        parsed = time.fromisoformat(str(value).strip())
+        parsed = time.fromisoformat(value.strip())
     except (TypeError, ValueError) as exc:
         raise ScheduleError(f"{value!r} is not a time of day, expected HH:MM") from exc
     if parsed.tzinfo is not None:
@@ -99,8 +103,17 @@ def _parse_time(value: Any) -> time:
     return parsed
 
 
-def _format_time(value: time) -> str:
+def format_time(value: time) -> str:
     return value.strftime("%H:%M")
+
+
+def local_datetime(moment: datetime, timezone: str) -> datetime:
+    """
+    An instant as wall clock time in `timezone`. Naive `moment` is read as UTC.
+    """
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=ZoneInfo("UTC"))
+    return moment.astimezone(ZoneInfo(timezone))
 
 
 def _parse_date(value: Any, field: str) -> Optional[date]:
@@ -245,8 +258,8 @@ class ServicePeriod:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "start": _format_time(self.start),
-            "end": _format_time(self.end),
+            "start": format_time(self.start),
+            "end": format_time(self.end),
             "vehicles": None if self.vehicles is None else sorted(self.vehicles),
             "starts_on": self.starts_on.isoformat() if self.starts_on else None,
             "ends_on": self.ends_on.isoformat() if self.ends_on else None,
@@ -335,9 +348,7 @@ class Schedule:
             False for an empty schedule, since nothing is rostered. Periods
             are half open, so an instant exactly at a closing time is out.
         """
-        if moment.tzinfo is None:
-            moment = moment.replace(tzinfo=ZoneInfo("UTC"))
-        local = moment.astimezone(ZoneInfo(timezone))
+        local = local_datetime(moment, timezone)
         return any(
             period.covers_time(local.time())
             for period in self.for_day(DAYS[local.weekday()], vehicle_id)
@@ -409,8 +420,8 @@ class Schedule:
                     raise ScheduleError(f"{day}: expected 'hours' as an [open, close] pair, got {entry!r}")
                 rows.append(
                     ServicePeriod(
-                        _parse_time(hours[0]),
-                        _parse_time(hours[1]),
+                        parse_time(hours[0]),
+                        parse_time(hours[1]),
                         _parse_vehicles(entry.get("vehicles")),
                         _parse_date(entry.get("starts_on"), f"{day} starts_on"),
                         _parse_date(entry.get("ends_on"), f"{day} ends_on"),
@@ -418,7 +429,7 @@ class Schedule:
                     )
                 )
             elif isinstance(entry, (list, tuple)) and len(entry) == 2:
-                rows.append(ServicePeriod(_parse_time(entry[0]), _parse_time(entry[1])))
+                rows.append(ServicePeriod(parse_time(entry[0]), parse_time(entry[1])))
             else:
                 raise ScheduleError(f"{day}: expected an [open, close] pair or a period mapping, got {entry!r}")
         return rows
@@ -461,7 +472,7 @@ class Schedule:
                 continue
             lines.append(f"{indent}{day}:")
             for period in rows:
-                lines.append(f'{indent}{_INDENT}- hours: ["{_format_time(period.start)}", "{_format_time(period.end)}"]')
+                lines.append(f'{indent}{_INDENT}- hours: ["{format_time(period.start)}", "{format_time(period.end)}"]')
                 if period.vehicles is not None:
                     listed = ", ".join(f'"{vehicle}"' for vehicle in sorted(period.vehicles))
                     lines.append(f"{indent}{_INDENT}  vehicles: [{listed}]")
@@ -499,7 +510,7 @@ def _validated(day: str, rows: Iterable[ServicePeriod]) -> list[ServicePeriod]:
             )
         if period.end <= period.start:
             raise ScheduleError(
-                f"{day}: {_format_time(period.start)}-{_format_time(period.end)} must end after it starts. "
+                f"{day}: {format_time(period.start)}-{format_time(period.end)} must end after it starts. "
                 "A period crossing midnight is not supported; split it across two days."
             )
 
@@ -510,7 +521,7 @@ def _validated(day: str, rows: Iterable[ServicePeriod]) -> list[ServicePeriod]:
             if period.shares_vehicles_with(other) and _ranges_overlap(period, other):
                 scope = "the whole fleet" if period.is_fleet_wide or other.is_fleet_wide else "the same vehicle"
                 raise ScheduleError(
-                    f"{day}: periods overlap at {_format_time(other.start)} for {scope}. "
+                    f"{day}: periods overlap at {format_time(other.start)} for {scope}. "
                     "Give one of them a start or end date so they are never in force together."
                 )
     return ordered

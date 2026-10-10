@@ -67,12 +67,21 @@ document.addEventListener('DOMContentLoaded', () => {
   // a request already waiting or collected plays out regardless of hours
   // that close mid-ride.
 
+  // `next_open` is when a window next opens: later today (days_ahead 0),
+  // or on a later day once today's has ended or today has none.
   function describeHours(info) {
-    if (info.today_hours) {
+    const next = info.next_open;
+    if (next && next.days_ahead === 0 && info.today_hours) {
       const [open, close] = info.today_hours;
       return `Pickup requests open today from ${open} to ${close}.`;
     }
-    return 'No shuttle service today. Check back on the next service day.';
+
+    const today = info.today_hours ? 'Pickup requests have closed for today.' : 'No shuttle service today.';
+    if (!next) return `${today} Check back on the next service day.`;
+
+    const day = next.day.charAt(0).toUpperCase() + next.day.slice(1);
+    const when = next.days_ahead === 1 ? 'tomorrow' : `on ${day}`;
+    return `${today} They open again ${when} at ${next.at}.`;
   }
 
   function renderIdleView() {
@@ -85,13 +94,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function checkHours() {
+    const wasOpen = hoursInfo?.open_now === true;
     try {
       hoursInfo = await getPickupRequestHours();
     } catch (error) {
       console.warn(`Could not check shuttle hours: ${error.message}`);
       return;
     }
-    if (currentRequestId === null) renderIdleView();
+    if (currentRequestId !== null) return;
+
+    // Closing while the rider was mid-choice: put the picker and the map
+    // back as they were, so nothing half chosen sits behind the message or
+    // is still there when the hours reopen.
+    if (wasOpen && !hoursInfo.open_now) {
+      clearSelection();
+      clearStatus();
+    }
+    renderIdleView();
   }
 
   function showWaiting(pickupRequest) {
@@ -115,13 +134,17 @@ document.addEventListener('DOMContentLoaded', () => {
     setActiveStop(pickupRequest.stop_id);
   }
 
-  function resetToPicker(message, kind) {
-    stopPolling();
-    currentRequestId = null;
+  function clearSelection() {
     setActiveStop(null);
     els.select.value = '';
     els.button.disabled = true;
     els.buttonSub.textContent = 'Choose a stop first';
+  }
+
+  function resetToPicker(message, kind) {
+    stopPolling();
+    currentRequestId = null;
+    clearSelection();
     renderIdleView();
     showStatus(message, kind);
   }

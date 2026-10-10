@@ -72,6 +72,13 @@ class PickupRequestStore:
             self._requests[request.id] = request
             return request, True
 
+    def open_request(self, stop_id: str, rider_token: str) -> Optional[PickupRequest]:
+        """
+        The rider's open request at this stop, or None if they have none.
+        """
+        with self._lock:
+            return self._open_request(stop_id, rider_token)
+
     def list(self, status: Optional[str] = None) -> list[PickupRequest]:
         """
         Every request, ascending by `created_at`, optionally filtered by status

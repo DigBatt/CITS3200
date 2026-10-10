@@ -24,10 +24,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, time
 from typing import Any, Optional
-from zoneinfo import ZoneInfo
 
-#: Day keys, Monday first to match `datetime.weekday()`.
-DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+# The day keys and the time handling are the roster's, so the two cannot drift.
+from backend.schedule import DAYS, ScheduleError, format_time, local_datetime, parse_time
 
 
 class OperatingHoursError(Exception):
@@ -38,16 +37,9 @@ class OperatingHoursError(Exception):
 
 def _parse_time(value: Any, where: str) -> time:
     try:
-        parsed = time.fromisoformat(str(value).strip())
-    except (TypeError, ValueError) as exc:
-        raise OperatingHoursError(f"{where}: {value!r} is not a time of day, expected HH:MM") from exc
-    if parsed.tzinfo is not None:
-        raise OperatingHoursError(f"{where}: must be a local wall clock time, without a timezone")
-    return parsed
-
-
-def _format_time(value: time) -> str:
-    return value.strftime("%H:%M")
+        return parse_time(value)
+    except ScheduleError as exc:
+        raise OperatingHoursError(f"{where}: {exc}") from exc
 
 
 @dataclass(frozen=True)
@@ -102,7 +94,7 @@ class OperatingHours:
             end = _parse_time(value[1], f"{day} close")
             if end <= start:
                 raise OperatingHoursError(
-                    f"{day}: {_format_time(start)}-{_format_time(end)} must close after it opens. "
+                    f"{day}: {format_time(start)}-{format_time(end)} must close after it opens. "
                     "A window crossing midnight is not supported."
                 )
             windows[day] = (start, end)
@@ -147,8 +139,31 @@ class OperatingHours:
         result: dict[str, Optional[list[str]]] = {}
         for day in DAYS:
             window = self.windows.get(day)
-            result[day] = [_format_time(window[0]), _format_time(window[1])] if window else None
+            result[day] = [format_time(window[0]), format_time(window[1])] if window else None
         return result
+
+    def next_opening(self, moment: datetime, timezone: str) -> Optional[tuple[str, time, int]]:
+        """
+        When a window next opens after `moment`, for telling a rider who
+        finds the service closed when to come back.
+
+        Returns
+        -------
+        tuple of (str, time, int) or None
+            The day name, the opening time and how many days ahead of
+            `moment`'s local day that is: 0 for later today, 7 for the same
+            weekday next week. None when the feature is off, `timezone` is
+            not set or no day has a window.
+        """
+        if not self.configured or not timezone:
+            return None
+        local = local_datetime(moment, timezone)
+        for days_ahead in range(8):
+            day = DAYS[(local.weekday() + days_ahead) % 7]
+            window = self.windows.get(day)
+            if window is not None and (days_ahead > 0 or local.time() < window[0]):
+                return day, window[0], days_ahead
+        return None
 
 
 def local_day_and_time(moment: datetime, timezone: str) -> tuple[str, time]:
@@ -156,7 +171,5 @@ def local_day_and_time(moment: datetime, timezone: str) -> tuple[str, time]:
     The day name (one of `DAYS`) and wall clock time of an instant, local to
     `timezone`. Naive `moment` is read as UTC.
     """
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=ZoneInfo("UTC"))
-    local = moment.astimezone(ZoneInfo(timezone))
+    local = local_datetime(moment, timezone)
     return DAYS[local.weekday()], local.time()

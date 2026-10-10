@@ -773,10 +773,12 @@ a JSON body, and the operator view never sees another rider's token.
 body, not a path lookup, so it does not follow the `404` convention `/api/stops/<id>`
 uses. `403` `outside_operating_hours` if the shuttle is not currently taking
 requests (S15 follow-up; see `GET /api/pickup-requests/hours` below for where
-that is defined and how to read it).
+that is defined and how to read it). Its `message` is shown to the rider as
+it stands.
 
 If the rider (by cookie) already has an open request at that stop, that same
-request is returned unchanged with `200` instead of opening a second one. A
+request is returned unchanged with `200` instead of opening a second one,
+outside the operating hours too: only a new request is refused then. A
 genuinely new request is `201`.
 
 ```json
@@ -846,6 +848,7 @@ only to have `POST /api/pickup-requests` refuse it.
   "open_now": false,
   "today": "saturday",
   "today_hours": null,
+  "next_open": { "day": "monday", "at": "08:00", "days_ahead": 2 },
   "hours": {
     "monday": ["08:00", "17:00"],
     "tuesday": ["08:00", "17:00"],
@@ -876,6 +879,15 @@ is always `true` — the same "absent means no limit" default
 `pickup_requests.expire_after_seconds` already uses. `today`/`today_hours` are
 `null` only if `display.timezone` itself is not set, since there is then no
 way to say what day it locally is.
+
+`next_open` is when a window next opens, for telling a rider when to come
+back: `days_ahead` is `0` for later today, `1` for tomorrow, up to `7` for
+the same weekday next week. It is given while the service is open as well
+(the next opening after this one), and is `null` when the feature is off,
+`display.timezone` is not set or no day has a window.
+
+Times must be quoted. An unquoted `17:00` is read by YAML as the number 1020
+and is rejected at startup rather than taken for 10:20.
 
 This is deliberately separate from `utilisation.service_hours` (`GET
 /api/schedule`): that rosters the fleet per vehicle for the time usage model

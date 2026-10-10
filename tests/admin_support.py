@@ -9,6 +9,8 @@ from typing import Any
 import yaml
 from werkzeug.security import generate_password_hash
 
+from backend.schedule import DAYS
+
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "test-password"
 
@@ -41,7 +43,6 @@ def sign_in(client):
 #: to run at (backend/operating_hours.py). The sample config's own hours are
 #: realistic office hours, which is the opposite of what most tests want.
 _ALL_DAY = ["00:00", "23:59"]
-_DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 
 
 def allow_pickup_requests_any_time(config_dir: Path, app_config: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -67,7 +68,7 @@ def allow_pickup_requests_any_time(config_dir: Path, app_config: dict[str, Any] 
     """
     path = Path(config_dir) / "app.yaml"
     config = app_config if app_config is not None else yaml.safe_load(path.read_text(encoding="utf-8"))
-    config.setdefault("pickup_requests", {})["operating_hours"] = {day: _ALL_DAY for day in _DAYS}
+    config.setdefault("pickup_requests", {})["operating_hours"] = {day: _ALL_DAY for day in DAYS}
     if app_config is None:
         path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
     return config

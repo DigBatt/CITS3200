@@ -9,7 +9,7 @@ pass no matter what day or time it is when the suite actually runs.
 
 from __future__ import annotations
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -94,6 +94,8 @@ def test_to_dict_lists_every_day_monday_first():
         {"monday": ["17:00", "08:00"]},  # closes before it opens
         {"monday": ["08:00", "08:00"]},  # closes exactly when it opens
         {"monday": ["08:00"]},  # not a pair
+        {"monday": ["08:00", 1020]},  # an unquoted 17:00, as YAML reads it
+        yaml.safe_load("monday: [08:00, 17:00]"),
     ],
 )
 def test_a_malformed_block_is_rejected(block):
@@ -143,7 +145,25 @@ def test_a_request_is_refused_when_closed_all_week(tmp_path):
     client = build_app(tmp_path, ALL_CLOSED).test_client()
     response = client.post("/api/pickup-requests", json={"stop_id": "reid-library"})
     assert response.status_code == 403
-    assert response.get_json()["error"]["code"] == "outside_operating_hours"
+    error = response.get_json()["error"]
+    assert error["code"] == "outside_operating_hours"
+    # The rider page shows this as it stands.
+    assert error["message"] == "The shuttle is not taking pickup requests right now."
+
+
+def test_a_rider_still_waiting_after_closing_gets_their_request_back(tmp_path):
+    app = build_app(tmp_path, ALL_DAY)
+    waiting, newcomer = app.test_client(), app.test_client()
+    opened = waiting.post("/api/pickup-requests", json={"stop_id": "reid-library"})
+    assert opened.status_code == 201
+
+    app.config["OPERATING_HOURS"] = OperatingHours.from_config_block(ALL_CLOSED)
+
+    again = waiting.post("/api/pickup-requests", json={"stop_id": "reid-library"})
+    assert again.status_code == 200
+    assert again.get_json()["request"]["id"] == opened.get_json()["request"]["id"]
+
+    assert newcomer.post("/api/pickup-requests", json={"stop_id": "reid-library"}).status_code == 403
 
 
 def test_no_block_configured_accepts_a_request_regardless(tmp_path):
@@ -186,9 +206,55 @@ def test_hours_endpoint_when_open_all_day(tmp_path):
     assert body["hours"][body["today"]] == ["00:00", "23:59"]
 
 
+def test_hours_endpoint_says_when_it_next_opens(tmp_path):
+    client = build_app(tmp_path, ALL_DAY).test_client()
+    next_open = client.get("/api/pickup-requests/hours").get_json()["next_open"]
+    # Open every day from 00:00, so the next opening is always tomorrow's.
+    assert next_open["at"] == "00:00"
+    assert next_open["days_ahead"] == 1
+    assert next_open["day"] in DAYS
+
+
 def test_hours_endpoint_when_closed_all_week(tmp_path):
     body = build_app(tmp_path, ALL_CLOSED).test_client().get("/api/pickup-requests/hours").get_json()
     assert body["configured"] is True
     assert body["open_now"] is False
     assert body["today_hours"] is None
     assert all(value is None for value in body["hours"].values())
+    assert body["next_open"] is None
+
+
+# ---- next_opening: explicit instants ----
+
+WEEKDAYS = {day: ["08:00", "17:00"] for day in DAYS[:5]}
+
+
+def perth(year, month, day, hour, minute=0):
+    return datetime(year, month, day, hour, minute, tzinfo=ZoneInfo(PERTH))
+
+
+@pytest.mark.parametrize(
+    "moment, expected",
+    [
+        (perth(2026, 10, 12, 7, 30), ("monday", time(8), 0)),  # Monday, before opening
+        (perth(2026, 10, 12, 8), ("tuesday", time(8), 1)),  # exactly at opening: already open
+        (perth(2026, 10, 12, 12), ("tuesday", time(8), 1)),  # open now
+        (perth(2026, 10, 12, 18, 30), ("tuesday", time(8), 1)),  # Monday, after closing
+        (perth(2026, 10, 16, 18, 30), ("monday", time(8), 3)),  # Friday evening
+        (perth(2026, 10, 17, 12), ("monday", time(8), 2)),  # Saturday
+    ],
+)
+def test_next_opening(moment, expected):
+    assert OperatingHours.from_config_block(WEEKDAYS).next_opening(moment, PERTH) == expected
+
+
+def test_next_opening_is_a_week_away_when_only_today_has_hours_and_they_are_over():
+    hours = OperatingHours.from_config_block({"monday": ["08:00", "17:00"]})
+    assert hours.next_opening(perth(2026, 10, 12, 18), PERTH) == ("monday", time(8), 7)
+
+
+def test_next_opening_is_none_without_hours_a_timezone_or_the_feature():
+    moment = perth(2026, 10, 12, 12)
+    assert OperatingHours.from_config_block(ALL_CLOSED).next_opening(moment, PERTH) is None
+    assert OperatingHours.from_config_block(WEEKDAYS).next_opening(moment, "") is None
+    assert OperatingHours.from_config_block(None).next_opening(moment, PERTH) is None
