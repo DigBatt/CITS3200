@@ -263,6 +263,7 @@ def test_snapshots_read_the_repository_the_dashboard_reads(tmp_path, monkeypatch
     monkeypatch.setattr(logger_module, "generate_daily_snapshot", generate)
     config = dataclasses.replace(load_config(), live_directory=tmp_path / "live", storage_directory=tmp_path / "admin",
                                  snapshot_default_metrics=None)
+    monkeypatch.setattr(logger_module, "load_config", lambda: config)
     scheduler = logger_module.build_snapshot_scheduler(config)
     scheduler.generate(datetime.now(timezone.utc).date())
     assert captured["repository"].data_directory == config.data_directory
@@ -272,3 +273,34 @@ def test_snapshots_read_the_repository_the_dashboard_reads(tmp_path, monkeypatch
 def test_no_snapshots_without_a_storage_directory():
     config = dataclasses.replace(load_config(), storage_directory=None)
     assert logger_module.build_snapshot_scheduler(config) is None
+
+
+def test_snapshots_use_the_schedule_as_it_is_when_they_are_generated(tmp_path, monkeypatch):
+    monkeypatch.setattr(logger_module.SyncSettings, "load", lambda config, config_dir: None)
+    captured = []
+    monkeypatch.setattr(logger_module, "generate_daily_snapshot",
+                        lambda day, config, *args, **kwargs: captured.append(config))
+    started_with = dataclasses.replace(load_config(), storage_directory=tmp_path / "admin")
+    scheduler = logger_module.build_snapshot_scheduler(started_with)
+
+    # The schedule is saved from the admin page while the logger runs.
+    saved = dataclasses.replace(started_with, utilisation={**started_with.utilisation, "service_hours": {}})
+    monkeypatch.setattr(logger_module, "load_config", lambda: saved)
+    scheduler.generate(datetime.now(timezone.utc).date())
+
+    assert captured == [saved]
+
+
+@pytest.mark.parametrize("max_gap, warns", [(10, True), (5, True), (30, False)])
+def test_main_warns_when_the_gap_threshold_is_not_above_the_poll_interval(tmp_path, monkeypatch, caplog, max_gap, warns):
+    config = load_config()
+    config = dataclasses.replace(config, live_directory=tmp_path / "live", storage_directory=None,
+                                 logger={**config.logger, "poll_interval_seconds": 10},
+                                 utilisation={**config.utilisation, "max_gap_seconds": max_gap})
+    run_main(monkeypatch, config, ALL)
+    assert ("live data will count as not reporting" in caplog.text) == warns
+
+
+def test_the_supplied_gap_threshold_allows_for_a_missed_poll():
+    config = load_config()
+    assert config.utilisation["max_gap_seconds"] >= 2 * config.logger["poll_interval_seconds"]

@@ -20,7 +20,8 @@ Codes: `bad_timestamp`, `bad_range` (from > to), `unknown_vehicle`,
 `request_not_open`, `data_unavailable`, `not_signed_in`, `bad_credentials`,
 `admin_not_configured`, `missing_field`, `overlap`, `unknown_downtime`,
 `invalid_schedule`, `request_not_collected`, `bad_rating`,
-`already_reviewed`, `comment_too_long`, `outside_operating_hours`.
+`already_reviewed`, `comment_too_long`, `outside_operating_hours`,
+`invalid_request`, `invalid_metrics`, `invalid_date`, `not_found`.
 
 
 **Signing in.** Endpoints marked *Admin only* answer `401` `not_signed_in`
@@ -1070,7 +1071,7 @@ S16. Which metrics go into the daily snapshots, chosen on the admin page's
 Snapshots tab. Kept in `snapshot_settings.json` under `storage.directory`
 (`config/app.yaml`); until a selection is saved, it is
 `snapshots.default_metrics` from the same file. Generating and downloading the
-snapshots themselves is S17.
+snapshots themselves is S17, under [Daily snapshots](#daily-snapshots) below.
 
 *Admin only.* `401` if not signed in; `500` `data_unavailable` if
 `storage.directory` is not set or the saved file cannot be read.
@@ -1095,6 +1096,65 @@ selection in the same shape.
 `400` `invalid_request` if the body is not a JSON object. `400`
 `invalid_metrics` if `metrics` is not a list, is empty, repeats a metric or
 names one not listed above; the saved selection is left as it was.
+
+---
+
+## Daily snapshots
+
+S17. A saved copy of the selected metrics for one Perth calendar day, per
+vehicle. The live logger (`python -m backend.logger`) writes yesterday's on
+its first poll after midnight, Perth time, from `data.directory`, the
+downtime records and the synced roster. The web app only lists and serves
+them.
+
+Each snapshot is one file, `snapshots/<YYYY-MM-DD>.json` under
+`storage.directory`, and is never rewritten. A failed attempt is retried on
+each poll until 01:00; after that, or if the logger was not running when the
+day ended, the day is recorded as missing in `snapshot_schedule.json` in the
+same directory and is not generated later.
+
+*Admin only.* `401` if not signed in; `500` `data_unavailable` if
+`storage.directory` is not set or the files cannot be read.
+
+### `GET /api/snapshots`
+
+The days with a snapshot and the days recorded as missing, each newest first.
+
+```json
+{
+  "available": ["2026-10-09", "2026-10-08"],
+  "missing": ["2026-10-07"]
+}
+```
+
+### `GET /api/snapshots/<day>/download`
+
+The snapshot for `<day>` (`YYYY-MM-DD`) as an attachment named
+`snapshot-<day>.json`.
+
+`400` `invalid_date` if `<day>` is not a date. `404` `not_found` if there is
+no snapshot for it.
+
+```json
+{
+  "date": "2026-10-09",
+  "timezone": "Australia/Perth",
+  "from": "2026-10-08T16:00:00+00:00",
+  "to": "2026-10-09T16:00:00+00:00",
+  "metrics": ["asset_utilisation", "operating_efficiency"],
+  "vehicles": [
+    {
+      "vehicle_id": "1",
+      "kpis": { "asset_utilisation": 0.31, "operating_efficiency": null },
+      "unavailable": { "operating_efficiency": "no operating time in this window" }
+    }
+  ]
+}
+```
+
+`from` and `to` are the day's bounds in UTC. `kpis` holds only the metrics in
+`metrics`, as fractions, `null` where the data cannot support one; the reason
+is then under `unavailable`, as in `/api/metrics`.
 
 ---
 

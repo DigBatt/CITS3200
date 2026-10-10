@@ -190,9 +190,11 @@ def build_snapshot_scheduler(config) -> SnapshotScheduler | None:
                     "data.live_directory to snapshot live data", config.data_directory, config.live_directory)
 
     def generate_snapshot(day):
+        # Read afresh, so a schedule saved from the admin page since the
+        # logger started is the one the snapshot is worked out against.
         return generate_daily_snapshot(
             day,
-            config,
+            load_config(),
             repository,
             snapshot_settings,
             snapshot_store,
@@ -215,6 +217,13 @@ def main() -> None:
         raise ConfigError("config/app.yaml does not set data.live_directory")
     settings = LoggerSettings.from_config(config)
     vehicles = [v for v in config.vehicles if v.source_url]
+
+    # Positions are at least a poll apart, so a gap threshold at or under the
+    # interval would count nearly all live time as not reporting.
+    max_gap = (config.utilisation or {}).get("max_gap_seconds")
+    if max_gap is not None and max_gap <= settings.poll_interval_seconds:
+        log.warning("utilisation.max_gap_seconds (%g) is not above logger.poll_interval_seconds (%g): "
+                    "live data will count as not reporting", max_gap, settings.poll_interval_seconds)
 
     # The positions matter more than the snapshots, so bad snapshot settings
     # are reported and the logger polls on without them.
