@@ -14,11 +14,15 @@ Two programs, run from one folder:
 | Program | What it does | How it is run |
 |---|---|---|
 | **Web app** | Serves the dashboard, the admin page and the API behind them. | Always on, behind a web server that provides HTTPS. |
-| **Live logger** | Asks each shuttle's REV tracking address for its latest position and saves it. | Always on, alongside the web app. |
+| **Live logger** | Asks each shuttle's REV tracking address for its latest position and saves it. Just after midnight it also saves the daily snapshot of the day before. | Always on, alongside the web app. |
 
 The logger is what gives the dashboard a history. The REV tracking addresses
 only ever hold each shuttle's latest position, so the record starts when the
 logger starts and has a gap for any time it is stopped.
+
+The logger also has to be running at midnight, Perth time, for that day to
+get a daily snapshot. A day it misses is listed as "No snapshot" on the admin
+page and is not made up later.
 
 Everything is stored in files inside the install folder. There is no database
 server to set up.
@@ -53,9 +57,17 @@ sudo -iu nuway
 
 git clone https://github.com/DigBatt/CITS3200.git /opt/nuway
 cd /opt/nuway
+git config user.name "nuway"
+git config user.email "nuway@localhost"
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt gunicorn
 ```
+
+If the repository is private, `git clone` asks for a GitHub username and a
+personal access token with read access to it.
+
+The two `git config` lines give this copy a name to work under. Nothing is
+sent anywhere; updating to a new version (section 10) needs them.
 
 Stay signed in as `nuway` for sections 4 to 6.
 
@@ -98,6 +110,10 @@ data:
   directory: data/live        # was data/sample
   live_directory: data/live
 ```
+
+The daily snapshots are worked out from `data.directory` too, so that they
+match the dashboard. Left at `data/sample`, each snapshot describes the sample
+data, and the logger's log warns that it is not reading the live data.
 
 ### 4.3 Check the shuttles
 
@@ -268,7 +284,7 @@ commented in the file. Restart both services after changing any of them.
 |---|---|---|
 | `data.directory` | `data/sample` | Where the dashboard reads positions from. Set to `data/live` (section 4.2). |
 | `data.live_directory` | `data/live` | Where the logger writes. |
-| `storage.directory` | `data/admin` | Where downtime records, reviews, snapshot settings and the synced roster are kept. |
+| `storage.directory` | `data/admin` | Where downtime records, reviews, snapshot settings, the daily snapshots and the synced roster are kept. |
 | `logger.poll_interval_seconds` | `30` | How often the logger asks each shuttle for its position. |
 | `liveness.inactivity_threshold_seconds` | `300` | A shuttle silent for longer than this shows as INACTIVE, and its trail on the map is broken at the gap. |
 | `liveness.green_within_weekdays`, `liveness.red_after_days` | `1`, `10` | The green, yellow and red "last seen" light in the vehicle list. |
@@ -301,7 +317,7 @@ server on a schedule:
 | Path | Contents |
 |---|---|
 | `/opt/nuway/data/live/` | Every position the logger has recorded. |
-| `/opt/nuway/data/admin/` | Downtime records, rider reviews, snapshot settings, the synced roster. |
+| `/opt/nuway/data/admin/` | Downtime records, rider reviews, snapshot settings, the synced roster, the daily snapshots (`snapshots/`, one file per day) and the list of days without one (`snapshot_schedule.json`). |
 | `/opt/nuway/config/` | All settings, including the service schedule and the stops and routes edited from the admin page, and `secrets.yaml`. |
 
 To restore, put the folders back and restart both services.
@@ -321,6 +337,9 @@ and need no restart.
 Restarting the web app clears open pickup requests; riders who were waiting
 need to request again.
 
+A restart of the logger takes a few seconds. Avoid one around midnight: if
+the logger is not running when the day changes, that day gets no snapshot.
+
 ### Changing the admin password
 
 Generate a new hash as in section 4.1, replace `admin.password_hash` in
@@ -330,7 +349,9 @@ same time, replace `secret_key` as well.
 ### Updating to a new version
 
 The admin page writes to two tracked files, `config/app.yaml` and
-`config/stops.json`, so set your changes aside while updating:
+`config/stops.json`, so set your changes aside while updating. Both services
+are stopped while you do it, so do not update across midnight, or that day
+gets no snapshot:
 
 ```bash
 sudo systemctl stop nuway-web nuway-logger
@@ -362,6 +383,10 @@ file you had also changed. Compare the file with your copy in
 | The logger log shows HTTP 406 errors. | The REV server rejects requests that do not look like a browser. Leave `logger.user_agent` in `config/app.yaml` as supplied. |
 | The Downtime tab or rider reviews report an error about `storage.directory`. | `storage.directory` is unset in `config/app.yaml`, or the `nuway` user cannot write to it. |
 | Saving the schedule or routes from the admin page fails. | The `nuway` user cannot write to `/opt/nuway/config`. Run `sudo chown -R nuway:nuway /opt/nuway`. |
+| The Snapshots tab lists a day as "No snapshot". | The logger was not running when that day ended, or it could not work the snapshot out and gave up at 01:00. In the second case the logger log for that night has "Failed to generate daily snapshot" lines. The day is not made up later. |
+| The logger log says "daily snapshots disabled". | The roster sync, snapshot or data settings are invalid; the rest of the line names the problem. Positions are still being recorded. Fix the setting and restart `nuway-logger`. |
+| The logger log says "daily snapshots read ..., not the live data in ...". | `data.directory` still points at the sample. Do section 4.2. |
+| The Snapshots tab says "Unable to load snapshots". | With "(500)", `storage.directory` is unset in `config/app.yaml` or a file under it cannot be read. With "(401)", the sign-in has expired; reload the page and sign in again. |
 | The browser shows "502 Bad Gateway". | nginx is running but the web app is not. Check `systemctl status nuway-web`. |
 | Everyone is signed out of the admin page at once. | `secret_key` in `config/secrets.yaml` changed, which ends every session. Sign in again. |
 | The Earth switch in the 3D view cannot be turned on. | No `google_maps_api_key`, or the key is not enabled for the Map Tiles API or is restricted to a different address. |
@@ -377,8 +402,11 @@ file you had also changed. Compare the file with your copy in
   passwords. Use a long password and HTTPS.
 - **Pickup requests are not saved.** They are held in memory and cleared by a
   restart.
-- **Daily snapshots are not generated yet.** Administrators can choose which
-  metrics a snapshot will hold, but nothing is produced or downloadable.
+- **A missed daily snapshot is not made up.** A day gets a snapshot only if
+  the logger is running when it ends. Otherwise it is listed as "No snapshot",
+  even though its positions are still on the dashboard.
+- **A daily snapshot is fixed once saved.** Downtime recorded or changed for a
+  day afterwards changes the dashboard's figures for it, not its snapshot.
 - **Times are shown in Perth time.** The dashboard's date and time controls
   are fixed to Perth (UTC+8).
 - **One server process.** The app must run with a single worker (section 6.2),

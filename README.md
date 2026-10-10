@@ -24,9 +24,11 @@ pip install -r requirements.txt
 python -m backend.app              # http://127.0.0.1:5000
 ```
 
-The dashboard runs on the committed sample data with no client access and no
-further setup. None of it is a live feed, and only one of the two sample
-files contains real measurements, see [data/README.md](data/README.md).
+Out of the box the dashboard shows the committed sample data, so it runs with
+no client access and no further setup. The sample is a short recording, not a
+live feed, and only one of its two files contains real measurements, see
+[data/README.md](data/README.md). To run on live data instead, see
+[Live data](#live-data) below.
 
 ## Admin sign-in
 
@@ -47,7 +49,9 @@ Limits and details: [docs/api.md](docs/api.md#administrator-sign-in).
 ## Live data
 
 The logger polls each vehicle's REV tracking endpoint (`source_url` in
-`config/vehicles.yaml`) and appends new snapshots to `data/live/`.
+`config/vehicles.yaml`) and appends new positions to `data/live/`. Just after
+midnight, Perth time, it also saves the previous day's daily snapshot (S17)
+under `storage.directory`, worked out from `data.directory`.
 
 ```bash
 python -m backend.logger           # run until Ctrl+C
@@ -64,8 +68,9 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-The browser tests (`test_map_stops.py`, `test_operator_view.py`) use Google
-Chrome if it is installed. The operator view tests also accept the Chromium
+The browser tests (the files that import Playwright, such as
+`test_map_stops.py` and `test_operator_view.py`) use Google Chrome if it is
+installed. The operator view tests also accept the Chromium
 that Playwright downloads, the easy option under WSL or Linux:
 
 ```bash
@@ -83,7 +88,6 @@ data/        committed sample data.
 backend/     Flask app, storage behind an interface, API blueprints, live logger.
 tests/       pytest suite.
 frontend/    Leaflet dashboard.
-mobile/      Expo rider app for phones, see mobile/README.md.
 drafts/      Sprint 1 prototypes, reference only so not part of the build.
 GPS_Report/  client supplied telemetry and ROS 2 sample nodes.
 ```

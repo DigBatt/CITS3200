@@ -55,7 +55,7 @@ When the operator marks your stop as picked up, the panel changes to
 The review form has two required questions, each rated 1 (worst) to 5 (best):
 
 - **How safe did you feel?**
-- **Requesting a pickup and tracking the bus live**
+- **How easy was the app to use?** (requesting a pickup, tracking the bus)
 
 Everything else is optional: how the vehicle behaved, whether it was on time,
 what the ride was for, the stops, the accessibility ramp, a little about you,
@@ -146,8 +146,8 @@ bottom of the panel summarise utilisation for the vehicles and period chosen.
 #### The map
 
 - Each shuttle is a **small bus in its own colour**, with its number in a
-  badge, at its latest position in the period. Click it for its name and how
-  many positions were recorded.
+  badge, at its latest position in the period. Click it for its name, the time
+  of that position and how many positions were recorded in the period.
 - The **coloured line** is where it travelled during the period. The line
   has a break wherever the shuttle stopped reporting for more than 5
   minutes, so a gap in the line means a gap in the data, not a jump.
@@ -252,9 +252,9 @@ Two things affect the figures and are worth knowing:
 
 ## Part 3: The admin page
 
-The admin page is for operators and administrators. It holds six tabs:
-**Operator view**, **Figures**, **Downtime**, **Schedule**, **Routes** and
-**Snapshots**.
+The admin page is for operators and administrators. It holds seven tabs:
+**Operator view**, **Figures**, **Downtime**, **Schedule**, **Routes**,
+**Snapshots** and **Reviews**.
 
 ### Signing in
 
@@ -388,19 +388,62 @@ until they have been collected.
 **Saving**
 
 Nothing changes until you press **Save changes**; **Discard** throws your
-edits away. Until you save, **Undo** and **Redo** (or Ctrl+Z and Ctrl+R; Cmd
-on a Mac) step back and forward through your edits. Saved changes show on
-the dashboard and in the rider's stop list straight away.
+edits away. Until you save, **Undo** and **Redo** step back and forward
+through your edits. From the keyboard, Ctrl+Z undoes and Ctrl+Shift+Z or
+Ctrl+Y redoes (Cmd on a Mac). On this tab Ctrl+R also redoes, and does not
+reload the page. Saved changes show on the dashboard and in the rider's stop
+list straight away.
 
 ### Snapshots
 
-Choose which figures the system records in its daily snapshot.
+A daily snapshot is a saved copy of the chosen figures for one day, midnight
+to midnight, for each shuttle. The system saves one just after each day ends,
+so there is a record that does not depend on the dashboard.
+
+**To choose what a snapshot records:**
 
 1. Tick the metrics to include. At least one must be ticked.
 2. Press **Save selection**.
 
-Daily snapshots themselves are not produced yet, so there is nothing to
-download under **PAST SNAPSHOTS**. Your selection is kept for when they are.
+Your selection applies from the next snapshot. Snapshots already saved keep
+the metrics they were made with.
+
+**To download a snapshot,** find its day under **PAST SNAPSHOTS**, newest
+first:
+
+| Shown | Meaning |
+|---|---|
+| **Available**, with **Download** | A snapshot was saved for that day. **Download** gives you a file named `snapshot-` and the date. |
+| **No snapshot** | The system was not running when that day ended, so none was saved. One is not made later. The day's positions are still on the dashboard, and its figures on the Figures tab. |
+
+**Refresh** reloads the list. Yesterday's snapshot appears a minute or so
+after midnight.
+
+The file is in JSON, a text format that a spreadsheet or script can read. It
+states the day, the period it covers and the metrics chosen, then each
+shuttle's figures as fractions, so 0.75 means 75%. A figure the data cannot
+support is left empty and its reason is given
+([see above](#unavailable-is-not-zero)).
+
+A snapshot is not changed once saved. Downtime recorded for a day afterwards
+changes that day's figures on the dashboard, but not its snapshot.
+
+### Reviews
+
+What riders said after being collected ([Part 1](#leave-a-review)), newest
+first.
+
+- **SUMMARY** gives the averages across the reviews shown, and says how
+  many that is when a filter is on.
+- The filters at the top narrow the list by vehicle, by stop and by date
+  (today, the last 7 days or the last 30 days). **Rated 2 or lower only**
+  keeps just the poor ratings.
+- **Expand all** opens every review in full (**Collapse all** closes them
+  again), and **Refresh** fetches any that have arrived since.
+- **Previous** and **Next** move between pages when there are many.
+
+Reviews are anonymous; see [Leave a review](#leave-a-review) for what is and
+is not stored.
 
 ---
 
@@ -435,5 +478,9 @@ restarted. Request again.
 Sign-ins last 12 hours. Sign in again; you return to the page you were on.
 
 **Where do rider reviews go?**
-They are stored by the system, but the admin page has no screen for reading
-them yet. Whoever looks after the installation can retrieve them.
+To the **Reviews** tab of the admin page, where anyone signed in can read
+them. See [Reviews](#reviews).
+
+**A day says "No snapshot".**
+The system was not running when that day ended. Tell whoever looks after the
+installation if it keeps happening. See [Snapshots](#snapshots).
