@@ -12,6 +12,8 @@ CITS3200 Group 11.
   operators and administrators.
 - [Installation guide](docs/installation-guide.md): installing it on a web
   server and keeping it running.
+- [Microsoft Teams feasibility study](docs/microsoft-teams-feasibility-study.md):
+  proposed staff-channel notifications for operational and reporting events.
 
 The rest of this page is the quick start for developers.
 
