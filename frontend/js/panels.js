@@ -42,9 +42,15 @@ document.addEventListener('DOMContentLoaded', () => {
       timeline: timelineControl?.getFieldState(),
       vehicle: Vehicles.getSelection(),
       area: window.Area?.getSelection(),
+      route: window.Stops?.getSelectedRoute() ?? null,
+      focus: focusToggle()?.checked ?? false,
     };
     timelineControl?.setLiveToday();
     Vehicles.select(null); // every vehicle, not whichever ones Fleet had picked
+    // No route and no Focus: Rider has no Route bar or layer chips to clear
+    // them with, so a route Fleet had picked would stay drawn on the rider's map.
+    window.Stops?.select(null);
+    setFocus(false);
     window.Area?.select(null); // the Area chips are hidden anyway; this is what the next line pins instead
     pinMapTo(getCampusBounds); // campus only, regardless of whatever area was pinned
   }
@@ -59,7 +65,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // skip putting the real pin back when the saved selection is the same
     // null/area it already thinks is active.
     window.Area?.restore(riderOverrides.area);
+    window.Stops?.select(riderOverrides.route);
+    setFocus(riderOverrides.focus);
     riderOverrides = null;
+  }
+
+  // The map's Focus routes chip (js/stops.js wires it to setRouteFocus). Set
+  // through its checkbox, so the chip shows the state it is in.
+  function focusToggle() {
+    return document.getElementById('layer-toggle-focus-route');
+  }
+
+  function setFocus(on) {
+    const toggle = focusToggle();
+    if (!toggle || toggle.checked === on) return;
+    toggle.checked = on;
+    toggle.dispatchEvent(new Event('change'));
   }
 
   function setView(view) {
