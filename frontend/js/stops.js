@@ -89,7 +89,7 @@
     ].join('');
   }
 
-  // The Focus routes chip, off by default; on fades the buses' GPS trails
+  // The Focus routes chip, on by default; on fades the buses' GPS trails
   // and shows the selected route's line over them (js/map.js). The stops
   // themselves are always shown.
   function wireRouteFocusToggle() {
@@ -99,7 +99,7 @@
     toggle.addEventListener('change', () => setRouteFocus(toggle.checked));
   }
 
-  // The basemap is muted by default (css/colours.css); this switch shows its
+  // The basemap starts in full colour; this switch controls its
   // own colours, for anyone finding their way by its parks and roads.
   function wireFullColourToggle() {
     const toggle = document.getElementById('layer-toggle-full-colour');

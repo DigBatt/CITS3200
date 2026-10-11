@@ -1,6 +1,6 @@
-// The map pane's 3D view: a 2D / 3D toggle, and in 3D, one bus at a time on a
-// 3D campus with the camera circling it (js/campus3d.js). The ‹ › arrows, or
-// the arrow keys, step through the buses in the current selection.
+// The campus 3D view draws every selected bus and its recent trail.
+// The ‹ › arrows focus the camera on a bus without hiding the others.
+// The optional Earth view continues to follow one bus at a time.
 //
 // It shows the same position as the 2D map's end marker: each bus's last fix
 // in the selected period. Live, that is where the bus is now, and each poll
@@ -81,6 +81,7 @@
     const since = Date.parse(last.timestamp) - TRAIL_MS;
     bus.fix = {
       id: bus.id,
+      name: bus.name,
       colour: bus.colour,
       lng: last.longitude,
       lat: last.latitude,
@@ -106,7 +107,7 @@
     return `At ${formatInstant(bus.fix.timestamp)}${speed}`;
   }
 
-  function render() {
+  function render(focusRequested = false) {
     const bus = current();
     const several = buses.length > 1;
     els.steps.forEach((button) => { button.disabled = !several; });
@@ -116,11 +117,14 @@
       els.dot.style.background = 'transparent';
     } else {
       els.name.textContent = bus.name ?? `Vehicle ${bus.id}`;
-      els.meta.textContent = describe(bus);
+      const visibleCount = buses.filter((entry) => entry.fix).length;
+      els.meta.textContent = describe(bus) + (active === 'campus' && visibleCount > 1 ? ` · ${visibleCount} buses shown` : '');
       els.dot.style.background = bus.colour ?? 'transparent';
     }
     // Both views, so switching between them lands on the same bus.
-    for (const view of Object.values(views)) view.api?.show(bus?.fix ?? null);
+    const fixes = buses.map((entry) => entry.fix).filter(Boolean);
+    views.campus.api?.showAll(fixes, currentId, focusRequested);
+    views.earth.api?.show(bus?.fix ?? null);
   }
 
   function showStatus() {
@@ -133,7 +137,7 @@
     if (buses.length < 2) return;
     const index = Math.max(0, buses.findIndex((bus) => bus.id === currentId));
     currentId = buses[(index + delta + buses.length) % buses.length].id;
-    render();
+    render(true);
   }
 
   // ---- Loading the views ----
@@ -193,6 +197,7 @@
     for (const [key, host] of Object.entries(els.hosts)) host.hidden = key !== name;
     els.earth.checked = name === 'earth';
     showStatus();
+    render();
     load(name);
     views[name].api?.resize();
   }

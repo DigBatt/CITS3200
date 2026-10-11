@@ -1,4 +1,4 @@
-// 3D view of a bus on campus: the nUWAy CAD model, in its real livery, at its
+// 3D view of the selected buses on campus: the nUWAy CAD model, in its real livery, at its
 // position on a 3D map of UWA, with the camera slowly circling it.
 //
 // The map is MapLibre GL over OpenFreeMap's vector tiles (no key needed),
@@ -104,24 +104,49 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
 
   // ---- The bus, as a custom layer ----
 
-  const bus = buildBus(modelData);
-  const ring = buildRing();
-  const scene = new THREE.Scene();
-  scene.add(bus.solid, ring);
-  // The X-ray, drawn first in a pass of its own (see buildBus).
-  const ghostScene = new THREE.Scene();
-  ghostScene.add(bus.ghost);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7378, 2.2));
-  const sun = new THREE.DirectionalLight(0xffffff, 2.4);
-  sun.position.set(-40, 80, 30);
-  scene.add(sun);
+  // Each selected vehicle owns its model, animation and label.
+  const vehicles = new Map();
   const camera = new THREE.Camera();
   let renderer = null;
+  let focusedId = null; // null keeps the camera on the fleet
+  let selectionKey = '';
 
-  // Where the bus is drawn: its position, as a MercatorCoordinate, and its
-  // heading in degrees clockwise from north. Moved by the glide below.
-  const at = { lng: CAMPUS_CENTRE[0], lat: CAMPUS_CENTRE[1], heading: 0 };
-  let visible = false;
+  function createVehicle(target) {
+    const bus = buildBus(modelData);
+    const ring = buildRing();
+    const scene = new THREE.Scene();
+    scene.add(bus.solid, ring);
+    const ghostScene = new THREE.Scene();
+    ghostScene.add(bus.ghost);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7378, 2.2));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+    sun.position.set(-40, 80, 30);
+    scene.add(sun);
+    const label = document.createElement('span');
+    label.textContent = target.name ?? `nUWAy ${target.id}`;
+    Object.assign(label.style, {
+      background: '#fff', color: '#1c1917', padding: '2px 6px',
+      borderRadius: '4px', fontWeight: '700', border: '2px solid',
+    });
+    const marker = new maplibregl.Marker({ element: label, offset: [0, -22] })
+      .setLngLat([target.lng, target.lat]).addTo(map);
+    return { bus, ring, scene, ghostScene, marker, label,
+      at: { lng: target.lng, lat: target.lat, heading: target.heading ?? 0 }, glide: null };
+  }
+
+  function disposeVehicle(vehicle) {
+    vehicle.marker.remove();
+    const geometries = new Set();
+    const materials = new Set();
+    for (const scene of [vehicle.scene, vehicle.ghostScene]) {
+      scene.traverse((object) => {
+        if (object.geometry) geometries.add(object.geometry);
+        for (const material of [].concat(object.material ?? [])) materials.add(material);
+      });
+    }
+    geometries.forEach((geometry) => geometry.dispose());
+    materials.forEach((material) => material.dispose());
+  }
 
   const layer = {
     id: MODEL_LAYER_ID,
@@ -132,28 +157,29 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
       renderer.autoClear = false;
     },
     render(_gl, matrix) {
-      if (!visible) return;
-      const origin = maplibregl.MercatorCoordinate.fromLngLat([at.lng, at.lat], 0);
-      const scale = origin.meterInMercatorCoordinateUnits();
-      // Model space is metres, Y up, length along X. Map space is Mercator,
-      // Z up, Y pointing south: stand the model up, then turn it about the
-      // vertical so its length runs along the heading.
-      const transform = new THREE.Matrix4()
-        .makeTranslation(origin.x, origin.y, origin.z)
-        .scale(new THREE.Vector3(scale, -scale, scale))
-        .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2))
-        .multiply(new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(90 - at.heading)));
-      camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix).multiply(transform);
-      renderer.resetState();
-      renderer.render(ghostScene, camera);
-      renderer.render(scene, camera);
+      for (const { at, scene, ghostScene } of vehicles.values()) {
+        const origin = maplibregl.MercatorCoordinate.fromLngLat([at.lng, at.lat], 0);
+        const scale = origin.meterInMercatorCoordinateUnits();
+        // Model space is metres, Y up, length along X. Map space is Mercator,
+        // Z up, Y pointing south: stand the model up, then turn it about the
+        // vertical so its length runs along the heading.
+        const transform = new THREE.Matrix4()
+          .makeTranslation(origin.x, origin.y, origin.z)
+          .scale(new THREE.Vector3(scale, -scale, scale))
+          .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2))
+          .multiply(new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(90 - at.heading)));
+        camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix).multiply(transform);
+        renderer.resetState();
+        renderer.render(ghostScene, camera);
+        renderer.render(scene, camera);
+      }
     },
   };
 
   // ---- The trail ----
 
   const TRAIL_SOURCE = 'nuway-trail';
-  const emptyTrail = { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} };
+  const emptyTrail = { type: 'FeatureCollection', features: [] };
 
   await new Promise((resolve) => (map.loaded() ? resolve() : map.once('load', resolve)));
 
@@ -168,7 +194,7 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
     type: 'line',
     source: TRAIL_SOURCE,
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#2f7d8f', 'line-width': 6, 'line-opacity': 0.75 },
+    paint: { 'line-color': ['get', 'colour'], 'line-width': 6, 'line-opacity': 0.75 },
   });
   map.addLayer(layer);
   onStatus('');
@@ -187,7 +213,7 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
   let frame = null;
   let lastTime = null;
   let pausedUntil = 0;
-  let glide = null; // { from, to, start }
+
 
   // Someone moving the view takes over from the orbit for a while.
   for (const event of ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart']) {
@@ -208,18 +234,22 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
     lastTime = time;
     let moving = false;
 
-    if (glide) {
+    for (const vehicle of vehicles.values()) {
+      const { at, glide } = vehicle;
+      if (!glide) continue;
       const t = Math.min((time - glide.start) / GLIDE_MS, 1);
       const k = easeInOut(t);
       at.lng = glide.from.lng + (glide.to.lng - glide.from.lng) * k;
       at.lat = glide.from.lat + (glide.to.lat - glide.from.lat) * k;
       at.heading = turnTowards(glide.from.heading, glide.to.heading, k);
-      if (t >= 1) glide = null;
+      vehicle.marker.setLngLat([at.lng, at.lat]);
+      if (t >= 1) vehicle.glide = null;
       moving = true;
     }
 
     const orbiting = spin && time >= pausedUntil;
-    const view = { center: [at.lng, at.lat] };
+    const followed = vehicles.get(focusedId);
+    const view = followed ? { center: [followed.at.lng, followed.at.lat] } : {};
     if (orbiting) view.bearing = map.getBearing() + ORBIT_DEGREES_PER_SECOND * dt;
     // While someone is looking around, only follow the bus if it moves.
     if (orbiting || moving) map.jumpTo(view);
@@ -234,7 +264,7 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
       return;
     }
     // Not spinning, there is nothing to animate once a glide is done.
-    if (!spin && !glide) {
+    if (!spin && ![...vehicles.values()].some((vehicle) => vehicle.glide)) {
       lastTime = null;
       return;
     }
@@ -250,47 +280,78 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
   document.addEventListener('visibilitychange', schedule);
   reducedMotion.addEventListener('change', schedule);
 
-  let shownKey = null;
-
-  function show(target) {
-    if (!target) {
-      visible = false;
-      map.getSource(TRAIL_SOURCE).setData(emptyTrail);
-      map.triggerRepaint();
-      shownKey = null;
-      return;
+  function showAll(targets, focusId = null, focusRequested = false) {
+    const ids = new Set(targets.map((target) => target.id));
+    for (const [id, vehicle] of vehicles) {
+      if (!ids.has(id)) {
+        disposeVehicle(vehicle);
+        vehicles.delete(id);
+      }
     }
-
-    ring.material.color.set(target.colour ?? '#2f7d8f');
-    bus.ghostEdges.color.set(target.colour ?? '#2f7d8f');
-    map.setPaintProperty('nuway-trail', 'line-color', target.colour ?? '#2f7d8f');
+    let jumped = false;
+    for (const target of targets) {
+      const fresh = !vehicles.has(target.id);
+      if (fresh) vehicles.set(target.id, createVehicle(target));
+      const vehicle = vehicles.get(target.id);
+      const { at, bus, ring } = vehicle;
+      const colour = target.colour ?? '#2f7d8f';
+      ring.material.color.set(colour);
+      bus.ghostEdges.color.set(colour);
+      vehicle.label.style.borderColor = colour;
+      vehicle.label.textContent = target.name ?? `nUWAy ${target.id}`;
+      const to = { lng: target.lng, lat: target.lat, heading: target.heading ?? 0 };
+      const far = Math.hypot(to.lng - at.lng, to.lat - at.lat) > 0.002;
+      jumped ||= far;
+      if (fresh || far || reducedMotion.matches) {
+        Object.assign(at, to);
+        vehicle.glide = null;
+        vehicle.marker.setLngLat([at.lng, at.lat]);
+      } else {
+        vehicle.glide = { from: { ...at }, to, start: performance.now() };
+      }
+    }
     map.getSource(TRAIL_SOURCE).setData({
-      ...emptyTrail,
-      geometry: { type: 'LineString', coordinates: target.trail ?? [] },
+      type: 'FeatureCollection',
+      features: targets.filter((target) => target.trail?.length > 1).map((target) => ({
+        type: 'Feature', properties: { colour: target.colour ?? '#2f7d8f' },
+        geometry: { type: 'LineString', coordinates: target.trail },
+      })),
     });
-
-    const to = { lng: target.lng, lat: target.lat, heading: target.heading ?? 0 };
-    // A different bus is cut to; the same bus moving is glided along, unless
-    // it has jumped further than a short drive, as when the period changes.
-    const key = target.id;
-    const far = Math.hypot(to.lng - at.lng, to.lat - at.lat) > 0.002; // ~200 m
-    if (key !== shownKey || !visible || far || reducedMotion.matches) {
-      Object.assign(at, to);
-      glide = null;
-      map.jumpTo({ center: [to.lng, to.lat] });
-    } else {
-      glide = { from: { ...at }, to, start: performance.now() };
+    const nextKey = JSON.stringify([...ids].sort());
+    if (nextKey !== selectionKey || jumped) {
+      focusedId = null;
+      if (targets.length === 1) {
+        focusedId = targets[0].id;
+        map.jumpTo({ center: [targets[0].lng, targets[0].lat], zoom: ZOOM });
+      } else if (targets.length > 1) {
+        const bounds = new maplibregl.LngLatBounds();
+        for (const target of targets) {
+          bounds.extend([target.lng, target.lat]);
+          for (const point of target.trail ?? []) bounds.extend(point);
+        }
+        map.fitBounds(bounds, { padding: 70, maxZoom: ZOOM, duration: 0 });
+      }
+      selectionKey = nextKey;
     }
-    shownKey = key;
-    visible = true;
+    if (focusRequested && vehicles.has(focusId)) {
+      focusedId = focusId;
+      const at = vehicles.get(focusId).at;
+      map.jumpTo({ center: [at.lng, at.lat], zoom: ZOOM });
+    }
     map.triggerRepaint();
     schedule();
+  }
+
+  // Retained for callers that show a single vehicle.
+  function show(target) {
+    showAll(target ? [target] : []);
   }
 
   schedule();
 
   return {
     show,
+    showAll,
     setPaused(next) {
       paused = next;
       schedule();
@@ -323,6 +384,8 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
       visibility.disconnect();
       document.removeEventListener('visibilitychange', schedule);
       reducedMotion.removeEventListener('change', schedule);
+      vehicles.forEach(disposeVehicle);
+      vehicles.clear();
       map.remove();
     },
   };
