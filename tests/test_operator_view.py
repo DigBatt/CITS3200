@@ -318,6 +318,11 @@ def test_picked_up_enables_once_a_vehicle_is_chosen(page_without_vehicle, server
 
     page.select_option("#vehicle-selector", "1")
 
-    button.wait_for(state="attached")
-    assert not button.is_disabled()
+    # Choosing a vehicle refreshes the list, and it is that redraw which
+    # enables the button. Wait for it rather than read the button at once: on
+    # a slow machine the redraw has not happened yet when the choice is made.
+    page.wait_for_function(
+        "() => document.querySelector('.operator-stop[data-stop-id=\"shared\"] .operator-collect')?.disabled === false",
+        timeout=5_000,
+    )
     assert page.locator("#operator-vehicle-notice").is_hidden()

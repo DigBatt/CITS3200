@@ -161,6 +161,26 @@ def test_layer_chips_are_hidden_on_the_rider_tab(page):
     assert page.locator("#map-layers").is_visible()
 
 
+def test_rider_tab_drops_fleets_route_and_focus_and_fleet_gets_them_back(page):
+    # Rider has no Route bar or layer chips, so it must not keep Fleet's route
+    # drawn where a rider cannot clear it.
+    route_line = page.locator(".leaflet-routes-pane path.planned-route-path")
+    focus = page.locator("#layer-toggle-focus-route")
+    select_route(page, "North Route")
+    layer_switch(page, "Focus routes").click()
+    assert route_line.count() > 0
+
+    page.locator("#app-tabs .app-tab", has_text="Rider").click()
+    assert route_line.count() == 0
+    assert not focus.is_checked()
+    assert page.evaluate("Stops.getSelectedRoute()") is None
+
+    page.locator("#app-tabs .app-tab", has_text="Fleet").click()
+    assert page.evaluate("Stops.getSelectedRoute()") == "north"
+    assert focus.is_checked()
+    assert route_line.count() > 0
+
+
 def test_focus_routes_fades_the_trails_and_shows_the_route_line(page):
     # The panes' own opacity, as set, not as computed: computed, it would read
     # partway through the 200ms fade.
