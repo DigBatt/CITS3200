@@ -27,3 +27,6 @@ config/secrets.yaml
 
 # Log files, wherever a tool writes them (e.g. Expo's mobile/.expo/dev/logs/).
 *.log
+
+# Obsidian vault settings
+.obsidian/

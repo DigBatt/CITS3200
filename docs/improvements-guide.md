@@ -28,6 +28,23 @@ exist, extend `rev_php.py`'s mapping and the position schema
 (`docs/data-schema.md`) to carry them through, so the dashboard and the
 utilisation model can report on them like any other field.
 
+**Alternative: rosbridge.** If the shuttle's onboard unit runs ROS and REV
+can give access to it, `rosbridge_server` (from the `rosbridge_suite`
+package) exposes the robot's topics and services as JSON over a WebSocket,
+on port 9090 by default. It is started on the vehicle with
+`ros2 launch rosbridge_server rosbridge_websocket_launch.xml` (ROS 2) or
+`roslaunch rosbridge_server rosbridge_websocket.launch` (ROS 1). The logger
+could then subscribe to the autonomy-state and disengagement topics as they
+are published, rather than polling for them, through a new adapter beside
+`rev_php.py` in `backend/ingest/` (the `roslibpy` library is the usual
+Python client). This depends on REV: which topics exist, and whether they
+will open a port on the vehicle at all. rosbridge has no authentication by
+default, so it should only be reachable over a VPN or behind an
+authenticating TLS proxy, and limited to the topics the dashboard reads
+(`rosbridge_server`'s `topics_glob` and `services_glob` parameters). Also
+see Item 7: a WebSocket held open over the shuttles' patchy mobile link
+needs to reconnect and resume cleanly.
+
 ## 2. iCal subscription
 
 The driving roster syncs from one specific vendor's proprietary API
