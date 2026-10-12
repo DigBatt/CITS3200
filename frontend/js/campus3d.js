@@ -61,10 +61,12 @@ function loadMapLibre() {
  *   messages to show over the view; '' clears it.
  * @param {boolean} [options.spin] - Whether the camera circles the bus to
  *   start with; `setSpin` changes it. Defaults to true.
- * @returns {Promise<{show: (bus: Object|null) => void, setSpin: (on: boolean) => void, destroy: () => void}>}
- *   `show` puts the camera on a bus: `{ colour, lng, lat, heading, trail }`,
- *   where `trail` is its recent track as [lng, lat] pairs, or null for a bus
- *   with no position, which leaves the camera on campus with no bus drawn.
+ * @returns {Promise<{showAll: Function, setSpin: (on: boolean) => void, destroy: () => void}>}
+ *   `showAll(buses, focusId, focusRequested)` draws every bus given, each
+ *   `{ id, name, colour, lng, lat, heading, trail }` where `trail` is its
+ *   recent track as [lng, lat] pairs. A new selection follows its one bus or
+ *   frames them all. With `focusRequested`, the camera goes to the bus
+ *   `focusId`, or back to framing them all when it is null.
  */
 export async function mount(host, { onStatus = () => {}, spin: spinAtStart = true, paused: pausedAtStart = false } = {}) {
   onStatus('Loading the 3D campus…');
@@ -110,6 +112,13 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
   let renderer = null;
   let focusedId = null; // null keeps the camera on the fleet
   let selectionKey = '';
+  let shown = []; // the targets last handed to showAll
+  // Set when the camera should be framed again. Framing waits until the map
+  // has a size, since a hidden map (after warming up, or behind Earth)
+  // cannot fit anything.
+  let framePending = false;
+  // Whether the zoom is the fleet's fit rather than one someone chose.
+  let fleetFramed = false;
 
   function createVehicle(target) {
     const bus = buildBus(modelData);
@@ -157,7 +166,7 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
       renderer.autoClear = false;
     },
     render(_gl, matrix) {
-      for (const { at, scene, ghostScene } of vehicles.values()) {
+      const placed = [...vehicles.values()].map(({ at, scene, ghostScene }) => {
         const origin = maplibregl.MercatorCoordinate.fromLngLat([at.lng, at.lat], 0);
         const scale = origin.meterInMercatorCoordinateUnits();
         // Model space is metres, Y up, length along X. Map space is Mercator,
@@ -168,10 +177,16 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
           .scale(new THREE.Vector3(scale, -scale, scale))
           .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2))
           .multiply(new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(90 - at.heading)));
-        camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix).multiply(transform);
-        renderer.resetState();
-        renderer.render(ghostScene, camera);
-        renderer.render(scene, camera);
+        return { scene, ghostScene, projection: new THREE.Matrix4().fromArray(matrix).multiply(transform) };
+      });
+      // Every bus's X-ray before any bus's solid: an X-ray ignores depth, so
+      // one drawn after another bus's solid would show through it.
+      for (const pass of ['ghostScene', 'scene']) {
+        for (const vehicle of placed) {
+          camera.projectionMatrix = vehicle.projection;
+          renderer.resetState();
+          renderer.render(vehicle[pass], camera);
+        }
       }
     },
   };
@@ -273,7 +288,10 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
 
   const visibility = new IntersectionObserver(([entry]) => {
     onScreen = entry.isIntersecting;
-    if (onScreen) map.resize();
+    if (onScreen) {
+      map.resize();
+      frameCamera();
+    }
     schedule();
   });
   visibility.observe(host);
@@ -317,40 +335,55 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
         geometry: { type: 'LineString', coordinates: target.trail },
       })),
     });
+    shown = targets;
     const nextKey = JSON.stringify([...ids].sort());
-    if (nextKey !== selectionKey || jumped) {
-      focusedId = null;
-      if (targets.length === 1) {
-        focusedId = targets[0].id;
-        map.jumpTo({ center: [targets[0].lng, targets[0].lat], zoom: ZOOM });
-      } else if (targets.length > 1) {
-        const bounds = new maplibregl.LngLatBounds();
-        for (const target of targets) {
-          bounds.extend([target.lng, target.lat]);
-          for (const point of target.trail ?? []) bounds.extend(point);
-        }
-        map.fitBounds(bounds, { padding: 70, maxZoom: ZOOM, duration: 0 });
-      }
+    if (nextKey !== selectionKey) {
+      // A new selection: one bus is followed, several are framed together.
       selectionKey = nextKey;
+      focusedId = targets.length === 1 ? targets[0].id : null;
+      framePending = true;
+    } else if (jumped) {
+      // A bus moved a long way, e.g. the period changed: reframe, staying
+      // on the bus someone stepped to if there is one.
+      framePending = true;
     }
-    if (focusRequested && vehicles.has(focusId)) {
-      focusedId = focusId;
-      const at = vehicles.get(focusId).at;
-      map.jumpTo({ center: [at.lng, at.lat], zoom: ZOOM });
+    if (focusRequested) {
+      // A step with the arrows: to a bus, or back to the whole fleet (null).
+      // A lone bus is followed whichever is asked for.
+      focusedId = vehicles.has(focusId) ? focusId : targets.length === 1 ? targets[0].id : null;
+      framePending = true;
     }
+    frameCamera();
     map.triggerRepaint();
     schedule();
   }
 
-  // Retained for callers that show a single vehicle.
-  function show(target) {
-    showAll(target ? [target] : []);
+  // Put the camera on the followed bus, or fit the fleet, once the map has a
+  // size to do it in. A bus keeps the zoom someone chose, except when coming
+  // from the fleet's fit, which may be zoomed well out.
+  function frameCamera() {
+    if (!framePending || !host.clientWidth || !host.clientHeight) return;
+    // The map may not have noticed it was just shown yet.
+    map.resize();
+    framePending = false;
+    const followed = vehicles.get(focusedId);
+    if (followed) {
+      map.jumpTo({ center: [followed.at.lng, followed.at.lat], ...(fleetFramed ? { zoom: ZOOM } : {}) });
+      fleetFramed = false;
+    } else if (shown.length > 1) {
+      const bounds = new maplibregl.LngLatBounds();
+      for (const target of shown) {
+        bounds.extend([target.lng, target.lat]);
+        for (const point of target.trail ?? []) bounds.extend(point);
+      }
+      map.fitBounds(bounds, { padding: 70, maxZoom: ZOOM, duration: 0 });
+      fleetFramed = true;
+    }
   }
 
   schedule();
 
   return {
-    show,
     showAll,
     setPaused(next) {
       paused = next;
@@ -378,7 +411,10 @@ export async function mount(host, { onStatus = () => {}, spin: spinAtStart = tru
       schedule();
     },
     // The container changed size, e.g. the view was just revealed.
-    resize: () => map.resize(),
+    resize() {
+      map.resize();
+      frameCamera();
+    },
     destroy() {
       if (frame !== null) cancelAnimationFrame(frame);
       visibility.disconnect();

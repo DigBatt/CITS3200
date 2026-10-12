@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 let map, renders = 0, disposed = 0;
+const drawn = [];
 const markers = new Set();
 class Scene {
   constructor() { this.children = []; }
@@ -45,9 +46,9 @@ const context = vm.createContext({
   THREE: { Scene, Camera: class {}, Matrix4: Matrix, Vector3: class {},
     HemisphereLight: class {}, DirectionalLight: class { position = { set() {} }; },
     MathUtils: { degToRad: n => n },
-    WebGLRenderer: class { resetState() {} render() { renders++; } },
+    WebGLRenderer: class { resetState() {} render(scene) { renders++; drawn.push(scene.children[0].kind); } },
   },
-  buildBus: () => ({ solid: mesh(), ghost: mesh(), ghostEdges: { color: colour() } }), buildRing: mesh,
+  buildBus: () => ({ solid: { ...mesh(), kind: 'solid' }, ghost: { ...mesh(), kind: 'ghost' }, ghostEdges: { color: colour() } }), buildRing: mesh,
   loadModel: async () => ({}),
   IntersectionObserver: class { observe() {} disconnect() {} },
   requestAnimationFrame: () => 1, cancelAnimationFrame() {}, setTimeout, clearTimeout,
@@ -57,7 +58,8 @@ source = source.replace(/^import .*;\n/gm, '').replace('export async function mo
 vm.runInContext(source + '\nglobalThis.mount = mount;', context);
 const bus = (id, lng) => ({ id, name: `nUWAy ${id}`, lng, lat: -31.98, colour: id === '1' ? '#ff0000' : '#0000ff', trail: [[lng - .001, -31.98], [lng, -31.98]] });
 (async () => {
-  const api = await context.mount({}, { spin: false });
+  const host = { clientWidth: 800, clientHeight: 600 };
+  const api = await context.mount(host, { spin: false });
   const first = bus('1', 115.81), second = bus('2', 115.82);
   api.showAll([first]);
   api.showAll([first, second]);
@@ -67,6 +69,7 @@ const bus = (id, lng) => ({ id, name: `nUWAy ${id}`, lng, lat: -31.98, colour: i
   assert.equal(map.fits[0].points.length, 6, 'bounds contain positions and both trails');
   map.layers['nuway-bus'].render({}, []);
   assert.equal(renders, 4, 'each bus renders its solid and ghost model');
+  assert.deepEqual(drawn, ['ghost', 'ghost', 'solid', 'solid'], 'every X-ray is drawn before any solid');
   api.showAll([second, first]);
   assert.equal(map.fits.length, 1, 'reordering does not reset the camera');
   api.showAll([first, second], '2', true);
@@ -74,15 +77,31 @@ const bus = (id, lng) => ({ id, name: `nUWAy ${id}`, lng, lat: -31.98, colour: i
   assert.equal(map.jumps.at(-1).center[0], second.lng);
   api.showAll([first, { ...second, lng: 115.83 }]);
   assert.equal([...markers].find(m => m.label.textContent === 'nUWAy 2').point[0], 115.83, 'position updates apply per bus');
+  assert.equal(map.jumps.at(-1).center[0], 115.83, 'a long jump stays on the focused bus');
+  assert.equal(map.fits.length, 1, 'a long jump does not drop the focused bus for the fleet');
+  assert.equal(map.jumps.at(-1).zoom, undefined, 'a bus keeps the zoom someone chose');
+  api.showAll([first, { ...second, lng: 115.83 }], null, true);
+  assert.equal(map.fits.length, 2, 'stepping to the fleet frames every bus again');
+  api.showAll([first, { ...second, lng: 115.83 }], '1', true);
+  assert.equal(map.jumps.at(-1).zoom, 20.6, 'leaving the fleet fit goes back to street level');
   api.showAll([second]);
   assert.equal(markers.size, 1);
+  api.showAll([second], '3', true);
+  assert.equal(map.jumps.at(-1).center[0], second.lng, 'a lone bus is followed even when another is asked for');
   assert.equal(map.sources['nuway-trail'].data.features.length, 1);
   assert.ok(disposed > 0, 'deselected models release resources');
   api.showAll([]);
   assert.equal(markers.size, 0);
   assert.equal(map.sources['nuway-trail'].data.features.length, 0);
+  host.clientWidth = host.clientHeight = 0; // hidden, e.g. put away after warming up
   api.showAll([second, first]);
   assert.equal(markers.size, 2, 'reverse selection order also shows both buses');
+  const fitsWhileHidden = map.fits.length;
+  api.showAll([second, first]);
+  assert.equal(map.fits.length, fitsWhileHidden, 'a hidden map is not framed');
+  host.clientWidth = 800; host.clientHeight = 600;
+  api.resize();
+  assert.equal(map.fits.length, fitsWhileHidden + 1, 'a selection made while hidden is framed once shown');
   api.destroy();
   assert.equal(markers.size, 0);
   console.log('PASS: multiple buses, trails, framing, focus, updates, deselection and cleanup');
@@ -97,8 +116,8 @@ const bus = (id, lng) => ({ id, name: `nUWAy ${id}`, lng, lat: -31.98, colour: i
       handlers: {}, addEventListener(type, fn) { this.handlers[type] = fn; } });
     return nodes.get(id);
   };
-  let lastFixes, focused;
-  const api = { showAll(fixes, id, requested) { lastFixes = fixes; focused = requested; }, resize() {}, setPaused() {} };
+  let lastFixes, focused, focusId;
+  const api = { showAll(fixes, id, requested) { lastFixes = fixes; focusId = id; focused = requested; }, resize() {}, setPaused() {} };
   const scope = vm.createContext({ console, URL,
     document: { baseURI: 'http://localhost/', querySelector: node, getElementById: node, querySelectorAll: () => [] },
     window: { addEventListener() {}, matchMedia: () => ({ matches: true }) },
@@ -118,6 +137,18 @@ const bus = (id, lng) => ({ id, name: `nUWAy ${id}`, lng, lat: -31.98, colour: i
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(Array.from(lastFixes, fix => fix.id), ['2', '1']);
   assert.equal(focused, false);
+  const view = node('campus3d');
+  const press = key => view.handlers.keydown({ key, preventDefault() {} });
+  press('ArrowRight');
+  assert.equal(focusId, '2');
+  assert.equal(focused, true);
+  press('ArrowLeft');
+  assert.equal(focusId, null, 'the arrows lead back to the whole fleet');
+  assert.equal(node('campus3d-name').textContent, 'All selected buses');
+  press('ArrowRight');
+  scope.window.View3D.update([vehicle('2'), vehicle('1'), { vehicle_id: '3', positions: [] }, { vehicle_id: '4', positions: [] }]);
+  assert.equal(focusId, null, 'adding a bus with no position still sends the camera back to the fleet');
+  assert.equal(focused, true);
   scope.window.View3D.update([vehicle('1')]);
   assert.deepEqual(Array.from(lastFixes, fix => fix.id), ['1']);
   scope.window.View3D.update([]);
