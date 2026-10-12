@@ -14,6 +14,8 @@ CITS3200 Group 11.
   server and keeping it running.
 - [Microsoft Teams feasibility study](docs/microsoft-teams-feasibility-study.md):
   proposed staff-channel notifications for operational and reporting events.
+- [Improvements guide](docs/improvements-guide.md): recommendations for
+  whoever picks this project up next.
 
 The rest of this page is the quick start for developers.
 
