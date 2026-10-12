@@ -125,24 +125,28 @@ def test_stops_are_drawn_under_the_vehicles(page):
     assert int(panes["stops"]) < int(panes["overlay"])
 
 
-def test_layer_chips_are_on_the_map_and_off_by_default(page):
+def test_layer_chips_are_on_the_map_and_on_by_default(page):
     for label in ("Focus routes", "Full colour"):
         chip = layer_switch(page, label)
         assert chip.is_visible()
-        assert not chip.locator("input").is_checked()
+        assert chip.locator("input").is_checked()
 
 
 def test_a_layer_chip_turns_blue_while_on(page):
     chip = layer_switch(page, "Full colour")
     background = "chip => getComputedStyle(chip).backgroundColor"
-    off = chip.evaluate(background)
+    blue = "rgb(0, 48, 135)"  # UWA blue, css/tokens.css
+
+    # On by default.
+    assert chip.evaluate(background) == blue
+
+    chip.click()
+    assert not chip.locator("input").is_checked()
+    assert chip.evaluate(background) != blue
 
     chip.click()
     assert chip.locator("input").is_checked()
-    assert chip.evaluate(background) == "rgb(0, 48, 135)"  # UWA blue, css/tokens.css
-
-    chip.click()
-    assert chip.evaluate(background) == off
+    assert chip.evaluate(background) == blue
 
 
 def test_layer_chips_are_hidden_in_3d(page):
@@ -167,7 +171,7 @@ def test_rider_tab_drops_fleets_route_and_focus_and_fleet_gets_them_back(page):
     route_line = page.locator(".leaflet-routes-pane path.planned-route-path")
     focus = page.locator("#layer-toggle-focus-route")
     select_route(page, "North Route")
-    layer_switch(page, "Focus routes").click()
+    assert focus.is_checked()  # on by default
     assert route_line.count() > 0
 
     page.locator("#app-tabs .app-tab", has_text="Rider").click()
@@ -189,21 +193,23 @@ def test_focus_routes_fades_the_trails_and_shows_the_route_line(page):
         "name => [name, document.querySelector(`.leaflet-${name}-pane`).style.opacity]))"
     )
     switch = layer_switch(page, "Focus routes")
+    focused = {"trails": "0.65", "stopRings": "0.65", "routes": "", "stops": ""}
+    unfocused = {"trails": "", "stopRings": "", "routes": "0", "stops": ""}
 
-    # Off by default: trails and rings at full strength, no route line.
-    assert page.evaluate(opacities) == {"trails": "", "stopRings": "", "routes": "0", "stops": ""}
-
-    switch.click()
-    assert page.evaluate(opacities) == {"trails": "0.65", "stopRings": "0.65", "routes": "", "stops": ""}
+    # On by default: trails and rings faded, route line shown.
+    assert page.evaluate(opacities) == focused
     assert page.locator(STOP_PATHS).count() == 4
 
     switch.click()
-    assert page.evaluate(opacities) == {"trails": "", "stopRings": "", "routes": "0", "stops": ""}
+    assert page.evaluate(opacities) == unfocused
+
+    switch.click()
+    assert page.evaluate(opacities) == focused
 
 
 def test_focus_shows_the_selected_routes_line_and_keeps_the_stops(page):
+    # Focus routes is on by default, so selecting a route is enough.
     select_route(page, "North Route")
-    layer_switch(page, "Focus routes").click()
 
     assert page.locator(".leaflet-routes-pane path.planned-route-path").count() > 0
     assert page.locator(STOP_PATHS).count() == 4
@@ -213,13 +219,13 @@ def test_full_colour_switch_turns_the_basemap_tint_off_and_on(page):
     tint = "() => getComputedStyle(document.querySelector('.leaflet-tile-pane')).filter"
     switch = layer_switch(page, "Full colour")
 
-    assert page.evaluate(tint) != "none"  # muted by default
-
-    switch.click()
-    assert page.evaluate(tint) == "none"
+    assert page.evaluate(tint) == "none"  # full colour by default
 
     switch.click()
     assert page.evaluate(tint) != "none"
+
+    switch.click()
+    assert page.evaluate(tint) == "none"
 
 
 # ---- S07.2 route selector and highlighting ----
