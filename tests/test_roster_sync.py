@@ -368,3 +368,22 @@ def test_metrics_count_a_synced_drive_as_scheduled(synced):
     sync.sync_once()
     after = client.get("/api/metrics" + query).get_json()["vehicles"][0]["buckets"]["scheduled_seconds"]
     assert after - before == 2 * 3600
+
+
+def test_flask_run_starts_the_sync(config_dir, monkeypatch):
+    # `flask --app backend.app run` builds the app through create_app alone.
+    add_secret(config_dir, CALENDAR_ID)
+    started = []
+    monkeypatch.setattr(RosterSync, "start", lambda self: started.append(self))
+    monkeypatch.setenv("FLASK_RUN_FROM_CLI", "true")
+    app = create_app(config_dir=config_dir)
+    assert started == [app.config["ROSTER_SYNC"]]
+
+
+def test_a_test_app_never_starts_the_sync(config_dir, monkeypatch):
+    add_secret(config_dir, CALENDAR_ID)
+    started = []
+    monkeypatch.setattr(RosterSync, "start", lambda self: started.append(self))
+    monkeypatch.delenv("FLASK_RUN_FROM_CLI", raising=False)
+    create_app(config_dir=config_dir)
+    assert started == []

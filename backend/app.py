@@ -213,6 +213,11 @@ def create_app(config_dir: Path | str = DEFAULT_CONFIG_DIR, config=None) -> Flas
         """
         return jsonify(error={"code": "data_unavailable", "message": str(exc)}), 500
 
+    # `flask run` builds the app through this factory and never reaches the
+    # __main__ block below, so the roster would otherwise never sync.
+    if os.environ.get("FLASK_RUN_FROM_CLI") == "true":
+        start_roster_sync(app)
+
     return app
 
 
